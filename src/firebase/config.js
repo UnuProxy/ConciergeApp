@@ -13,7 +13,7 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Inițializează Firebase
+
 const app = initializeApp(firebaseConfig);
 
 // Exportă serviciile Firebase pentru a fi utilizate în aplicație
