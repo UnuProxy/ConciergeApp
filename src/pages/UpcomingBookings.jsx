@@ -3151,7 +3151,7 @@ const UpcomingBookings = () => {
       showNotificationMessage(t.paymentFailed || 'Payment update failed: ' + err.message, 'error');
     }
   };
-    // ─── ADD THIS HOOK ─────────────────────────────────────────────────────────────
+   
     useEffect(() => {
       window.upcomingBookingsInstance = {
         viewClientDetails,
@@ -3163,7 +3163,7 @@ const UpcomingBookings = () => {
         delete window.upcomingBookingsInstance;
       };
     }, [viewClientDetails, openPaymentModal, openAddServiceModal, openAddShoppingModal]);
-    // ───────────────────────────────────────────────────────────────────────────────
+    
   
 
   // Render main content based on loaded data
