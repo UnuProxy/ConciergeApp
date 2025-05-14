@@ -3164,7 +3164,6 @@ const UpcomingBookings = () => {
       };
     }, [viewClientDetails, openPaymentModal, openAddServiceModal, openAddShoppingModal]);
     
-  
 
   // Render main content based on loaded data
   const renderMainContent = () => {
