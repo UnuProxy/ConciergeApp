@@ -98,7 +98,7 @@ const Finance = () => {
       addPayment: 'Adaugă Plată',
       paymentHistory: 'Istoric Plăți',
       noPayments: 'Nu s-au găsit plăți.',
-      paymentsTotal: 'Total Plăți',
+      
       
       // Expenses view
       addNewExpense: 'Adaugă Cheltuială Nouă',
@@ -194,7 +194,7 @@ const Finance = () => {
       addPayment: 'Add Payment',
       paymentHistory: 'Payment History',
       noPayments: 'No payments found.',
-      paymentsTotal: 'Total Payments',
+     
       
       // Expenses view
       addNewExpense: 'Add New Expense',

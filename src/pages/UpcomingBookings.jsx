@@ -959,6 +959,7 @@ const ClientCard = ({ client }) => {
       paymentHistory: "Istoric Plăți",
       noPaymentsRecorded: "Nu există plăți înregistrate",
       addToBooking: "Adaugă la Rezervare",
+      paymentsTotal: "Total Plăți",
       
       // Payments
       client: "Client:",
@@ -989,7 +990,6 @@ const ClientCard = ({ client }) => {
       receiptAvailable: "Chitanță disponibilă",
       additionalNotes: "Note adiționale",
       cancel: "Anulează",
-      addShoppingExpense: "Adaugă Cheltuială Cumpărături",
       adding: "Se adaugă...",
       shoppingAt: "Cumpărături la",
       
@@ -1004,6 +1004,14 @@ const ClientCard = ({ client }) => {
       pleaseEnterStore: "Vă rugăm să introduceți numele magazinului",
       pleaseEnterItems: "Vă rugăm să introduceți articolele cumpărate",
       pleaseEnterValidAmount: "Vă rugăm să introduceți o sumă validă",
+      // Add these new translation keys here
+      bookingDeletedSuccess: "Rezervare ștearsă cu succes",
+      serviceDeletedSuccess: "Serviciu șters cu succes",
+      serviceDeleteFailed: "Ștergerea serviciului a eșuat",
+      bookingNotFound: "Rezervarea nu a fost găsită",
+      notAuthorizedToModify: "Nu sunteți autorizat să modificați această rezervare",
+      noBookingFound: "Nu s-a găsit nicio rezervare pentru acest client",
+      paymentFailed: "Plata a eșuat",
       
       // Confirmation messages
       deleteBookingConfirm: "Sigur doriți să ștergeți rezervarea pentru",
@@ -1134,6 +1142,7 @@ const ClientCard = ({ client }) => {
       paymentHistory: "Payment History",
       noPaymentsRecorded: "No payments recorded",
       addToBooking: "Add to Booking",
+      paymentsTotal: "Total Payments",
       
       // Payments
       client: "Client:",
@@ -1164,7 +1173,6 @@ const ClientCard = ({ client }) => {
       receiptAvailable: "Receipt available",
       additionalNotes: "Additional notes",
       cancel: "Cancel",
-      addShoppingExpense: "Add Shopping Expense",
       adding: "Adding...",
       shoppingAt: "Shopping at",
       
@@ -1179,6 +1187,14 @@ const ClientCard = ({ client }) => {
       pleaseEnterStore: "Please enter a store name",
       pleaseEnterItems: "Please enter items purchased",
       pleaseEnterValidAmount: "Please enter a valid amount",
+      // Add these new translation keys here
+      bookingDeletedSuccess: "Booking successfully deleted",
+      serviceDeletedSuccess: "Service deleted successfully",
+      serviceDeleteFailed: "Service deletion failed",
+      bookingNotFound: "Booking not found",
+      notAuthorizedToModify: "You are not authorized to modify this booking",
+      noBookingFound: "No booking found for this client",
+      paymentFailed: "Payment failed",
       
       // Confirmation messages
       deleteBookingConfirm: "Are you sure you want to delete the booking for",
@@ -1526,7 +1542,6 @@ const UpcomingBookings = () => {
       editPayment: "Editează Plată",
       addService: "Adaugă Serviciu",
       serviceDetails: "Detalii Serviciu",
-      addShoppingExpense: "Adaugă Cheltuieli Cumpărături",
       
       // Client Details
       clientId: "ID Client:",
@@ -1569,9 +1584,10 @@ const UpcomingBookings = () => {
       receiptAvailable: "Chitanță disponibilă",
       additionalNotes: "Note adiționale",
       cancel: "Anulează",
-      addShoppingExpense: "Adaugă Cheltuială Cumpărături",
+      // Fix: Removed duplicate key "addShoppingExpense" here
       adding: "Se adaugă...",
       shoppingAt: "Cumpărături la",
+      addShoppingExpense: "Adaugă Cheltuială Cumpărături", // Only one instance of this key
       
       // Messages
       noClientSelected: "Niciun client selectat",
@@ -1701,7 +1717,6 @@ const UpcomingBookings = () => {
       editPayment: "Edit Payment",
       addService: "Add Service",
       serviceDetails: "Service Details",
-      addShoppingExpense: "Add Shopping Expense",
       
       // Client Details
       clientId: "Client ID:",
@@ -1744,9 +1759,10 @@ const UpcomingBookings = () => {
       receiptAvailable: "Receipt available",
       additionalNotes: "Additional notes",
       cancel: "Cancel",
-      addShoppingExpense: "Add Shopping Expense",
+      // Fix: Removed duplicate key "addShoppingExpense" here
       adding: "Adding...",
       shoppingAt: "Shopping at",
+      addShoppingExpense: "Add Shopping Expense", // Only one instance of this key
       
       // Messages
       noClientSelected: "No client selected",
@@ -3366,14 +3382,14 @@ const UpcomingBookings = () => {
             <div className="p-4 border-b sticky top-0 bg-white z-10">
               <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-3 md:hidden"></div>
               <div className="flex justify-between items-center">
-                <h3 className="font-bold text-lg">
-                  {bottomSheetContent === 'client-details' ? t.clientDetails :
-                   bottomSheetContent === 'quick-payment' ? t.addPayment :
-                   bottomSheetContent === 'edit-payment' ? t.editPayment :
-                   bottomSheetContent === 'add-service' ? t.addService :
-                   bottomSheetContent === 'edit-service' ? t.serviceDetails :
-                   bottomSheetContent === 'add-shopping' ? t.addShoppingExpense : ''}
-                </h3>
+              <h3 className="font-bold text-lg">
+                {bottomSheetContent === 'client-details' ? t.clientDetails :
+                bottomSheetContent === 'quick-payment' ? t.addPayment :
+                bottomSheetContent === 'edit-payment' ? t.editPayment :
+                bottomSheetContent === 'add-service' ? t.addService :
+                bottomSheetContent === 'edit-service' ? t.serviceDetails :
+                bottomSheetContent === 'add-shopping' ? t.addShoppingExpense : ''}
+              </h3>
                 <button 
                   className="text-gray-500 hover:text-gray-700"
                   onClick={closeBottomSheet}
