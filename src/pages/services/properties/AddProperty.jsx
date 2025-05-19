@@ -297,7 +297,7 @@ function AddProperty() {
     }
   };
   
-  // Format numbers with thousands separators as you type
+  // Format numbers with thousands separators as you type - Enhanced for millions
   const handleNumberChange = (e) => {
     const { name, value, selectionStart } = e.target;
     
@@ -351,7 +351,7 @@ function AddProperty() {
     }, 0);
   };
   
-  // Helper function to format price for display elsewhere
+  // Helper function to format price for display elsewhere - Enhanced for millions
   const formatPrice = (price) => {
     if (!price) return '';
     // Remove any existing formatting first
@@ -569,7 +569,7 @@ function AddProperty() {
         },
         type: formData.type,
         location: formData.location,
-        size: parseFloat(formData.size) || 0,
+        size: parseFloat(formData.size.replace(/,/g, '')) || 0,
         status: formData.status,
         
         // Store price as a number - handle large numbers properly
@@ -595,7 +595,7 @@ function AddProperty() {
           : {
               // Land specs
               zoning: formData.zoning || '',
-              buildableArea: parseFloat(formData.buildableArea) || 0,
+              buildableArea: parseFloat(formData.buildableArea.replace(/,/g, '')) || 0,
               terrain: formData.terrain || ''
             },
         
@@ -655,20 +655,20 @@ function AddProperty() {
   }
   
   return (
-    <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-6">
+    <div className="w-full px-4 sm:px-6 md:max-w-4xl md:mx-auto bg-white rounded-lg shadow-md p-4 sm:p-6">
       <form onSubmit={handleSubmit}>
-        <h1 className="text-2xl font-semibold text-gray-800 mb-6">
+        <h1 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-4 sm:mb-6">
           {isEditing ? t.editProperty : t.addNewProperty}
         </h1>
         
         {error && (
-          <div className="bg-red-50 text-red-600 p-4 rounded-md mb-6">
+          <div className="bg-red-50 text-red-600 p-4 rounded-md mb-4 sm:mb-6">
             {error}
           </div>
         )}
 
         {/* Property Type */}
-        <div className="mb-6">
+        <div className="mb-4 sm:mb-6">
           <label className="block text-gray-700 font-medium mb-2">{t.propertyType}</label>
           <div className="flex space-x-4">
             <label className="inline-flex items-center">
@@ -697,9 +697,9 @@ function AddProperty() {
         </div>
         
         {/* Basic Information */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
           {/* Title */}
-          <div className="col-span-2">
+          <div className="col-span-1 md:col-span-2">
             <label className="block text-gray-700 font-medium mb-2">{t.propertyTitle} *</label>
             <input
               type="text"
@@ -713,7 +713,7 @@ function AddProperty() {
           </div>
           
           {/* Location */}
-          <div className="col-span-2">
+          <div className="col-span-1 md:col-span-2">
             <label className="block text-gray-700 font-medium mb-2">{t.location} *</label>
             <input
               type="text"
@@ -726,7 +726,7 @@ function AddProperty() {
             />
           </div>
           
-          {/* Price - Modified to handle large numbers */}
+          {/* Price - Modified to handle millions */}
           <div>
             <label className="block text-gray-700 font-medium mb-2">{t.price} (€) *</label>
             <input
@@ -776,9 +776,9 @@ function AddProperty() {
         {/* Type-specific fields */}
         {formData.type === 'villa' ? (
           // Villa specific fields
-          <div className="mb-6">
+          <div className="mb-4 sm:mb-6">
             <h3 className="text-lg font-medium text-gray-800 mb-4">{t.villaDetails}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
               <div>
                 <label className="block text-gray-700 font-medium mb-2">{t.bedrooms}</label>
                 <input
@@ -819,7 +819,7 @@ function AddProperty() {
             {/* Amenities */}
             <div className="mt-4">
               <label className="block text-gray-700 font-medium mb-2">{t.amenities}</label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                 {availableAmenities.map(amenity => (
                   <label key={amenity.id} className="inline-flex items-center">
                     <input
@@ -837,9 +837,9 @@ function AddProperty() {
           </div>
         ) : (
           // Land parcel specific fields
-          <div className="mb-6">
+          <div className="mb-4 sm:mb-6">
             <h3 className="text-lg font-medium text-gray-800 mb-4">{t.landDetails}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
               <div>
                 <label className="block text-gray-700 font-medium mb-2">{t.zoning}</label>
                 <select
@@ -887,7 +887,7 @@ function AddProperty() {
         )}
         
         {/* Description */}
-        <div className="mb-6">
+        <div className="mb-4 sm:mb-6">
           <label className="block text-gray-700 font-medium mb-2">{t.description}</label>
           
           {/* English Description */}
@@ -930,10 +930,10 @@ function AddProperty() {
         </div>
         
         {/* Image Upload */}
-        <div className="mb-6">
+        <div className="mb-4 sm:mb-6">
           <label className="block text-gray-700 font-medium mb-2">{t.propertyImages}</label>
-          <div className="flex items-center space-x-4">
-            <label className="flex items-center justify-center bg-white px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center sm:space-x-4">
+            <label className="flex items-center justify-center bg-white px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer mb-2 sm:mb-0">
               <svg className="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
@@ -952,18 +952,18 @@ function AddProperty() {
           
           {/* Image previews */}
           {formData.images.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-4">
               {formData.images.map((image, index) => (
                 <div key={index} className="relative rounded-md overflow-hidden group">
                   <img
                     src={typeof image === 'string' ? image : image.url}
                     alt={`Property ${index + 1}`}
-                    className="w-full h-32 object-cover"
+                    className="w-full h-24 sm:h-32 object-cover"
                   />
                   <button
                     type="button"
                     onClick={() => removeImage(index)}
-                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -979,10 +979,10 @@ function AddProperty() {
         </div>
         
         {/* Document Upload */}
-        <div className="mb-6">
+        <div className="mb-4 sm:mb-6">
           <label className="block text-gray-700 font-medium mb-2">{t.documents}</label>
-          <div className="flex items-center space-x-4">
-            <label className="flex items-center justify-center bg-white px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center sm:space-x-4">
+            <label className="flex items-center justify-center bg-white px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer mb-2 sm:mb-0">
               <svg className="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
@@ -1004,16 +1004,16 @@ function AddProperty() {
             <div className="mt-4 space-y-2">
               {formData.documents.map((doc, index) => (
                 <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <div className="flex items-center overflow-hidden">
+                    <svg className="flex-shrink-0 w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    <span className="text-gray-800">{doc.name || `Document ${index + 1}`}</span>
+                    <span className="text-gray-800 truncate">{doc.name || `Document ${index + 1}`}</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => removeDocument(index)}
-                    className="text-red-500 hover:text-red-700"
+                    className="flex-shrink-0 ml-2 text-red-500 hover:text-red-700"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1026,18 +1026,18 @@ function AddProperty() {
         </div>
         
         {/* Submit Buttons */}
-        <div className="flex justify-end space-x-4 mt-8">
+        <div className="flex flex-col sm:flex-row justify-end sm:space-x-4 mt-6 sm:mt-8">
           <button
             type="button"
             onClick={() => navigate('/services/properties-for-sale')}
-            className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 mb-3 sm:mb-0"
           >
             {t.cancel}
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-70 disabled:cursor-not-allowed flex items-center"
+            className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
           >
             {saving ? (
               <>

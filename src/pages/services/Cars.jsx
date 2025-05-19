@@ -6,45 +6,50 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { db, storage } from '../../firebase/config';
 import { getCurrentLanguage } from "../../utils/languageHelper";
 
-// Common styles for reuse
+// Enhanced styles with mobile responsiveness
 const styles = {
   container: {
+    width: '100%',
     maxWidth: '1200px',
     margin: '0 auto',
-    padding: '20px'
+    padding: '12px'
   },
   header: {
     display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: '16px'
+  },
+  headerRow: {
+    display: 'flex',
+    width: '100%',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '24px'
+    marginBottom: '12px'
   },
   title: {
-    fontSize: '24px',
+    fontSize: '22px',
     fontWeight: '700',
-    color: '#1a202c'
+    color: '#1a202c',
+    marginBottom: '8px'
   },
   subtitle: {
-    fontSize: '20px',
+    fontSize: '18px',
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: '16px'
+    marginBottom: '12px'
   },
   card: {
     background: '#fff',
     borderRadius: '8px',
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
     overflow: 'hidden',
-    marginBottom: '20px'
-  },
-  form: {
-    padding: '24px',
-    background: '#fff',
-    borderRadius: '8px',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+    marginBottom: '16px',
+    width: '100%'
   },
   formSection: {
-    marginBottom: '20px'
+    marginBottom: '16px'
   },
   formLabel: {
     display: 'block',
@@ -55,78 +60,91 @@ const styles = {
   },
   input: {
     width: '100%',
-    padding: '8px 12px',
+    padding: '10px 12px',
     borderRadius: '6px',
     border: '1px solid #d1d5db',
-    fontSize: '14px',
-    marginBottom: '12px'
+    fontSize: '16px',
+    marginBottom: '12px',
+    touchAction: 'manipulation'
   },
   textarea: {
     width: '100%',
-    padding: '8px 12px',
+    padding: '10px 12px',
     borderRadius: '6px',
     border: '1px solid #d1d5db',
-    fontSize: '14px',
+    fontSize: '16px',
     marginBottom: '12px',
     minHeight: '100px'
   },
   fileInput: {
-    marginBottom: '12px'
-  },
-  flexRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    marginBottom: '12px'
+    marginBottom: '12px',
+    width: '100%'
   },
   checkboxLabel: {
     display: 'flex',
     alignItems: 'center',
-    fontSize: '14px',
+    fontSize: '16px',
     color: '#4b5563',
-    marginBottom: '8px'
+    marginBottom: '12px',
+    touchAction: 'manipulation'
   },
   checkbox: {
+    width: '20px',
+    height: '20px',
     marginRight: '8px'
   },
   buttonPrimary: {
     backgroundColor: '#3b82f6',
     color: 'white',
     fontWeight: '500',
-    padding: '8px 16px',
+    padding: '12px 16px',
     borderRadius: '6px',
     border: 'none',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    fontSize: '16px',
+    width: '100%',
+    maxWidth: '250px',
+    touchAction: 'manipulation'
   },
   buttonSecondary: {
     backgroundColor: '#f3f4f6',
     color: '#1f2937',
     fontWeight: '500',
-    padding: '8px 16px',
+    padding: '12px 16px',
     borderRadius: '6px',
     border: '1px solid #d1d5db',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    fontSize: '16px',
+    touchAction: 'manipulation'
   },
   buttonDanger: {
     backgroundColor: '#fee2e2',
     color: '#b91c1c',
     fontWeight: '500',
-    padding: '8px 16px',
+    padding: '12px 16px',
     borderRadius: '6px',
     border: 'none',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    fontSize: '16px',
+    touchAction: 'manipulation'
   },
   tabContainer: {
     display: 'flex',
+    overflowX: 'auto',
     borderBottom: '1px solid #e5e7eb',
-    marginBottom: '24px'
+    marginBottom: '16px',
+    WebkitOverflowScrolling: 'touch',
+    scrollbarWidth: 'none',
+    paddingBottom: '4px'
   },
   tab: {
-    padding: '8px 16px',
-    marginRight: '12px',
+    padding: '10px 16px',
+    marginRight: '8px',
     fontWeight: '500',
     fontSize: '14px',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    touchAction: 'manipulation'
   },
   activeTab: {
     borderBottom: '2px solid #3b82f6',
@@ -154,20 +172,15 @@ const styles = {
     right: '4px',
     backgroundColor: 'rgba(239, 68, 68, 0.9)',
     color: 'white',
-    width: '20px',
-    height: '20px',
+    width: '24px',
+    height: '24px',
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
-    fontSize: '14px'
-  },
-  twoColumnGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(45%, 1fr))',
-    gap: '16px',
-    marginBottom: '20px'
+    fontSize: '16px',
+    touchAction: 'manipulation'
   },
   sectionTitle: {
     fontSize: '18px',
@@ -184,7 +197,7 @@ const styles = {
   },
   carListContainer: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
     gap: '16px'
   },
   carCard: {
@@ -194,7 +207,7 @@ const styles = {
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
   },
   carImageContainer: {
-    height: '200px',
+    height: '180px',
     backgroundColor: '#f3f4f6'
   },
   carImage: {
@@ -219,7 +232,8 @@ const styles = {
   buttonRow: {
     display: 'flex',
     justifyContent: 'space-between',
-    marginTop: '16px'
+    marginTop: '16px',
+    gap: '8px'
   },
   currencyInput: {
     position: 'relative',
@@ -229,15 +243,15 @@ const styles = {
   currencySymbol: {
     position: 'absolute',
     left: '12px',
-    fontSize: '14px',
+    fontSize: '16px',
     color: '#6b7280'
   },
   currencyTextInput: {
     width: '100%',
-    padding: '8px 12px 8px 24px',
+    padding: '10px 12px 10px 24px',
     borderRadius: '6px',
     border: '1px solid #d1d5db',
-    fontSize: '14px'
+    fontSize: '16px'
   },
   placeholderImage: {
     display: 'flex',
@@ -249,12 +263,85 @@ const styles = {
   },
   select: {
     width: '100%',
-    padding: '8px 12px',
+    padding: '10px 12px',
     borderRadius: '6px',
     border: '1px solid #d1d5db',
-    fontSize: '14px',
+    fontSize: '16px',
     marginBottom: '12px',
-    backgroundColor: '#fff'
+    backgroundColor: '#fff',
+    minHeight: '48px'
+  },
+  progressBar: {
+    width: '100%',
+    height: '8px',
+    backgroundColor: '#e5e7eb',
+    borderRadius: '4px',
+    marginTop: '8px',
+    overflow: 'hidden'
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#3b82f6',
+    transition: 'width 0.3s ease'
+  },
+  formCardHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '16px',
+    borderBottom: '1px solid #e5e7eb'
+  },
+  formContent: {
+    padding: '16px'
+  },
+  formStepsIndicator: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    marginBottom: '16px',
+    padding: '0 16px'
+  },
+  formStep: {
+    width: '10px',
+    height: '10px',
+    borderRadius: '50%',
+    backgroundColor: '#e5e7eb'
+  },
+  formStepActive: {
+    backgroundColor: '#3b82f6'
+  },
+  formNavigation: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    marginTop: '24px',
+    gap: '8px'
+  },
+  navButton: {
+    padding: '12px 16px',
+    borderRadius: '6px',
+    border: '1px solid #d1d5db',
+    backgroundColor: '#fff',
+    fontSize: '16px',
+    cursor: 'pointer',
+    flex: '1',
+    textAlign: 'center',
+    touchAction: 'manipulation'
+  },
+  navButtonPrimary: {
+    backgroundColor: '#3b82f6',
+    color: 'white',
+    border: 'none'
+  },
+  formGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr',
+    gap: '16px',
+    marginBottom: '20px'
+  },
+  formGridDesktop: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: '16px',
+    marginBottom: '20px'
   }
 };
 
@@ -269,7 +356,25 @@ function Cars() {
   const [previewUrls, setPreviewUrls] = useState([]);
   const [activeTab, setActiveTab] = useState('basic'); // For form navigation
   const [imageErrors, setImageErrors] = useState({}); // Track image loading errors
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 768);
   
+  // Track window size for responsiveness
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  // Check if we're on mobile
+  const isMobile = windowWidth <= 768;
+
   // Form data with comprehensive car details
   const [formData, setFormData] = useState({
     // Basic Information
@@ -381,7 +486,7 @@ function Cars() {
     return () => unsubscribe();
   }, []);
   
-  // Add this useEffect below your other useEffects
+  // Handle language changes
   useEffect(() => {
     const handleStorageChange = () => {
       setLanguage(getCurrentLanguage());
@@ -695,7 +800,7 @@ function Cars() {
   
   // Handle adding a new car
   const handleAddCar = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     try {
       // Upload photos
       const photoUrls = await uploadPhotos();
@@ -722,7 +827,7 @@ function Cars() {
   
   // Handle updating an existing car
   const handleUpdateCar = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     try {
       if (!currentCar || !currentCar.id) {
         console.error("No current car selected for update");
@@ -901,6 +1006,39 @@ function Cars() {
     setIsEditingCar(true);
   };
   
+  // Handle tab navigation
+  const navigateToNextTab = () => {
+    const tabs = ['basic', 'specs', 'pricing', 'features', 'contact'];
+    const currentIndex = tabs.indexOf(activeTab);
+    if (currentIndex < tabs.length - 1) {
+      setActiveTab(tabs[currentIndex + 1]);
+      // Scroll to top of form
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }
+  };
+  
+  const navigateToPrevTab = () => {
+    const tabs = ['basic', 'specs', 'pricing', 'features', 'contact'];
+    const currentIndex = tabs.indexOf(activeTab);
+    if (currentIndex > 0) {
+      setActiveTab(tabs[currentIndex - 1]);
+      // Scroll to top of form
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }
+  };
+  
+  // Get current tab index for steps indicator
+  const getCurrentTabIndex = () => {
+    const tabs = ['basic', 'specs', 'pricing', 'features', 'contact'];
+    return tabs.indexOf(activeTab);
+  };
+  
   // Translations
   const translations = {
     en: {
@@ -998,6 +1136,12 @@ function Cars() {
         addNew: "Add New Car",
         noCars: "No cars available. Add your first car to get started!"
       },
+      navigation: {
+        next: "Next",
+        previous: "Previous",
+        back: "Back",
+        finish: "Save Car",
+      }
     },
     ro: {
       addCar: "Adaugă Mașină",
@@ -1094,6 +1238,12 @@ function Cars() {
         addNew: "Adaugă Mașină Nouă",
         noCars: "Nu există mașini disponibile. Adaugă prima mașină pentru a începe!"
       },
+      navigation: {
+        next: "Următorul",
+        previous: "Anterior",
+        back: "Înapoi",
+        finish: "Salvează Mașina",
+      }
     }
   };
   
@@ -1139,8 +1289,73 @@ function Cars() {
     );
   };
   
+  // Form step indicators for mobile
+  const renderFormSteps = () => {
+    const tabs = ['basic', 'specs', 'pricing', 'features', 'contact'];
+    const currentIndex = tabs.indexOf(activeTab);
+    
+    return (
+      <div style={styles.formStepsIndicator}>
+        {tabs.map((tab, index) => (
+          <div
+            key={tab}
+            style={{
+              ...styles.formStep,
+              ...(index <= currentIndex ? styles.formStepActive : {})
+            }}
+          />
+        ))}
+      </div>
+    );
+  };
+  
+  // Mobile-friendly form navigation
+  const renderFormNavigation = () => {
+    const tabs = ['basic', 'specs', 'pricing', 'features', 'contact'];
+    const currentIndex = tabs.indexOf(activeTab);
+    const isLastTab = currentIndex === tabs.length - 1;
+    const isFirstTab = currentIndex === 0;
+    
+    return (
+      <div style={styles.formNavigation}>
+        {!isFirstTab && (
+          <div
+            style={styles.navButton}
+            onClick={navigateToPrevTab}
+          >
+            {t.navigation.previous}
+          </div>
+        )}
+        
+        {isLastTab ? (
+          <div
+            style={{
+              ...styles.navButton,
+              ...styles.navButtonPrimary
+            }}
+            onClick={isAddingCar ? handleAddCar : handleUpdateCar}
+          >
+            {t.navigation.finish}
+          </div>
+        ) : (
+          <div
+            style={{
+              ...styles.navButton,
+              ...styles.navButtonPrimary
+            }}
+            onClick={navigateToNextTab}
+          >
+            {t.navigation.next}
+          </div>
+        )}
+      </div>
+    );
+  };
+  
   // Tab navigation system for the form
   const renderFormTab = () => {
+    const gridStyle = isMobile ? styles.formGrid : styles.formGridDesktop;
+    
     switch(activeTab) {
       case 'basic':
         return (
@@ -1158,7 +1373,7 @@ function Cars() {
                 style={styles.input}
               />
             </div>
-            <div style={styles.twoColumnGrid}>
+            <div style={gridStyle}>
               <div>
                 <label style={styles.formLabel}>
                   {t.make}
@@ -1184,7 +1399,7 @@ function Cars() {
                 />
               </div>
             </div>
-            <div style={styles.twoColumnGrid}>
+            <div style={gridStyle}>
               <div>
                 <label style={styles.formLabel}>
                   {t.year}
@@ -1214,7 +1429,7 @@ function Cars() {
                 />
               </div>
             </div>
-            <div style={styles.twoColumnGrid}>
+            <div style={gridStyle}>
               <div>
                 <label style={styles.formLabel}>
                   {t.doors}
@@ -1327,7 +1542,7 @@ function Cars() {
         return (
           <div>
             <h3 style={styles.sectionTitle}>{t.specs.title}</h3>
-            <div style={styles.twoColumnGrid}>
+            <div style={gridStyle}>
               <div>
                 <label style={styles.formLabel}>
                   {t.specs.engine}
@@ -1439,7 +1654,7 @@ function Cars() {
             <h4 style={styles.sectionSubtitle}>
               {t.price.monthly}
             </h4>
-            <div style={styles.twoColumnGrid}>
+            <div style={gridStyle}>
               <div>
                 <label style={styles.formLabel}>
                   {t.price.may}
@@ -1551,7 +1766,7 @@ function Cars() {
             <h3 style={styles.sectionTitle}>{t.features.title}</h3>
             {/* Comfort */}
             <h4 style={styles.sectionSubtitle}>{t.features.comfort}</h4>
-            <div style={styles.twoColumnGrid}>
+            <div style={gridStyle}>
               <div style={styles.checkboxLabel}>
                 <input
                   type="checkbox"
@@ -1615,7 +1830,7 @@ function Cars() {
             </div>
             {/* Technology */}
             <h4 style={styles.sectionSubtitle}>{t.features.technology}</h4>
-            <div style={styles.twoColumnGrid}>
+            <div style={gridStyle}>
               <div style={styles.checkboxLabel}>
                 <input
                   type="checkbox"
@@ -1679,7 +1894,7 @@ function Cars() {
             </div>
             {/* Safety */}
             <h4 style={styles.sectionSubtitle}>{t.features.safety}</h4>
-            <div style={styles.twoColumnGrid}>
+            <div style={gridStyle}>
               <div style={styles.checkboxLabel}>
                 <input
                   type="checkbox"
@@ -1731,7 +1946,7 @@ function Cars() {
             </div>
             {/* Convenience */}
             <h4 style={styles.sectionSubtitle}>{t.features.convenience}</h4>
-            <div style={styles.twoColumnGrid}>
+            <div style={gridStyle}>
               <div style={styles.checkboxLabel}>
                 <input
                   type="checkbox"
@@ -1863,7 +2078,7 @@ function Cars() {
       {/* Add/Edit Forms */}
       {(isAddingCar || isEditingCar) && (
         <div style={styles.card}>
-          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderBottom: '1px solid #e5e7eb'}}>
+          <div style={styles.formCardHeader}>
             <h2 style={styles.subtitle}>
               {isAddingCar ? t.addCar : t.editCar}
             </h2>
@@ -1881,51 +2096,73 @@ function Cars() {
             </button>
           </div>
           
-          {/* Tab navigation */}
-          <div style={styles.tabContainer}>
-            {Object.entries(t.formTabs).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setActiveTab(key)}
-                style={{
-                  ...styles.tab,
-                  ...(activeTab === key ? styles.activeTab : styles.inactiveTab)
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          {/* Mobile step indicator */}
+          {isMobile && renderFormSteps()}
+          
+          {/* Desktop tab navigation */}
+          {!isMobile && (
+            <div style={styles.tabContainer}>
+              {Object.entries(t.formTabs).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setActiveTab(key)}
+                  style={{
+                    ...styles.tab,
+                    ...(activeTab === key ? styles.activeTab : styles.inactiveTab)
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           
           {/* Form content based on active tab */}
-          <form onSubmit={isAddingCar ? handleAddCar : handleUpdateCar} style={{padding: '20px'}}>
+          <div style={styles.formContent}>
             {renderFormTab()}
             
-            {/* Submit button */}
-            <div style={{marginTop: '30px', display: 'flex', justifyContent: 'flex-end'}}>
-              {isUploading ? (
-                <div style={{display: 'flex', alignItems: 'center'}}>
-                  <div style={{width: '20px', height: '20px', marginRight: '10px', borderTop: '2px solid #3b82f6', borderRight: '2px solid transparent', borderBottom: '2px solid #3b82f6', borderLeft: '2px solid #3b82f6', borderRadius: '50%', animation: 'spin 1s linear infinite'}}></div>
+            {/* Mobile navigation buttons */}
+            {isMobile && renderFormNavigation()}
+            
+            {/* Upload progress indicator */}
+            {isUploading && (
+              <div style={{marginTop: '16px'}}>
+                <div style={{display: 'flex', alignItems: 'center', marginBottom: '8px'}}>
+                  <div style={{width: '16px', height: '16px', marginRight: '8px', borderTop: '2px solid #3b82f6', borderRight: '2px solid transparent', borderBottom: '2px solid #3b82f6', borderLeft: '2px solid #3b82f6', borderRadius: '50%', animation: 'spin 1s linear infinite'}}></div>
                   <span>{t.uploadingPhotos} {Math.round(uploadProgress)}%</span>
                 </div>
-              ) : (
+                <div style={styles.progressBar}>
+                  <div 
+                    style={{
+                      ...styles.progressFill,
+                      width: `${uploadProgress}%`
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+            
+            {/* Desktop submit button */}
+            {!isMobile && !isUploading && (
+              <div style={{marginTop: '24px', display: 'flex', justifyContent: 'flex-end'}}>
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={isAddingCar ? handleAddCar : handleUpdateCar}
                   style={styles.buttonPrimary}
                 >
                   {t.save}
                 </button>
-              )}
-            </div>
-          </form>
+              </div>
+            )}
+          </div>
         </div>
       )}
       
       {/* Car List */}
       {!isAddingCar && !isEditingCar && (
         <div>
-          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+          <div style={styles.headerRow}>
             <h2 style={styles.subtitle}>{t.carList.subtitle}</h2>
             <button
               type="button"
@@ -1944,7 +2181,10 @@ function Cars() {
               <p style={{color: '#6b7280'}}>{t.carList.noCars}</p>
             </div>
           ) : (
-            <div style={styles.carListContainer}>
+            <div style={{
+              ...styles.carListContainer,
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))'
+            }}>
               {cars.map((car) => (
                 <div key={car.id} style={styles.carCard}>
                   {/* Car image or placeholder with error handling */}
@@ -1967,7 +2207,7 @@ function Cars() {
                       <button
                         type="button"
                         onClick={() => startEditingCar(car)}
-                        style={styles.buttonSecondary}
+                        style={isMobile ? {...styles.buttonSecondary, flex: 1} : styles.buttonSecondary}
                       >
                         {t.edit}
                       </button>
@@ -1978,7 +2218,7 @@ function Cars() {
                             handleDeleteCar(car.id);
                           }
                         }}
-                        style={styles.buttonDanger}
+                        style={isMobile ? {...styles.buttonDanger, flex: 1} : styles.buttonDanger}
                       >
                         {t.delete}
                       </button>

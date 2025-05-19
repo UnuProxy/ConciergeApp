@@ -5,133 +5,168 @@ import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebas
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import { db, storage } from '../../firebase/config';
 
-// Common styles for reuse
+// Responsive styles with media queries
 const styles = {
   container: {
+    width: '100%',
     maxWidth: '1200px',
     margin: '0 auto',
-    padding: '20px'
+    padding: '1rem'
   },
   header: {
     display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '24px'
+    flexDirection: 'column',
+    gap: '0.5rem',
+    marginBottom: '1.5rem',
+    '@media (min-width: 768px)': {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    }
   },
   title: {
-    fontSize: '24px',
+    fontSize: '1.5rem',
     fontWeight: '700',
     color: '#1a202c'
   },
   subtitle: {
-    fontSize: '20px',
+    fontSize: '1.25rem',
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: '16px'
+    marginBottom: '1rem'
   },
   card: {
     background: '#fff',
     borderRadius: '8px',
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
     overflow: 'hidden',
-    marginBottom: '20px'
+    marginBottom: '1.25rem'
   },
   form: {
-    padding: '24px',
+    padding: '1.5rem',
     background: '#fff',
     borderRadius: '8px',
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
   },
   formSection: {
-    marginBottom: '20px'
+    marginBottom: '1.25rem'
   },
   formLabel: {
     display: 'block',
-    fontSize: '14px',
+    fontSize: '0.875rem',
     fontWeight: '500',
     color: '#4b5563',
-    marginBottom: '4px'
+    marginBottom: '0.25rem'
   },
   input: {
     width: '100%',
-    padding: '8px 12px',
+    padding: '0.625rem 0.75rem',
     borderRadius: '6px',
     border: '1px solid #d1d5db',
-    fontSize: '14px',
-    marginBottom: '12px'
+    fontSize: '0.875rem',
+    marginBottom: '0.75rem'
   },
   textarea: {
     width: '100%',
-    padding: '8px 12px',
+    padding: '0.625rem 0.75rem',
     borderRadius: '6px',
     border: '1px solid #d1d5db',
-    fontSize: '14px',
-    marginBottom: '12px',
+    fontSize: '0.875rem',
+    marginBottom: '0.75rem',
     minHeight: '100px'
   },
   fileInput: {
-    marginBottom: '12px'
+    marginBottom: '0.75rem',
+    width: '100%'
   },
   flexRow: {
     display: 'flex',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: '8px',
-    marginBottom: '12px'
+    gap: '0.5rem',
+    marginBottom: '0.75rem'
   },
   gridContainer: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-    gap: '20px',
-    marginTop: '20px'
+    gridTemplateColumns: '1fr',
+    gap: '1rem',
+    marginTop: '1.25rem',
+    '@media (min-width: 640px)': {
+      gridTemplateColumns: 'repeat(2, 1fr)',
+    },
+    '@media (min-width: 768px)': {
+      gridTemplateColumns: 'repeat(3, 1fr)',
+    }
   },
   checkboxLabel: {
     display: 'flex',
     alignItems: 'center',
-    fontSize: '14px',
+    fontSize: '0.875rem',
     color: '#4b5563',
-    marginBottom: '8px'
+    marginBottom: '0.5rem'
   },
   checkbox: {
-    marginRight: '8px'
+    marginRight: '0.5rem',
+    width: '1rem',
+    height: '1rem'
   },
   buttonPrimary: {
     backgroundColor: '#3b82f6',
     color: 'white',
     fontWeight: '500',
-    padding: '8px 16px',
+    padding: '0.625rem 1rem',
     borderRadius: '6px',
     border: 'none',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    minHeight: '2.5rem',
+    width: '100%',
+    '@media (min-width: 640px)': {
+      width: 'auto'
+    }
   },
   buttonSecondary: {
     backgroundColor: '#f3f4f6',
     color: '#1f2937',
     fontWeight: '500',
-    padding: '8px 16px',
+    padding: '0.625rem 1rem',
     borderRadius: '6px',
     border: '1px solid #d1d5db',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    minHeight: '2.5rem',
+    width: '100%',
+    '@media (min-width: 640px)': {
+      width: 'auto'
+    }
   },
   buttonDanger: {
     backgroundColor: '#fee2e2',
     color: '#b91c1c',
     fontWeight: '500',
-    padding: '8px 16px',
+    padding: '0.625rem 1rem',
     borderRadius: '6px',
     border: 'none',
-    cursor: 'pointer'
+    cursor: 'pointer',
+    minHeight: '2.5rem',
+    width: '100%',
+    '@media (min-width: 640px)': {
+      width: 'auto'
+    }
   },
   tabContainer: {
     display: 'flex',
+    flexWrap: 'wrap',
     borderBottom: '1px solid #e5e7eb',
-    marginBottom: '24px' 
+    marginBottom: '1.5rem',
+    gap: '0.25rem',
+    overflowX: 'auto',
+    whiteSpace: 'nowrap'
   },
   tab: {
-    padding: '8px 16px',
-    marginRight: '12px',
+    padding: '0.5rem 0.75rem',
     fontWeight: '500',
-    fontSize: '14px',
-    cursor: 'pointer'
+    fontSize: '0.875rem',
+    cursor: 'pointer',
+    flex: '0 0 auto'
   },
   activeTab: {
     borderBottom: '2px solid #3b82f6',
@@ -143,54 +178,63 @@ const styles = {
   photosContainer: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: '8px',
-    marginTop: '12px'
+    gap: '0.5rem',
+    marginTop: '0.75rem'
   },
   photoPreview: {
     position: 'relative',
-    height: '80px',
-    width: '80px',
+    height: '5rem',
+    width: '5rem',
     borderRadius: '4px',
     overflow: 'hidden'
   },
   deleteButton: {
     position: 'absolute',
-    top: '4px',
-    right: '4px',
+    top: '0.25rem',
+    right: '0.25rem',
     backgroundColor: 'rgba(239, 68, 68, 0.9)',
     color: 'white',
-    width: '20px',
-    height: '20px',
+    width: '1.5rem',
+    height: '1.5rem',
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
-    fontSize: '14px'
+    fontSize: '1rem'
   },
   twoColumnGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(45%, 1fr))',
-    gap: '16px',
-    marginBottom: '20px'
+    gridTemplateColumns: '1fr',
+    gap: '1rem',
+    marginBottom: '1.25rem',
+    '@media (min-width: 640px)': {
+      gridTemplateColumns: 'repeat(2, 1fr)',
+    }
   },
   sectionTitle: {
-    fontSize: '18px',
+    fontSize: '1.125rem',
     fontWeight: '600',
-    marginBottom: '16px',
-    paddingBottom: '8px',
+    marginBottom: '1rem',
+    paddingBottom: '0.5rem',
     borderBottom: '1px solid #e5e7eb'
   },
   sectionSubtitle: {
-    fontSize: '16px',
+    fontSize: '1rem',
     fontWeight: '500',
-    marginBottom: '12px',
-    marginTop: '16px'
+    marginBottom: '0.75rem',
+    marginTop: '1rem'
   },
   boatListContainer: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-    gap: '16px'
+    gridTemplateColumns: '1fr',
+    gap: '1rem',
+    '@media (min-width: 640px)': {
+      gridTemplateColumns: 'repeat(2, 1fr)',
+    },
+    '@media (min-width: 768px)': {
+      gridTemplateColumns: 'repeat(3, 1fr)',
+    }
   },
   boatCard: {
     backgroundColor: '#fff',
@@ -199,7 +243,7 @@ const styles = {
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
   },
   boatImageContainer: {
-    height: '200px',
+    height: '12rem',
     backgroundColor: '#f3f4f6'
   },
   boatImage: {
@@ -208,23 +252,28 @@ const styles = {
     objectFit: 'cover'
   },
   boatCardContent: {
-    padding: '16px'
+    padding: '1rem'
   },
   boatCardTitle: {
-    fontSize: '18px',
+    fontSize: '1.125rem',
     fontWeight: '600',
-    marginBottom: '8px',
+    marginBottom: '0.5rem',
     color: '#1f2937'
   },
   boatCardDetails: {
-    fontSize: '14px',
+    fontSize: '0.875rem',
     color: '#6b7280',
-    marginBottom: '16px'
+    marginBottom: '1rem'
   },
   buttonRow: {
     display: 'flex',
-    justifyContent: 'space-between',
-    marginTop: '16px'
+    flexDirection: 'column',
+    gap: '0.5rem',
+    marginTop: '1rem',
+    '@media (min-width: 640px)': {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    }
   },
   currencyInput: {
     position: 'relative',
@@ -233,16 +282,16 @@ const styles = {
   },
   currencySymbol: {
     position: 'absolute',
-    left: '12px',
-    fontSize: '14px',
+    left: '0.75rem',
+    fontSize: '0.875rem',
     color: '#6b7280'
   },
   currencyTextInput: {
     width: '100%',
-    padding: '8px 12px 8px 24px',
+    padding: '0.625rem 0.75rem 0.625rem 1.5rem',
     borderRadius: '6px',
     border: '1px solid #d1d5db',
-    fontSize: '14px'
+    fontSize: '0.875rem'
   },
   placeholderImage: {
     display: 'flex',
@@ -253,10 +302,154 @@ const styles = {
     color: '#9ca3af'
   },
   nestedInput: {
-    marginLeft: '24px',
-    marginTop: '8px',
-    marginBottom: '16px'
+    marginLeft: '1.5rem',
+    marginTop: '0.5rem',
+    marginBottom: '1rem'
+  },
+  formHeader: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.5rem',
+    padding: '1.25rem',
+    borderBottom: '1px solid #e5e7eb',
+    '@media (min-width: 640px)': {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    }
+  },
+  formContent: {
+    padding: '1.25rem'
+  },
+  formFooter: {
+    marginTop: '1.5rem',
+    display: 'flex',
+    justifyContent: 'center',
+    '@media (min-width: 640px)': {
+      justifyContent: 'flex-end',
+    }
+  },
+  scrollableTabs: {
+    display: 'flex',
+    overflowX: 'auto',
+    whiteSpace: 'nowrap',
+    padding: '0 0.25rem',
+    marginBottom: '1.5rem',
+    scrollbarWidth: 'none', /* Firefox */
+    msOverflowStyle: 'none', /* IE and Edge */
+    '::-webkit-scrollbar': {
+      display: 'none' /* Chrome, Safari, Opera */
+    },
+    WebkitOverflowScrolling: 'touch'
+  },
+  tabButton: {
+    padding: '0.625rem 1rem',
+    margin: '0 0.125rem',
+    borderRadius: '6px',
+    background: '#f9fafb',
+    border: '1px solid #e5e7eb',
+    whiteSpace: 'nowrap',
+    fontWeight: '500',
+    fontSize: '0.875rem',
+    color: '#6b7280',
+    flex: '0 0 auto'
+  },
+  activeTabButton: {
+    background: '#3b82f6',
+    color: 'white',
+    borderColor: '#3b82f6'
+  },
+  spinnerContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  spinner: {
+    width: '1.25rem',
+    height: '1.25rem',
+    marginRight: '0.625rem',
+    borderTop: '2px solid #3b82f6',
+    borderRight: '2px solid transparent',
+    borderBottom: '2px solid #3b82f6',
+    borderLeft: '2px solid #3b82f6',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite'
+  },
+  // Add keyframes animation for spinner
+  '@keyframes spin': {
+    '0%': { transform: 'rotate(0deg)' },
+    '100%': { transform: 'rotate(360deg)' }
   }
+};
+
+// Create a style injector that handles media queries
+const injectStyles = () => {
+  // Only inject once
+  if (document.getElementById('responsive-boat-styles')) return;
+  
+  const styleElement = document.createElement('style');
+  styleElement.id = 'responsive-boat-styles';
+  
+  // Process styles object into CSS with media queries
+  let cssText = '';
+  
+  // Extract keyframes
+  if (styles['@keyframes spin']) {
+    cssText += `@keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }\n`;
+  }
+  
+  // Add special webkit webkit-scrollbar rule
+  cssText += `::-webkit-scrollbar { 
+    display: none; 
+  }\n`;
+  
+  
+  // Process each style rule
+  Object.entries(styles).forEach(([selector, rules]) => {
+    if (selector.startsWith('@')) return; // Skip keyframes and media queries for now
+    
+    cssText += `.${selector} {\n`;
+    
+    // Add base rules
+    Object.entries(rules).forEach(([prop, value]) => {
+      if (prop.startsWith('@')) return; // Skip media queries for now
+      cssText += `  ${convertCamelToKebab(prop)}: ${value};\n`;
+    });
+    
+    cssText += '}\n';
+    
+    // Add media queries for this selector
+    Object.entries(rules).forEach(([prop, value]) => {
+      if (prop.startsWith('@media')) {
+        cssText += `${prop} {\n`;
+        cssText += `  .${selector} {\n`;
+        
+        // Add rules for this media query
+        Object.entries(value).forEach(([mediaProp, mediaValue]) => {
+          cssText += `    ${convertCamelToKebab(mediaProp)}: ${mediaValue};\n`;
+        });
+        
+        cssText += '  }\n';
+        cssText += '}\n';
+      }
+    });
+  });
+  
+  styleElement.textContent = cssText;
+  document.head.appendChild(styleElement);
+};
+
+// Helper to convert camelCase to kebab-case for CSS properties
+const convertCamelToKebab = (camelCase) => {
+  return camelCase.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+};
+
+// Apply className helper
+const cx = (...classNames) => {
+  return classNames.filter(Boolean).join(' ');
 };
 
 function Boats() {
@@ -269,6 +462,11 @@ function Boats() {
   const [photoFiles, setPhotoFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
   const [activeTab, setActiveTab] = useState('basic'); // For form navigation
+  
+  // Inject responsive styles on component mount
+  useEffect(() => {
+    injectStyles();
+  }, []);
   
   // Form data with comprehensive boat details
   const [formData, setFormData] = useState({
@@ -1125,7 +1323,8 @@ function Boats() {
         addNew: "Add New Boat",
         noBoats: "No boats available. Add your first boat to get started!"
       },
-      switchLanguage: "Switch to Romanian"
+      switchLanguage: "Switch to Romanian",
+      selectTab: "Select section"
     },
     ro: {
       addBoat: "Adaugă Barcă",
@@ -1241,7 +1440,8 @@ function Boats() {
         addNew: "Adaugă Barcă Nouă",
         noBoats: "Nu există bărci disponibile. Adaugă prima barcă pentru a începe!"
       },
-      switchLanguage: "Schimbă în Engleză"
+      switchLanguage: "Schimbă în Engleză",
+      selectTab: "Selectează secțiunea"
     }
   };
   
@@ -1253,8 +1453,8 @@ function Boats() {
       case 'basic':
         return (
           <div>
-            <div style={styles.formSection}>
-              <label style={styles.formLabel}>
+            <div className="formSection">
+              <label className="formLabel">
                 {t.boatName}
               </label>
               <input
@@ -1263,13 +1463,13 @@ function Boats() {
                 value={formData[`name_${language}`] || ''}
                 onChange={handleInputChange}
                 required
-                style={styles.input}
+                className="input"
               />
             </div>
             
-            <div style={styles.twoColumnGrid}>
+            <div className="twoColumnGrid">
               <div>
-                <label style={styles.formLabel}>
+                <label className="formLabel">
                   {t.length}
                 </label>
                 <input
@@ -1279,12 +1479,12 @@ function Boats() {
                   onChange={handleInputChange}
                   min="0"
                   step="0.1"
-                  style={styles.input}
+                  className="input"
                 />
               </div>
               
               <div>
-                <label style={styles.formLabel}>
+                <label className="formLabel">
                   {t.capacity}
                 </label>
                 <input
@@ -1293,13 +1493,13 @@ function Boats() {
                   value={formData.capacity || ''}
                   onChange={handleInputChange}
                   min="0"
-                  style={styles.input}
+                  className="input"
                 />
               </div>
             </div>
             
-            <div style={styles.formSection}>
-              <label style={styles.formLabel}>
+            <div className="formSection">
+              <label className="formLabel">
                 {t.cruisingArea}
               </label>
               <input
@@ -1307,12 +1507,12 @@ function Boats() {
                 name={`cruisingArea_${language}`}
                 value={formData[`cruisingArea_${language}`] || ''}
                 onChange={handleInputChange}
-                style={styles.input}
+                className="input"
               />
             </div>
             
-            <div style={styles.formSection}>
-              <label style={styles.formLabel}>
+            <div className="formSection">
+              <label className="formLabel">
                 {t.description}
               </label>
               <textarea
@@ -1320,12 +1520,12 @@ function Boats() {
                 value={formData[`description_${language}`] || ''}
                 onChange={handleInputChange}
                 rows="4"
-                style={styles.textarea}
+                className="textarea"
               />
             </div>
             
-            <div style={styles.formSection}>
-              <label style={styles.formLabel}>
+            <div className="formSection">
+              <label className="formLabel">
                 {t.photos}
               </label>
               <input
@@ -1333,14 +1533,14 @@ function Boats() {
                 accept="image/*"
                 multiple
                 onChange={handlePhotoChange}
-                style={styles.fileInput}
+                className="fileInput"
               />
               
               {/* Photo previews */}
-              <div style={styles.photosContainer}>
+              <div className="photosContainer">
                 {/* Existing photos */}
                 {existingPhotos.map((photo, index) => (
-                  <div key={`existing-${index}`} style={styles.photoPreview}>
+                  <div key={`existing-${index}`} className="photoPreview">
                     <img 
                       src={photo.url} 
                       alt={`Photo ${index}`}
@@ -1349,7 +1549,8 @@ function Boats() {
                     <button
                       type="button"
                       onClick={() => handleDeletePhoto(index, true)}
-                      style={styles.deleteButton}
+                      className="deleteButton"
+                      aria-label="Delete photo"
                     >
                       ×
                     </button>
@@ -1358,7 +1559,7 @@ function Boats() {
                 
                 {/* New photo previews */}
                 {previewUrls.map((url, index) => (
-                  <div key={`preview-${index}`} style={styles.photoPreview}>
+                  <div key={`preview-${index}`} className="photoPreview">
                     <img 
                       src={url} 
                       alt={`Preview ${index}`}
@@ -1367,7 +1568,8 @@ function Boats() {
                     <button
                       type="button"
                       onClick={() => handleDeletePhoto(index, false)}
-                      style={styles.deleteButton}
+                      className="deleteButton"
+                      aria-label="Delete photo"
                     >
                       ×
                     </button>
@@ -1381,10 +1583,10 @@ function Boats() {
       case 'specs':
         return (
           <div>
-            <h3 style={styles.sectionTitle}>{t.specs.title}</h3>
-            <div style={styles.twoColumnGrid}>
+            <h3 className="sectionTitle">{t.specs.title}</h3>
+            <div className="twoColumnGrid">
               <div>
-                <label style={styles.formLabel}>
+                <label className="formLabel">
                   {t.specs.year}
                 </label>
                 <input
@@ -1394,12 +1596,12 @@ function Boats() {
                   onChange={(e) => handleInputChange(e, 'specs')}
                   min="1900"
                   max={new Date().getFullYear()}
-                  style={styles.input}
+                  className="input"
                 />
               </div>
               
               <div>
-                <label style={styles.formLabel}>
+                <label className="formLabel">
                   {t.specs.class}
                 </label>
                 <input
@@ -1407,12 +1609,12 @@ function Boats() {
                   name="class"
                   value={formData.specs.class || ''}
                   onChange={(e) => handleInputChange(e, 'specs')}
-                  style={styles.input}
+                  className="input"
                 />
               </div>
               
               <div>
-                <label style={styles.formLabel}>
+                <label className="formLabel">
                   {t.specs.cruisingSpeed}
                 </label>
                 <input
@@ -1421,12 +1623,12 @@ function Boats() {
                   value={formData.specs.cruisingSpeed || ''}
                   onChange={(e) => handleInputChange(e, 'specs')}
                   min="0"
-                  style={styles.input}
+                  className="input"
                 />
               </div>
               
               <div>
-                <label style={styles.formLabel}>
+                <label className="formLabel">
                   {t.specs.maxSpeed}
                 </label>
                 <input
@@ -1435,12 +1637,12 @@ function Boats() {
                   value={formData.specs.maxSpeed || ''}
                   onChange={(e) => handleInputChange(e, 'specs')}
                   min="0"
-                  style={styles.input}
+                  className="input"
                 />
               </div>
               
               <div>
-                <label style={styles.formLabel}>
+                <label className="formLabel">
                   {t.specs.engine}
                 </label>
                 <input
@@ -1448,12 +1650,12 @@ function Boats() {
                   name="engine"
                   value={formData.specs.engine || ''}
                   onChange={(e) => handleInputChange(e, 'specs')}
-                  style={styles.input}
+                  className="input"
                 />
               </div>
               
               <div>
-                <label style={styles.formLabel}>
+                <label className="formLabel">
                   {t.specs.horsePower}
                 </label>
                 <input
@@ -1461,12 +1663,12 @@ function Boats() {
                   name="horsePower"
                   value={formData.specs.horsePower || ''}
                   onChange={(e) => handleInputChange(e, 'specs')}
-                  style={styles.input}
+                  className="input"
                 />
               </div>
               
               <div>
-                <label style={styles.formLabel}>
+                <label className="formLabel">
                   {t.specs.cabins}
                 </label>
                 <input
@@ -1474,12 +1676,12 @@ function Boats() {
                   name="cabins"
                   value={formData.specs.cabins || ''}
                   onChange={(e) => handleInputChange(e, 'specs')}
-                  style={styles.input}
+                  className="input"
                 />
               </div>
               
               <div>
-                <label style={styles.formLabel}>
+                <label className="formLabel">
                   {t.specs.crew}
                 </label>
                 <input
@@ -1487,7 +1689,7 @@ function Boats() {
                   name="crew"
                   value={formData.specs.crew || ''}
                   onChange={(e) => handleInputChange(e, 'specs')}
-                  style={styles.input}
+                  className="input"
                 />
               </div>
             </div>
@@ -1497,14 +1699,14 @@ function Boats() {
       case 'pricing':
         return (
           <div>
-            <h3 style={styles.sectionTitle}>{language === 'en' ? 'Pricing' : 'Prețuri'}</h3>
+            <h3 className="sectionTitle">{language === 'en' ? 'Pricing' : 'Prețuri'}</h3>
             
-            <div style={{marginBottom: '20px'}}>
-              <label style={styles.formLabel}>
+            <div style={{marginBottom: '1.25rem'}}>
+              <label className="formLabel">
                 {t.price.daily}
               </label>
-              <div style={styles.currencyInput}>
-                <span style={styles.currencySymbol}>
+              <div className="currencyInput">
+                <span className="currencySymbol">
                   €
                 </span>
                 <input
@@ -1512,22 +1714,22 @@ function Boats() {
                   name="priceDaily"
                   value={formData.priceDaily || ''}
                   onChange={handleInputChange}
-                  style={styles.currencyTextInput}
+                  className="currencyTextInput"
                 />
               </div>
             </div>
             
-            <h4 style={styles.sectionSubtitle}>
+            <h4 className="sectionSubtitle">
               {t.price.monthly}
             </h4>
             
-            <div style={styles.twoColumnGrid}>
+            <div className="twoColumnGrid">
               <div>
-                <label style={styles.formLabel}>
+                <label className="formLabel">
                   {t.price.may}
                 </label>
-                <div style={styles.currencyInput}>
-                  <span style={styles.currencySymbol}>
+                <div className="currencyInput">
+                  <span className="currencySymbol">
                     €
                   </span>
                   <input
@@ -1535,17 +1737,17 @@ function Boats() {
                     name="may"
                     value={formData.monthlyPrices.may || ''}
                     onChange={(e) => handleInputChange(e, 'monthlyPrices')}
-                    style={styles.currencyTextInput}
+                    className="currencyTextInput"
                   />
                 </div>
               </div>
               
               <div>
-                <label style={styles.formLabel}>
+                <label className="formLabel">
                   {t.price.june}
                 </label>
-                <div style={styles.currencyInput}>
-                  <span style={styles.currencySymbol}>
+                <div className="currencyInput">
+                  <span className="currencySymbol">
                     €
                   </span>
                   <input
@@ -1553,17 +1755,17 @@ function Boats() {
                     name="june"
                     value={formData.monthlyPrices.june || ''}
                     onChange={(e) => handleInputChange(e, 'monthlyPrices')}
-                    style={styles.currencyTextInput}
+                    className="currencyTextInput"
                   />
                 </div>
               </div>
               
               <div>
-                <label style={styles.formLabel}>
+                <label className="formLabel">
                   {t.price.july}
                 </label>
-                <div style={styles.currencyInput}>
-                  <span style={styles.currencySymbol}>
+                <div className="currencyInput">
+                  <span className="currencySymbol">
                     €
                   </span>
                   <input
@@ -1571,17 +1773,17 @@ function Boats() {
                     name="july"
                     value={formData.monthlyPrices.july || ''}
                     onChange={(e) => handleInputChange(e, 'monthlyPrices')}
-                    style={styles.currencyTextInput}
+                    className="currencyTextInput"
                   />
                 </div>
               </div>
               
               <div>
-                <label style={styles.formLabel}>
+                <label className="formLabel">
                   {t.price.august}
                 </label>
-                <div style={styles.currencyInput}>
-                  <span style={styles.currencySymbol}>
+                <div className="currencyInput">
+                  <span className="currencySymbol">
                     €
                   </span>
                   <input
@@ -1589,17 +1791,17 @@ function Boats() {
                     name="august"
                     value={formData.monthlyPrices.august || ''}
                     onChange={(e) => handleInputChange(e, 'monthlyPrices')}
-                    style={styles.currencyTextInput}
+                    className="currencyTextInput"
                   />
                 </div>
               </div>
               
               <div>
-                <label style={styles.formLabel}>
+                <label className="formLabel">
                   {t.price.september}
                 </label>
-                <div style={styles.currencyInput}>
-                  <span style={styles.currencySymbol}>
+                <div className="currencyInput">
+                  <span className="currencySymbol">
                     €
                   </span>
                   <input
@@ -1607,17 +1809,17 @@ function Boats() {
                     name="september"
                     value={formData.monthlyPrices.september || ''}
                     onChange={(e) => handleInputChange(e, 'monthlyPrices')}
-                    style={styles.currencyTextInput}
+                    className="currencyTextInput"
                   />
                 </div>
               </div>
               
               <div>
-                <label style={styles.formLabel}>
+                <label className="formLabel">
                   {t.price.october}
                 </label>
-                <div style={styles.currencyInput}>
-                  <span style={styles.currencySymbol}>
+                <div className="currencyInput">
+                  <span className="currencySymbol">
                     €
                   </span>
                   <input
@@ -1625,7 +1827,7 @@ function Boats() {
                     name="october"
                     value={formData.monthlyPrices.october || ''}
                     onChange={(e) => handleInputChange(e, 'monthlyPrices')}
-                    style={styles.currencyTextInput}
+                    className="currencyTextInput"
                   />
                 </div>
               </div>
@@ -1637,18 +1839,18 @@ function Boats() {
         return (
           <div>
             {/* Equipment Section */}
-            <div style={{marginBottom: '30px'}}>
-              <h3 style={styles.sectionTitle}>{t.equipment.title}</h3>
-              <div style={styles.twoColumnGrid}>
+            <div style={{marginBottom: '1.875rem'}}>
+              <h3 className="sectionTitle">{t.equipment.title}</h3>
+              <div className="twoColumnGrid">
                 {/* Left Column */}
                 <div>
-                  <div style={styles.checkboxLabel}>
+                  <div className="checkboxLabel">
                     <input
                       type="checkbox"
                       id="tenders"
                       checked={formData.equipment.tenders || false}
                       onChange={() => toggleFeature('equipment', 'tenders')}
-                      style={styles.checkbox}
+                      className="checkbox"
                     />
                     <label htmlFor="tenders">
                       {t.equipment.tenders}
@@ -1656,8 +1858,8 @@ function Boats() {
                   </div>
                   
                   {formData.equipment.tenders && (
-                    <div style={styles.nestedInput}>
-                      <label style={styles.formLabel}>
+                    <div className="nestedInput">
+                      <label className="formLabel">
                         {t.equipment.tenderCount}
                       </label>
                       <input
@@ -1666,18 +1868,18 @@ function Boats() {
                         value={formData.equipment.tenderCount || ''}
                         onChange={(e) => handleInputChange(e, 'equipment')}
                         min="0"
-                        style={styles.input}
+                        className="input"
                       />
                     </div>
                   )}
                   
-                  <div style={styles.checkboxLabel}>
+                  <div className="checkboxLabel">
                     <input
                       type="checkbox"
                       id="deckJacuzzi"
                       checked={formData.equipment.deckJacuzzi || false}
                       onChange={() => toggleFeature('equipment', 'deckJacuzzi')}
-                      style={styles.checkbox}
+                      className="checkbox"
                     />
                     <label htmlFor="deckJacuzzi">
                       {t.equipment.deckJacuzzi}
@@ -1685,8 +1887,8 @@ function Boats() {
                   </div>
                   
                   {formData.equipment.deckJacuzzi && (
-                    <div style={styles.nestedInput}>
-                      <label style={styles.formLabel}>
+                    <div className="nestedInput">
+                      <label className="formLabel">
                         {t.equipment.deckJacuzziCount}
                       </label>
                       <input
@@ -1695,7 +1897,7 @@ function Boats() {
                         value={formData.equipment.deckJacuzziCount || ''}
                         onChange={(e) => handleInputChange(e, 'equipment')}
                         min="0"
-                        style={styles.input}
+                        className="input"
                       />
                     </div>
                   )}
@@ -1703,52 +1905,52 @@ function Boats() {
                 
                 {/* Right Column */}
                 <div>
-                  <div style={styles.checkboxLabel}>
+                  <div className="checkboxLabel">
                     <input
                       type="checkbox"
                       id="pool"
                       checked={formData.equipment.pool || false}
                       onChange={() => toggleFeature('equipment', 'pool')}
-                      style={styles.checkbox}
+                      className="checkbox"
                     />
                     <label htmlFor="pool">
                       {t.equipment.pool}
                     </label>
                   </div>
                   
-                  <div style={styles.checkboxLabel}>
+                  <div className="checkboxLabel">
                     <input
                       type="checkbox"
                       id="antiJellyfishPool"
                       checked={formData.equipment.antiJellyfishPool || false}
                       onChange={() => toggleFeature('equipment', 'antiJellyfishPool')}
-                      style={styles.checkbox}
+                      className="checkbox"
                     />
                     <label htmlFor="antiJellyfishPool">
                       {t.equipment.antiJellyfishPool}
                     </label>
                   </div>
                   
-                  <div style={styles.checkboxLabel}>
+                  <div className="checkboxLabel">
                     <input
                       type="checkbox"
                       id="aquapark"
                       checked={formData.equipment.aquapark || false}
                       onChange={() => toggleFeature('equipment', 'aquapark')}
-                      style={styles.checkbox}
+                      className="checkbox"
                     />
                     <label htmlFor="aquapark">
                       {t.equipment.aquapark}
                     </label>
                   </div>
                   
-                  <div style={styles.checkboxLabel}>
+                  <div className="checkboxLabel">
                     <input
                       type="checkbox"
                       id="inflatablePlatform"
                       checked={formData.equipment.inflatablePlatform || false}
                       onChange={() => toggleFeature('equipment', 'inflatablePlatform')}
-                      style={styles.checkbox}
+                      className="checkbox"
                     />
                     <label htmlFor="inflatablePlatform">
                       {t.equipment.inflatablePlatform}
@@ -1759,18 +1961,18 @@ function Boats() {
             </div>
             
             {/* Water Sports */}
-            <div style={{marginBottom: '30px'}}>
-              <h3 style={styles.sectionTitle}>{t.waterSports.title}</h3>
-              <div style={styles.twoColumnGrid}>
+            <div style={{marginBottom: '1.875rem'}}>
+              <h3 className="sectionTitle">{t.waterSports.title}</h3>
+              <div className="twoColumnGrid">
                 {/* Left Column */}
                 <div>
-                  <div style={styles.checkboxLabel}>
+                  <div className="checkboxLabel">
                     <input
                       type="checkbox"
                       id="jetSkis"
                       checked={formData.waterSports.jetSkis || false}
                       onChange={() => toggleFeature('waterSports', 'jetSkis')}
-                      style={styles.checkbox}
+                      className="checkbox"
                     />
                     <label htmlFor="jetSkis">
                       {t.waterSports.jetSkis}
@@ -1778,8 +1980,8 @@ function Boats() {
                   </div>
                   
                   {formData.waterSports.jetSkis && (
-                    <div style={styles.nestedInput}>
-                      <label style={styles.formLabel}>
+                    <div className="nestedInput">
+                      <label className="formLabel">
                         {t.waterSports.jetSkiCount}
                       </label>
                       <input
@@ -1788,18 +1990,18 @@ function Boats() {
                         value={formData.waterSports.jetSkiCount || ''}
                         onChange={(e) => handleInputChange(e, 'waterSports')}
                         min="0"
-                        style={styles.input}
+                        className="input"
                       />
                     </div>
                   )}
                   
-                  <div style={styles.checkboxLabel}>
+                  <div className="checkboxLabel">
                     <input
                       type="checkbox"
                       id="seabobs"
                       checked={formData.waterSports.seabobs || false}
                       onChange={() => toggleFeature('waterSports', 'seabobs')}
-                      style={styles.checkbox}
+                      className="checkbox"
                     />
                     <label htmlFor="seabobs">
                       {t.waterSports.seabobs}
@@ -1807,8 +2009,8 @@ function Boats() {
                   </div>
                   
                   {formData.waterSports.seabobs && (
-                    <div style={styles.nestedInput}>
-                      <label style={styles.formLabel}>
+                    <div className="nestedInput">
+                      <label className="formLabel">
                         {t.waterSports.seabobCount}
                       </label>
                       <input
@@ -1817,18 +2019,18 @@ function Boats() {
                         value={formData.waterSports.seabobCount || ''}
                         onChange={(e) => handleInputChange(e, 'waterSports')}
                         min="0"
-                        style={styles.input}
+                        className="input"
                       />
                     </div>
                   )}
                   
-                  <div style={styles.checkboxLabel}>
+                  <div className="checkboxLabel">
                     <input
                       type="checkbox"
                       id="paddleboards"
                       checked={formData.waterSports.paddleboards || false}
                       onChange={() => toggleFeature('waterSports', 'paddleboards')}
-                      style={styles.checkbox}
+                      className="checkbox"
                     />
                     <label htmlFor="paddleboards">
                       {t.waterSports.paddleboards}
@@ -1836,8 +2038,8 @@ function Boats() {
                   </div>
                   
                   {formData.waterSports.paddleboards && (
-                    <div style={styles.nestedInput}>
-                      <label style={styles.formLabel}>
+                    <div className="nestedInput">
+                      <label className="formLabel">
                         {t.waterSports.paddleboardCount}
                       </label>
                       <input
@@ -1846,7 +2048,7 @@ function Boats() {
                         value={formData.waterSports.paddleboardCount || ''}
                         onChange={(e) => handleInputChange(e, 'waterSports')}
                         min="0"
-                        style={styles.input}
+                        className="input"
                       />
                     </div>
                   )}
@@ -1854,65 +2056,65 @@ function Boats() {
                 
                 {/* Right Column */}
                 <div>
-                  <div style={styles.checkboxLabel}>
+                  <div className="checkboxLabel">
                     <input
                       type="checkbox"
                       id="wakeboard"
                       checked={formData.waterSports.wakeboard || false}
                       onChange={() => toggleFeature('waterSports', 'wakeboard')}
-                      style={styles.checkbox}
+                      className="checkbox"
                     />
                     <label htmlFor="wakeboard">
                       {t.waterSports.wakeboard}
                     </label>
                   </div>
                   
-                  <div style={styles.checkboxLabel}>
+                  <div className="checkboxLabel">
                     <input
                       type="checkbox"
                       id="waterSkis"
                       checked={formData.waterSports.waterSkis || false}
                       onChange={() => toggleFeature('waterSports', 'waterSkis')}
-                      style={styles.checkbox}
+                      className="checkbox"
                     />
                     <label htmlFor="waterSkis">
                       {t.waterSports.waterSkis}
                     </label>
                   </div>
                   
-                  <div style={styles.checkboxLabel}>
+                  <div className="checkboxLabel">
                     <input
                       type="checkbox"
                       id="snorkelingGear"
                       checked={formData.waterSports.snorkelingGear || false}
                       onChange={() => toggleFeature('waterSports', 'snorkelingGear')}
-                      style={styles.checkbox}
+                      className="checkbox"
                     />
                     <label htmlFor="snorkelingGear">
                       {t.waterSports.snorkelingGear}
                     </label>
                   </div>
                   
-                  <div style={styles.checkboxLabel}>
+                  <div className="checkboxLabel">
                     <input
                       type="checkbox"
                       id="fishingGear"
                       checked={formData.waterSports.fishingGear || false}
                       onChange={() => toggleFeature('waterSports', 'fishingGear')}
-                      style={styles.checkbox}
+                      className="checkbox"
                     />
                     <label htmlFor="fishingGear">
                       {t.waterSports.fishingGear}
                     </label>
                   </div>
                   
-                  <div style={styles.checkboxLabel}>
+                  <div className="checkboxLabel">
                     <input
                       type="checkbox"
                       id="inflatables"
                       checked={formData.waterSports.inflatables || false}
                       onChange={() => toggleFeature('waterSports', 'inflatables')}
-                      style={styles.checkbox}
+                      className="checkbox"
                     />
                     <label htmlFor="inflatables">
                       {t.waterSports.inflatables}
@@ -1923,84 +2125,84 @@ function Boats() {
             </div>
             
             {/* Amenities */}
-            <div style={{marginBottom: '30px'}}>
-              <h3 style={styles.sectionTitle}>{t.amenities.title}</h3>
+            <div style={{marginBottom: '1.875rem'}}>
+              <h3 className="sectionTitle">{t.amenities.title}</h3>
               
               {/* Entertainment */}
-              <h4 style={styles.sectionSubtitle}>{t.amenities.entertainment}</h4>
-              <div style={styles.twoColumnGrid}>
-                <div style={styles.checkboxLabel}>
+              <h4 className="sectionSubtitle">{t.amenities.entertainment}</h4>
+              <div className="twoColumnGrid">
+                <div className="checkboxLabel">
                   <input
                     type="checkbox"
                     id="wifi"
                     checked={formData.amenities.wifi || false}
                     onChange={() => toggleFeature('amenities', 'wifi')}
-                    style={styles.checkbox}
+                    className="checkbox"
                   />
                   <label htmlFor="wifi">
                     {t.amenities.wifi}
                   </label>
                 </div>
                 
-                <div style={styles.checkboxLabel}>
+                <div className="checkboxLabel">
                   <input
                     type="checkbox"
                     id="satelliteTV"
                     checked={formData.amenities.satelliteTV || false}
                     onChange={() => toggleFeature('amenities', 'satelliteTV')}
-                    style={styles.checkbox}
+                    className="checkbox"
                   />
                   <label htmlFor="satelliteTV">
                     {t.amenities.satelliteTV}
                   </label>
                 </div>
                 
-                <div style={styles.checkboxLabel}>
+                <div className="checkboxLabel">
                   <input
                     type="checkbox"
                     id="appleTV"
                     checked={formData.amenities.appleTV || false}
                     onChange={() => toggleFeature('amenities', 'appleTV')}
-                    style={styles.checkbox}
+                    className="checkbox"
                   />
                   <label htmlFor="appleTV">
                     {t.amenities.appleTV}
                   </label>
                 </div>
                 
-                <div style={styles.checkboxLabel}>
+                <div className="checkboxLabel">
                   <input
                     type="checkbox"
                     id="sonos"
                     checked={formData.amenities.sonos || false}
                     onChange={() => toggleFeature('amenities', 'sonos')}
-                    style={styles.checkbox}
+                    className="checkbox"
                   />
                   <label htmlFor="sonos">
                     {t.amenities.sonos}
                   </label>
                 </div>
                 
-                <div style={styles.checkboxLabel}>
+                <div className="checkboxLabel">
                   <input
                     type="checkbox"
                     id="indoorCinema"
                     checked={formData.amenities.indoorCinema || false}
                     onChange={() => toggleFeature('amenities', 'indoorCinema')}
-                    style={styles.checkbox}
+                    className="checkbox"
                   />
                   <label htmlFor="indoorCinema">
                     {t.amenities.indoorCinema}
                   </label>
                 </div>
                 
-                <div style={styles.checkboxLabel}>
+                <div className="checkboxLabel">
                   <input
                     type="checkbox"
                     id="outdoorCinema"
                     checked={formData.amenities.outdoorCinema || false}
                     onChange={() => toggleFeature('amenities', 'outdoorCinema')}
-                    style={styles.checkbox}
+                    className="checkbox"
                   />
                   <label htmlFor="outdoorCinema">
                     {t.amenities.outdoorCinema}
@@ -2009,43 +2211,43 @@ function Boats() {
               </div>
               
               {/* Comfort & Deck */}
-              <div style={styles.twoColumnGrid}>
+              <div className="twoColumnGrid">
                 <div>
-                  <h4 style={styles.sectionSubtitle}>{t.amenities.comfort}</h4>
+                  <h4 className="sectionSubtitle">{t.amenities.comfort}</h4>
                   <div>
-                    <div style={styles.checkboxLabel}>
+                    <div className="checkboxLabel">
                       <input
                         type="checkbox"
                         id="airConditioning"
                         checked={formData.amenities.airConditioning || false}
                         onChange={() => toggleFeature('amenities', 'airConditioning')}
-                        style={styles.checkbox}
+                        className="checkbox"
                       />
                       <label htmlFor="airConditioning">
                         {t.amenities.airConditioning}
                       </label>
                     </div>
                     
-                    <div style={styles.checkboxLabel}>
+                    <div className="checkboxLabel">
                       <input
                         type="checkbox"
                         id="heating"
                         checked={formData.amenities.heating || false}
                         onChange={() => toggleFeature('amenities', 'heating')}
-                        style={styles.checkbox}
+                        className="checkbox"
                       />
                       <label htmlFor="heating">
                         {t.amenities.heating}
                       </label>
                     </div>
                     
-                    <div style={styles.checkboxLabel}>
+                    <div className="checkboxLabel">
                       <input
                         type="checkbox"
                         id="stabilizers"
                         checked={formData.amenities.stabilizers || false}
                         onChange={() => toggleFeature('amenities', 'stabilizers')}
-                        style={styles.checkbox}
+                        className="checkbox"
                       />
                       <label htmlFor="stabilizers">
                         {t.amenities.stabilizers}
@@ -2055,54 +2257,54 @@ function Boats() {
                 </div>
                 
                 <div>
-                  <h4 style={styles.sectionSubtitle}>{t.amenities.deck}</h4>
+                  <h4 className="sectionSubtitle">{t.amenities.deck}</h4>
                   <div>
-                    <div style={styles.checkboxLabel}>
+                    <div className="checkboxLabel">
                       <input
                         type="checkbox"
                         id="outdoorBar"
                         checked={formData.amenities.outdoorBar || false}
                         onChange={() => toggleFeature('amenities', 'outdoorBar')}
-                        style={styles.checkbox}
+                        className="checkbox"
                       />
                       <label htmlFor="outdoorBar">
                         {t.amenities.outdoorBar}
                       </label>
                     </div>
                     
-                    <div style={styles.checkboxLabel}>
+                    <div className="checkboxLabel">
                       <input
                         type="checkbox"
                         id="outdoorDining"
                         checked={formData.amenities.outdoorDining || false}
                         onChange={() => toggleFeature('amenities', 'outdoorDining')}
-                        style={styles.checkbox}
+                        className="checkbox"
                       />
                       <label htmlFor="outdoorDining">
                         {t.amenities.outdoorDining}
                       </label>
                     </div>
                     
-                    <div style={styles.checkboxLabel}>
+                    <div className="checkboxLabel">
                       <input
                         type="checkbox"
                         id="bbq"
                         checked={formData.amenities.bbq || false}
                         onChange={() => toggleFeature('amenities', 'bbq')}
-                        style={styles.checkbox}
+                        className="checkbox"
                       />
                       <label htmlFor="bbq">
                         {t.amenities.bbq}
                       </label>
                     </div>
                     
-                    <div style={styles.checkboxLabel}>
+                    <div className="checkboxLabel">
                       <input
                         type="checkbox"
                         id="sunpads"
                         checked={formData.amenities.sunpads || false}
                         onChange={() => toggleFeature('amenities', 'sunpads')}
-                        style={styles.checkbox}
+                        className="checkbox"
                       />
                       <label htmlFor="sunpads">
                         {t.amenities.sunpads}
@@ -2113,54 +2315,54 @@ function Boats() {
               </div>
               
               {/* Indoor */}
-              <h4 style={styles.sectionSubtitle}>{t.amenities.indoor}</h4>
-              <div style={styles.twoColumnGrid}>
-                <div style={styles.checkboxLabel}>
+              <h4 className="sectionSubtitle">{t.amenities.indoor}</h4>
+              <div className="twoColumnGrid">
+                <div className="checkboxLabel">
                   <input
                     type="checkbox"
                     id="formalDining"
                     checked={formData.amenities.formalDining || false}
                     onChange={() => toggleFeature('amenities', 'formalDining')}
-                    style={styles.checkbox}
+                    className="checkbox"
                   />
                   <label htmlFor="formalDining">
                     {t.amenities.formalDining}
                   </label>
                 </div>
                 
-                <div style={styles.checkboxLabel}>
+                <div className="checkboxLabel">
                   <input
                     type="checkbox"
                     id="wineStorage"
                     checked={formData.amenities.wineStorage || false}
                     onChange={() => toggleFeature('amenities', 'wineStorage')}
-                    style={styles.checkbox}
+                    className="checkbox"
                   />
                   <label htmlFor="wineStorage">
                     {t.amenities.wineStorage}
                   </label>
                 </div>
                 
-                <div style={styles.checkboxLabel}>
+                <div className="checkboxLabel">
                   <input
                     type="checkbox"
                     id="gym"
                     checked={formData.amenities.gym || false}
                     onChange={() => toggleFeature('amenities', 'gym')}
-                    style={styles.checkbox}
+                    className="checkbox"
                   />
                   <label htmlFor="gym">
                     {t.amenities.gym}
                   </label>
                 </div>
                 
-                <div style={styles.checkboxLabel}>
+                <div className="checkboxLabel">
                   <input
                     type="checkbox"
                     id="spa"
                     checked={formData.amenities.spa || false}
                     onChange={() => toggleFeature('amenities', 'spa')}
-                    style={styles.checkbox}
+                    className="checkbox"
                   />
                   <label htmlFor="spa">
                     {t.amenities.spa}
@@ -2174,55 +2376,55 @@ function Boats() {
       case 'crew':
         return (
           <div>
-            <h3 style={styles.sectionTitle}>{t.crew.title}</h3>
+            <h3 className="sectionTitle">{t.crew.title}</h3>
             
-            <div style={styles.twoColumnGrid}>
-              <div style={styles.checkboxLabel}>
+            <div className="twoColumnGrid">
+              <div className="checkboxLabel">
                 <input
                   type="checkbox"
                   id="captain"
                   checked={formData.crew.captain || false}
                   onChange={() => toggleFeature('crew', 'captain')}
-                  style={styles.checkbox}
+                  className="checkbox"
                 />
                 <label htmlFor="captain">
                   {t.crew.captain}
                 </label>
               </div>
               
-              <div style={styles.checkboxLabel}>
+              <div className="checkboxLabel">
                 <input
                   type="checkbox"
                   id="chef"
                   checked={formData.crew.chef || false}
                   onChange={() => toggleFeature('crew', 'chef')}
-                  style={styles.checkbox}
+                  className="checkbox"
                 />
                 <label htmlFor="chef">
                   {t.crew.chef}
                 </label>
               </div>
               
-              <div style={styles.checkboxLabel}>
+              <div className="checkboxLabel">
                 <input
                   type="checkbox"
                   id="deckhand"
                   checked={formData.crew.deckhand || false}
                   onChange={() => toggleFeature('crew', 'deckhand')}
-                  style={styles.checkbox}
+                  className="checkbox"
                 />
                 <label htmlFor="deckhand">
                   {t.crew.deckhand}
                 </label>
               </div>
               
-              <div style={styles.checkboxLabel}>
+              <div className="checkboxLabel">
                 <input
                   type="checkbox"
                   id="steward"
                   checked={formData.crew.steward || false}
                   onChange={() => toggleFeature('crew', 'steward')}
-                  style={styles.checkbox}
+                  className="checkbox"
                 />
                 <label htmlFor="steward">
                   {t.crew.steward}
@@ -2230,8 +2432,8 @@ function Boats() {
               </div>
             </div>
             
-            <div style={styles.formSection}>
-              <label style={styles.formLabel}>
+            <div className="formSection">
+              <label className="formLabel">
                 {t.crew.included}
               </label>
               <textarea
@@ -2239,7 +2441,7 @@ function Boats() {
                 value={formData.crew[`included_${language}`] || ''}
                 onChange={(e) => handleInputChange(e, 'crew')}
                 rows="4"
-                style={styles.textarea}
+                className="textarea"
               />
             </div>
           </div>
@@ -2248,10 +2450,10 @@ function Boats() {
       case 'contact':
         return (
           <div>
-            <h3 style={styles.sectionTitle}>{t.contact.title}</h3>
+            <h3 className="sectionTitle">{t.contact.title}</h3>
             
-            <div style={styles.formSection}>
-              <label style={styles.formLabel}>
+            <div className="formSection">
+              <label className="formLabel">
                 {t.contact.name}
               </label>
               <input
@@ -2259,12 +2461,12 @@ function Boats() {
                 name="contactName"
                 value={formData.contactName || ''}
                 onChange={handleInputChange}
-                style={styles.input}
+                className="input"
               />
             </div>
             
-            <div style={styles.formSection}>
-              <label style={styles.formLabel}>
+            <div className="formSection">
+              <label className="formLabel">
                 {t.contact.phone}
               </label>
               <input
@@ -2272,12 +2474,12 @@ function Boats() {
                 name="contactPhone"
                 value={formData.contactPhone || ''}
                 onChange={handleInputChange}
-                style={styles.input}
+                className="input"
               />
             </div>
             
-            <div style={styles.formSection}>
-              <label style={styles.formLabel}>
+            <div className="formSection">
+              <label className="formLabel">
                 {t.contact.email}
               </label>
               <input
@@ -2285,12 +2487,12 @@ function Boats() {
                 name="contactEmail"
                 value={formData.contactEmail || ''}
                 onChange={handleInputChange}
-                style={styles.input}
+                className="input"
               />
             </div>
             
-            <div style={styles.formSection}>
-              <label style={styles.formLabel}>
+            <div className="formSection">
+              <label className="formLabel">
                 {t.contact.bookingNotes}
               </label>
               <textarea
@@ -2298,7 +2500,7 @@ function Boats() {
                 value={formData[`bookingNotes_${language}`] || ''}
                 onChange={handleInputChange}
                 rows="4"
-                style={styles.textarea}
+                className="textarea"
               />
             </div>
           </div>
@@ -2310,17 +2512,16 @@ function Boats() {
   };
   
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <h1 style={styles.title}>{t.boatList.title}</h1>
-        
+    <div className="container">
+      <div className="header">
+        <h1 className="title">{t.boatList.title}</h1>
       </div>
       
       {/* Add/Edit Forms */}
       {(isAddingBoat || isEditingBoat) && (
-        <div style={styles.card}>
-          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderBottom: '1px solid #e5e7eb'}}>
-            <h2 style={styles.subtitle}>
+        <div className="card">
+          <div className="formHeader">
+            <h2 className="subtitle">
               {isAddingBoat ? t.addBoat : t.editBoat}
             </h2>
             <button
@@ -2331,112 +2532,138 @@ function Boats() {
                 setIsEditingBoat(false);
                 setCurrentBoat(null);
               }}
-              style={styles.buttonSecondary}
+              className="buttonSecondary"
             >
               {t.cancel}
             </button>
           </div>
           
-          {/* Tab navigation */}
-          <div style={styles.tabContainer}>
-            {Object.entries(t.formTabs).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setActiveTab(key)}
-                style={{
-                  ...styles.tab,
-                  ...(activeTab === key ? styles.activeTab : styles.inactiveTab)
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          
-          {/* Form content based on active tab */}
-          <form onSubmit={isAddingBoat ? handleAddBoat : handleUpdateBoat} style={{padding: '20px'}}>
-            {renderFormTab()}
+          {/* Mobile Tab Dropdown */}
+          <div className="formContent">
+            <select
+              className="mobileTabs"
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value)}
+              aria-label={t.selectTab}
+            >
+              {Object.entries(t.formTabs).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
             
-            {/* Submit button */}
-            <div style={{marginTop: '30px', display: 'flex', justifyContent: 'flex-end'}}>
-              {isUploading ? (
-                <div style={{display: 'flex', alignItems: 'center'}}>
-                  <div style={{width: '20px', height: '20px', marginRight: '10px', borderTop: '2px solid #3b82f6', borderRight: '2px solid transparent', borderBottom: '2px solid #3b82f6', borderLeft: '2px solid #3b82f6', borderRadius: '50%', animation: 'spin 1s linear infinite'}}></div>
-                  <span>{t.uploadingPhotos} {Math.round(uploadProgress)}%</span>
-                </div>
-              ) : (
+            {/* Desktop Tabs */}
+            <div className="desktopTabs tabContainer">
+              {Object.entries(t.formTabs).map(([key, label]) => (
                 <button
-                  type="submit"
-                  style={styles.buttonPrimary}
+                  key={key}
+                  type="button"
+                  onClick={() => setActiveTab(key)}
+                  className={cx(
+                    'tab',
+                    activeTab === key ? 'activeTab' : 'inactiveTab'
+                  )}
                 >
-                  {t.save}
+                  {label}
                 </button>
-              )}
+              ))}
             </div>
-          </form>
+            
+            {/* Form content based on active tab */}
+            <form onSubmit={isAddingBoat ? handleAddBoat : handleUpdateBoat}>
+              {renderFormTab()}
+              
+              {/* Submit button */}
+              <div className="formFooter">
+                {isUploading ? (
+                  <div className="spinnerContainer">
+                    <div className="spinner"></div>
+                    <span>{t.uploadingPhotos} {Math.round(uploadProgress)}%</span>
+                  </div>
+                ) : (
+                  <button
+                    type="submit"
+                    className="buttonPrimary"
+                  >
+                    {t.save}
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
         </div>
       )}
       
       {/* Boat List */}
       {!isAddingBoat && !isEditingBoat && (
         <div>
-          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
-            <h2 style={styles.subtitle}>{t.boatList.subtitle}</h2>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem',
+            marginBottom: '1.25rem',
+            '@media (min-width: 640px)': {
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }
+          }}>
+            <h2 className="subtitle">{t.boatList.subtitle}</h2>
             <button
               type="button"
               onClick={() => {
                 resetForm();
                 setIsAddingBoat(true);
               }}
-              style={styles.buttonPrimary}
+              className="buttonPrimary"
             >
               {t.boatList.addNew}
             </button>
           </div>
           
           {boats.length === 0 ? (
-            <div style={{textAlign: 'center', padding: '40px 0', background: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'}}>
+            <div style={{textAlign: 'center', padding: '2.5rem 1rem', background: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'}}>
               <p style={{color: '#6b7280'}}>{t.boatList.noBoats}</p>
             </div>
           ) : (
-            <div style={styles.boatListContainer}>
+            <div className="boatListContainer">
               {boats.map((boat) => (
-                <div key={boat.id} style={styles.boatCard}>
+                <div key={boat.id} className="boatCard">
                   {/* Boat image or placeholder */}
-                  <div style={styles.boatImageContainer}>
+                  <div className="boatImageContainer">
                     {boat.photos && boat.photos.length > 0 ? (
                       <img
                         src={boat.photos[0].url}
                         alt={getLocalizedContent(boat.name, language, t.noPhotos)}
-                        style={styles.boatImage}
+                        className="boatImage"
                       />
                     ) : (
-                      <div style={styles.placeholderImage}>
+                      <div className="placeholderImage">
                         {t.noPhotos}
                       </div>
                     )}
                   </div>
                   
                   {/* Boat details */}
-                  <div style={styles.boatCardContent}>
-                    <h3 style={styles.boatCardTitle}>
+                  <div className="boatCardContent">
+                    <h3 className="boatCardTitle">
                       {getLocalizedContent(boat.name, language)}
                     </h3>
                     
-                    <div style={styles.boatCardDetails}>
-                      <p style={{marginBottom: '4px'}}>
+                    <div className="boatCardDetails">
+                      <p style={{marginBottom: '0.25rem'}}>
                         {boat.length ? `${boat.length}m • ` : ''}
                         {boat.capacity ? `${boat.capacity} ${language === 'en' ? 'people' : 'persoane'}` : ''}
                       </p>
                       <p>{getLocalizedContent(boat.cruisingArea, language)}</p>
                     </div>
                     
-                    <div style={styles.buttonRow}>
+                    <div className="buttonRow">
                       <button
                         type="button"
                         onClick={() => startEditingBoat(boat)}
-                        style={styles.buttonSecondary}
+                        className="buttonSecondary"
                       >
                         {t.edit}
                       </button>
@@ -2448,7 +2675,7 @@ function Boats() {
                             handleDeleteBoat(boat.id);
                           }
                         }}
-                        style={styles.buttonDanger}
+                        className="buttonDanger"
                       >
                         {t.delete}
                       </button>
