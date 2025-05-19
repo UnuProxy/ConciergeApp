@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, where, getFirestore, addDoc } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
+/**
+ * Mobile-first Finance component
+ * This component is fully optimized for mobile devices with responsive design
+ */
 const Finance = () => {
   // State for component data
   const [reservations, setReservations] = useState([]);
@@ -614,200 +618,201 @@ const Finance = () => {
 
   // Render loading spinner
   const renderLoading = () => (
-    <div className="flex flex-col justify-center items-center h-64">
-      <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500 mb-4"></div>
-      <div className="text-lg text-gray-600">{t.loading}</div>
+    <div className="flex flex-col justify-center items-center h-48">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-500 mb-3"></div>
+      <div className="text-base text-gray-600">{t.loading}</div>
     </div>
   );
 
   // Render dashboard view
   const renderDashboard = () => (
-    <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="bg-white rounded-lg shadow p-6 flex flex-col items-center text-center">
-          <div className="bg-blue-100 rounded-full p-3 mb-3">
-            <svg className="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
+    <div className="space-y-5">
+      {/* Summary Cards - 2x2 Grid for mobile */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center justify-center mb-2">
+            <div className="bg-blue-100 rounded-full p-2.5">
+              <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
           </div>
-          <p className="text-sm font-medium text-gray-500 mb-1">{t.totalIncome}</p>
-          <p className="text-2xl font-bold text-gray-800">€{totalIncome.toLocaleString()}</p>
+          <p className="text-center text-sm font-medium text-gray-500 mb-1">{t.totalIncome}</p>
+          <p className="text-center text-xl font-bold text-gray-800">€{totalIncome.toLocaleString()}</p>
         </div>
         
-        <div className="bg-white rounded-lg shadow p-6 flex flex-col items-center text-center">
-          <div className="bg-red-100 rounded-full p-3 mb-3">
-            <svg className="h-8 w-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
-            </svg>
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center justify-center mb-2">
+            <div className="bg-red-100 rounded-full p-2.5">
+              <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+              </svg>
+            </div>
           </div>
-          <p className="text-sm font-medium text-gray-500 mb-1">{t.paymentsTotal}</p>
-          <p className="text-2xl font-bold text-gray-800">€{totalPayments.toLocaleString()}</p>
+          <p className="text-center text-sm font-medium text-gray-500 mb-1">{t.paymentsTotal}</p>
+          <p className="text-center text-xl font-bold text-gray-800">€{totalPayments.toLocaleString()}</p>
         </div>
         
-        <div className="bg-white rounded-lg shadow p-6 flex flex-col items-center text-center">
-          <div className="bg-green-100 rounded-full p-3 mb-3">
-            <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-            </svg>
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center justify-center mb-2">
+            <div className="bg-green-100 rounded-full p-2.5">
+              <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+              </svg>
+            </div>
           </div>
-          <p className="text-sm font-medium text-gray-500 mb-1">{t.revenue}</p>
-          <p className="text-2xl font-bold text-gray-800">€{totalRevenue.toLocaleString()}</p>
+          <p className="text-center text-sm font-medium text-gray-500 mb-1">{t.revenue}</p>
+          <p className="text-center text-xl font-bold text-gray-800">€{totalRevenue.toLocaleString()}</p>
         </div>
         
-        <div className="bg-white rounded-lg shadow p-6 flex flex-col items-center text-center">
-          <div className="bg-orange-100 rounded-full p-3 mb-3">
-            <svg className="h-8 w-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
-            </svg>
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center justify-center mb-2">
+            <div className="bg-purple-100 rounded-full p-2.5">
+              <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
           </div>
-          <p className="text-sm font-medium text-gray-500 mb-1">{t.expensesTotal}</p>
-          <p className="text-2xl font-bold text-gray-800">€{totalExpenses.toLocaleString()}</p>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow p-6 flex flex-col items-center text-center">
-          <div className="bg-purple-100 rounded-full p-3 mb-3">
-            <svg className="h-8 w-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-          </div>
-          <p className="text-sm font-medium text-gray-500 mb-1">{t.netProfit}</p>
-          <p className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          <p className="text-center text-sm font-medium text-gray-500 mb-1">{t.netProfit}</p>
+          <p className={`text-center text-xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
             €{netProfit.toLocaleString()}
           </p>
         </div>
       </div>
 
-      {/* Category Overview */}
+      {/* Category Overview - Mobile friendly Card View */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-800">{t.categoryOverview}</h2>
+        <div className="px-4 py-3 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-800">{t.categoryOverview}</h2>
         </div>
         
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">{t.category}</th>
-                <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.transactionCount}</th>
-                <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.income}</th>
-                <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.payments}</th>
-                <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.revenue}</th>
-                <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.margin}</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {categoryRevenueData.map((data, index) => (
-                <tr key={index} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 capitalize">{data.category}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{data.count}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">€{data.income.toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">€{data.payment.toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">€{data.revenue.toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{data.margin.toFixed(1)}%</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot className="bg-gray-50">
-              <tr>
-                <td colSpan={2} className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">{t.total}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 text-right">€{totalIncome.toLocaleString()}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 text-right">€{totalPayments.toLocaleString()}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 text-right">€{totalRevenue.toLocaleString()}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 text-right">
+        <div className="p-4 space-y-4">
+          {categoryRevenueData.map((data, index) => (
+            <div key={index} className="bg-gray-50 rounded-lg p-4 shadow-sm">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="font-medium text-gray-700 capitalize">{data.category}</h3>
+                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                  {data.count} {t.transactionCount}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-gray-500">{t.income}</p>
+                  <p className="font-semibold">€{data.income.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">{t.payments}</p>
+                  <p className="font-semibold">€{data.payment.toLocaleString()}</p>
+                </div>
+              </div>
+              <div className="mt-2 pt-2 border-t border-gray-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">{t.margin}</span>
+                  <span className="font-semibold text-sm">{data.margin.toFixed(1)}%</span>
+                </div>
+              </div>
+            </div>
+          ))}
+          
+          {/* Total Card */}
+          <div className="bg-blue-50 rounded-lg p-4 shadow-sm">
+            <h3 className="font-medium text-gray-700 mb-2">{t.total}</h3>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-gray-500">{t.income}</p>
+                <p className="font-semibold">€{totalIncome.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-gray-500">{t.payments}</p>
+                <p className="font-semibold">€{totalPayments.toLocaleString()}</p>
+              </div>
+            </div>
+            <div className="mt-2 pt-2 border-t border-gray-200">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500 text-sm">{t.margin}</span>
+                <span className="font-semibold text-sm">
                   {totalIncome > 0 ? `${(totalRevenue / totalIncome * 100).toFixed(1)}%` : '0%'}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Recent Transactions */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
-          <h3 className="text-xl font-semibold text-gray-800">{t.recentTransactions}</h3>
+        <div className="flex justify-between items-center px-4 py-3 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-800">{t.recentTransactions}</h3>
           <button 
-            className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg font-medium hover:bg-blue-200 transition-colors"
+            className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors"
             onClick={() => setViewMode('transactions')}
           >
             {t.viewAll}
           </button>
         </div>
-        <div className="overflow-x-auto">
+        <div className="p-4">
           {reservations.length === 0 ? (
-            <div className="flex items-center justify-center h-32">
-              <div className="text-gray-500">{t.noTransactions}</div>
+            <div className="flex items-center justify-center h-20">
+              <div className="text-gray-500 text-sm">{t.noTransactions}</div>
             </div>
           ) : (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">{t.date}</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">{t.service}</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500 hidden md:table-cell">{t.description}</th>
-                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.income}</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {reservations.slice(0, 5).map(reservation => (
-                  <tr key={reservation.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(reservation.date)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 capitalize">{reservation.service}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate hidden md:table-cell">{reservation.description}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right font-medium">€{reservation.clientIncome.toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="space-y-3">
+              {reservations.slice(0, 3).map(reservation => (
+                <div key={reservation.id} className="bg-gray-50 rounded-lg p-3 shadow-sm">
+                  <div className="flex justify-between mb-1">
+                    <div className="text-sm font-semibold capitalize text-gray-700">{reservation.service}</div>
+                    <div className="text-xs text-gray-500">{formatDate(reservation.date)}</div>
+                  </div>
+                  <div className="text-xs text-gray-500 mb-2 truncate">{reservation.description}</div>
+                  <div className="text-right font-semibold text-gray-700">€{reservation.clientIncome.toLocaleString()}</div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
     </div>
   );
 
-  // Render transactions view
+  // Render transactions view - Card style for mobile
   const renderTransactions = () => (
     <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-      <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-        <h2 className="text-xl font-semibold text-gray-800">{t.transactionsTitle}</h2>
-        <p className="text-gray-500 mt-1">
+      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+        <h2 className="text-lg font-semibold text-gray-800">{t.transactionsTitle}</h2>
+        <p className="text-gray-500 text-xs mt-1">
           {t.transactionsHelp}
         </p>
       </div>
       
-      <div className="overflow-x-auto">
+      <div className="p-4">
         {reservations.length === 0 ? (
-          <div className="flex items-center justify-center h-64">
+          <div className="flex items-center justify-center h-32">
             <div className="text-gray-500">{t.noTransactions}</div>
           </div>
         ) : (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">{t.date}</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">{t.service}</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500 hidden md:table-cell">{t.description}</th>
-                <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.income}</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {reservations.map(reservation => (
-                <tr key={reservation.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(reservation.date)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 capitalize">{reservation.service}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate max-w-xs hidden md:table-cell">{reservation.description}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right font-medium">€{reservation.clientIncome.toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot className="bg-gray-50">
-              <tr>
-                <td colSpan={3} className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">{t.total}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 text-right">€{totalIncome.toLocaleString()}</td>
-              </tr>
-            </tfoot>
-          </table>
+          <div className="space-y-3">
+            {reservations.map(reservation => (
+              <div key={reservation.id} className="bg-gray-50 rounded-lg p-3 shadow-sm">
+                <div className="flex justify-between mb-1">
+                  <div className="text-sm font-semibold capitalize text-gray-700">{reservation.service}</div>
+                  <div className="text-xs text-gray-500">{formatDate(reservation.date)}</div>
+                </div>
+                <div className="text-xs text-gray-500 mb-2 truncate">{reservation.description}</div>
+                <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                  <div className="text-xs font-medium text-gray-500">{t.income}</div>
+                  <div className="text-sm font-semibold text-gray-700">€{reservation.clientIncome.toLocaleString()}</div>
+                </div>
+              </div>
+            ))}
+            
+            {/* Total Card */}
+            <div className="bg-blue-50 rounded-lg p-3 shadow-sm">
+              <div className="flex justify-between items-center">
+                <div className="text-sm font-medium text-gray-700">{t.total}</div>
+                <div className="text-sm font-semibold text-gray-700">€{totalIncome.toLocaleString()}</div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -815,66 +820,57 @@ const Finance = () => {
 
   // Render category payments view
   const renderCategoryPayments = () => (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Category Overview */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-          <h2 className="text-xl font-semibold text-gray-800">{t.categoryOverview}</h2>
-          <p className="text-gray-500 mt-1">
+        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+          <h2 className="text-lg font-semibold text-gray-800">{t.categoryOverview}</h2>
+          <p className="text-gray-500 text-xs mt-1">
             {t.categoriesHelp}
           </p>
         </div>
         
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">{t.category}</th>
-                <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.transactionCount}</th>
-                <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.income}</th>
-                <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.payments}</th>
-                <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.revenue}</th>
-                <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.margin}</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {categoryRevenueData.map((data, index) => (
-                <tr key={index} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 capitalize">{data.category}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{data.count}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">€{data.income.toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">€{data.payment.toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">€{data.revenue.toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{data.margin.toFixed(1)}%</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot className="bg-gray-50">
-              <tr>
-                <td colSpan={2} className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">{t.total}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 text-right">€{totalIncome.toLocaleString()}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 text-right">€{totalPayments.toLocaleString()}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 text-right">€{totalRevenue.toLocaleString()}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 text-right">
-                  {totalIncome > 0 ? `${(totalRevenue / totalIncome * 100).toFixed(1)}%` : '0%'}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+        <div className="p-4 space-y-3">
+          {categoryRevenueData.map((data, index) => (
+            <div key={index} className="bg-gray-50 rounded-lg p-3 shadow-sm">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="font-medium text-gray-700 capitalize">{data.category}</h3>
+                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                  {data.count}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <p className="text-xs text-gray-500">{t.income}</p>
+                  <p className="text-sm font-semibold">€{data.income.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">{t.payments}</p>
+                  <p className="text-sm font-semibold">€{data.payment.toLocaleString()}</p>
+                </div>
+              </div>
+              <div className="mt-2 pt-2 border-t border-gray-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-500">{t.margin}</span>
+                  <span className="text-xs font-semibold">{data.margin.toFixed(1)}%</span>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
       
       {/* Add Category Payment Form */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-          <h2 className="text-xl font-semibold text-gray-800">{t.addCategoryPayment}</h2>
+        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+          <h2 className="text-lg font-semibold text-gray-800">{t.addCategoryPayment}</h2>
         </div>
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div className="p-4">
+          <div className="space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">{t.category}</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t.category}</label>
               <select
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 value={newPayment.category}
                 onChange={(e) => setNewPayment({...newPayment, category: e.target.value})}
               >
@@ -885,28 +881,28 @@ const Finance = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">{t.amountInput}</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t.amountInput}</label>
               <input
                 type="number"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 value={newPayment.amount}
                 onChange={(e) => setNewPayment({...newPayment, amount: e.target.value})}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">{t.date}</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t.date}</label>
               <input
                 type="date"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 value={newPayment.date}
                 onChange={(e) => setNewPayment({...newPayment, date: e.target.value})}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">{t.paymentDescription}</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t.paymentDescription}</label>
               <input
                 type="text"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 value={newPayment.description}
                 onChange={(e) => setNewPayment({...newPayment, description: e.target.value})}
                 placeholder={t.paymentPlaceholder}
@@ -914,9 +910,9 @@ const Finance = () => {
             </div>
           </div>
           
-          <div className="flex justify-end">
+          <div className="mt-5">
             <button
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 font-medium text-sm transition-colors"
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 font-medium text-sm transition-colors"
               onClick={handleAddPayment}
             >
               {t.addPayment}
@@ -927,42 +923,39 @@ const Finance = () => {
       
       {/* Payment History */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-          <h2 className="text-xl font-semibold text-gray-800">{t.paymentHistory}</h2>
+        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+          <h2 className="text-lg font-semibold text-gray-800">{t.paymentHistory}</h2>
         </div>
         
-        <div className="overflow-x-auto">
+        <div className="p-4">
           {categoryPayments.length === 0 ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="text-gray-500">{t.noPayments}</div>
+            <div className="flex items-center justify-center h-20">
+              <div className="text-gray-500 text-sm">{t.noPayments}</div>
             </div>
           ) : (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">{t.date}</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">{t.category}</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500 hidden md:table-cell">{t.description}</th>
-                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.amount}</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {categoryPayments.map(payment => (
-                  <tr key={payment.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(payment.date)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 capitalize">{payment.category}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate max-w-xs hidden md:table-cell">{payment.description}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right font-medium">€{payment.amount.toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-gray-50">
-                <tr>
-                  <td colSpan={3} className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">{t.paymentsTotal}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 text-right">€{totalPayments.toLocaleString()}</td>
-                </tr>
-              </tfoot>
-            </table>
+            <div className="space-y-3">
+              {categoryPayments.map(payment => (
+                <div key={payment.id} className="bg-gray-50 rounded-lg p-3 shadow-sm">
+                  <div className="flex justify-between mb-1">
+                    <div className="text-sm font-semibold capitalize text-gray-700">{payment.category}</div>
+                    <div className="text-xs text-gray-500">{formatDate(payment.date)}</div>
+                  </div>
+                  <div className="text-xs text-gray-500 mb-2 truncate">{payment.description}</div>
+                  <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                    <div className="text-xs font-medium text-gray-500">{t.amount}</div>
+                    <div className="text-sm font-semibold text-gray-700">€{payment.amount.toLocaleString()}</div>
+                  </div>
+                </div>
+              ))}
+              
+              {/* Total Card */}
+              <div className="bg-blue-50 rounded-lg p-3 shadow-sm">
+                <div className="flex justify-between items-center">
+                  <div className="text-sm font-medium text-gray-700">{t.paymentsTotal}</div>
+                  <div className="text-sm font-semibold text-gray-700">€{totalPayments.toLocaleString()}</div>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -971,21 +964,21 @@ const Finance = () => {
 
   // Render expenses view
   const renderExpenses = () => (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Add New Expense */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-          <h2 className="text-xl font-semibold text-gray-800">{t.addNewExpense}</h2>
-          <p className="text-gray-500 mt-1">
+        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+          <h2 className="text-lg font-semibold text-gray-800">{t.addNewExpense}</h2>
+          <p className="text-gray-500 text-xs mt-1">
             {t.expensesHelp}
           </p>
         </div>
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="p-4">
+          <div className="space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">{t.expenseCategory}</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t.expenseCategory}</label>
               <select
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 value={newExpense.category}
                 onChange={(e) => setNewExpense({...newExpense, category: e.target.value})}
               >
@@ -998,39 +991,38 @@ const Finance = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">{t.expenseAmount}</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t.expenseAmount}</label>
               <input
                 type="number"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 value={newExpense.amount}
                 onChange={(e) => setNewExpense({...newExpense, amount: e.target.value})}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">{t.expenseDate}</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t.expenseDate}</label>
               <input
                 type="date"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 value={newExpense.date}
                 onChange={(e) => setNewExpense({...newExpense, date: e.target.value})}
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t.expenseDescription}</label>
+              <input
+                type="text"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                value={newExpense.description}
+                onChange={(e) => setNewExpense({...newExpense, description: e.target.value})}
+                placeholder={t.expensePlaceholder}
+              />
+            </div>
           </div>
           
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t.expenseDescription}</label>
-            <input
-              type="text"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              value={newExpense.description}
-              onChange={(e) => setNewExpense({...newExpense, description: e.target.value})}
-              placeholder={t.expensePlaceholder}
-            />
-          </div>
-          
-          <div className="flex justify-end">
+          <div className="mt-5">
             <button
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 font-medium text-sm transition-colors"
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 font-medium text-sm transition-colors"
               onClick={handleAddExpense}
             >
               {t.addExpense}
@@ -1041,102 +1033,98 @@ const Finance = () => {
 
       {/* Expenses List */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-          <h2 className="text-xl font-semibold text-gray-800">{t.expenses}</h2>
+        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+          <h2 className="text-lg font-semibold text-gray-800">{t.expenses}</h2>
         </div>
         
-        <div className="overflow-x-auto">
+        <div className="p-4">
           {expenses.length === 0 ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="text-gray-500">{t.noExpenses}</div>
+            <div className="flex items-center justify-center h-20">
+              <div className="text-gray-500 text-sm">{t.noExpenses}</div>
             </div>
           ) : (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">{t.date}</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">{t.category}</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500 hidden md:table-cell">{t.description}</th>
-                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.amount}</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {expenses.map(expense => (
-                  <tr key={expense.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(expense.date)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 capitalize">{getExpenseCategoryName(expense.category)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate max-w-xs hidden md:table-cell">{expense.description}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right font-medium">€{expense.amount.toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-gray-50">
-                <tr>
-                  <td colSpan={3} className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">{t.expenseTotal}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 text-right">€{totalExpenses.toLocaleString()}</td>
-                </tr>
-              </tfoot>
-            </table>
+            <div className="space-y-3">
+              {expenses.map(expense => (
+                <div key={expense.id} className="bg-gray-50 rounded-lg p-3 shadow-sm">
+                  <div className="flex justify-between mb-1">
+                    <div className="text-sm font-semibold capitalize text-gray-700">
+                      {getExpenseCategoryName(expense.category)}
+                    </div>
+                    <div className="text-xs text-gray-500">{formatDate(expense.date)}</div>
+                  </div>
+                  <div className="text-xs text-gray-500 mb-2 truncate">{expense.description}</div>
+                  <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                    <div className="text-xs font-medium text-gray-500">{t.amount}</div>
+                    <div className="text-sm font-semibold text-gray-700">€{expense.amount.toLocaleString()}</div>
+                  </div>
+                </div>
+              ))}
+              
+              {/* Total Card */}
+              <div className="bg-blue-50 rounded-lg p-3 shadow-sm">
+                <div className="flex justify-between items-center">
+                  <div className="text-sm font-medium text-gray-700">{t.expenseTotal}</div>
+                  <div className="text-sm font-semibold text-gray-700">€{totalExpenses.toLocaleString()}</div>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
       
       {/* Expenses by Category */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-800">{t.expensesByCategory}</h2>
+        <div className="px-4 py-3 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-800">{t.expensesByCategory}</h2>
         </div>
-        <div className="p-6">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">{t.category}</th>
-                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.amount}</th>
-                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.percentage}</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {Object.keys(expenses.reduce((acc, expense) => {
-                  const key = expense.category;
-                  if (!acc[key]) {
-                    acc[key] = 0;
-                  }
-                  acc[key] += expense.amount;
-                  return acc;
-                }, {})).map((category, index) => {
-                  const amount = expenses
-                    .filter(e => e.category === category)
-                    .reduce((sum, e) => sum + e.amount, 0);
-                  const percentage = totalExpenses > 0 ? amount / totalExpenses * 100 : 0;
-                  
-                  return (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 capitalize">
-                        {getExpenseCategoryName(category)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                        €{amount.toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                        {percentage.toFixed(1)}%
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot className="bg-gray-50">
-                <tr>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">{t.total}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 text-right">
-                    €{totalExpenses.toLocaleString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 text-right">
-                    100%
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+        <div className="p-4">
+          <div className="space-y-3">
+            {Object.keys(expenses.reduce((acc, expense) => {
+              const key = expense.category;
+              if (!acc[key]) {
+                acc[key] = 0;
+              }
+              acc[key] += expense.amount;
+              return acc;
+            }, {})).map((category, index) => {
+              const amount = expenses
+                .filter(e => e.category === category)
+                .reduce((sum, e) => sum + e.amount, 0);
+              const percentage = totalExpenses > 0 ? amount / totalExpenses * 100 : 0;
+              
+              return (
+                <div key={index} className="bg-gray-50 rounded-lg p-3 shadow-sm">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-sm font-medium text-gray-700 capitalize">
+                      {getExpenseCategoryName(category)}
+                    </h3>
+                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                      {percentage.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="mt-1">
+                    <div className="bg-gray-200 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-blue-500 h-full rounded-full" 
+                        style={{ width: `${percentage}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex justify-between items-center">
+                    <span className="text-xs text-gray-500">{t.amount}</span>
+                    <span className="text-sm font-semibold">€{amount.toLocaleString()}</span>
+                  </div>
+                </div>
+              );
+            })}
+            
+            {/* Total Card */}
+            <div className="bg-blue-50 rounded-lg p-3 shadow-sm">
+              <div className="flex justify-between items-center">
+                <div className="text-sm font-medium text-gray-700">{t.total}</div>
+                <div className="text-sm font-semibold text-gray-700">€{totalExpenses.toLocaleString()}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1145,98 +1133,117 @@ const Finance = () => {
 
   // Render reports view
   const renderReports = () => (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-800">{t.financialSummary}</h2>
-          <p className="text-gray-500 mt-1">
+        <div className="px-4 py-3 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-800">{t.financialSummary}</h2>
+          <p className="text-gray-500 text-xs mt-1">
             {t.reportsHelp}
           </p>
         </div>
-        <div className="p-6">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">{t.metric}</th>
-                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.amountValue}</th>
-                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.percentage}</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                <tr className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">{t.totalIncome}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">€{totalIncome.toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">100%</td>
-                </tr>
-                <tr className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">{t.paymentsTotal}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">€{totalPayments.toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{totalIncome > 0 ? `${(totalPayments / totalIncome * 100).toFixed(1)}%` : '0%'}</td>
-                </tr>
-                <tr className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">{t.grossRevenue}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">€{totalRevenue.toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{totalIncome > 0 ? `${(totalRevenue / totalIncome * 100).toFixed(1)}%` : '0%'}</td>
-                </tr>
-                <tr className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">{t.expensesTotal}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">€{totalExpenses.toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{totalRevenue > 0 ? `${(totalExpenses / totalRevenue * 100).toFixed(1)}%` : '0%'}</td>
-                </tr>
-              </tbody>
-              <tfoot className="bg-gray-50">
-                <tr>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">{t.netProfit}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 text-right">€{netProfit.toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 text-right">{totalRevenue > 0 ? `${(netProfit / totalRevenue * 100).toFixed(1)}%` : '0%'}</td>
-                </tr>
-              </tfoot>
-            </table>
+        <div className="p-4">
+          <div className="space-y-3">
+            <div className="bg-gray-50 rounded-lg p-3 shadow-sm">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">{t.totalIncome}</h3>
+              <div className="flex justify-between items-center">
+                <span className="text-base font-semibold text-gray-800">€{totalIncome.toLocaleString()}</span>
+                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">100%</span>
+              </div>
+            </div>
+            
+            <div className="bg-gray-50 rounded-lg p-3 shadow-sm">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">{t.paymentsTotal}</h3>
+              <div className="flex justify-between items-center">
+                <span className="text-base font-semibold text-gray-800">€{totalPayments.toLocaleString()}</span>
+                <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">
+                  {totalIncome > 0 ? `${(totalPayments / totalIncome * 100).toFixed(1)}%` : '0%'}
+                </span>
+              </div>
+            </div>
+            
+            <div className="bg-gray-50 rounded-lg p-3 shadow-sm">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">{t.grossRevenue}</h3>
+              <div className="flex justify-between items-center">
+                <span className="text-base font-semibold text-gray-800">€{totalRevenue.toLocaleString()}</span>
+                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                  {totalIncome > 0 ? `${(totalRevenue / totalIncome * 100).toFixed(1)}%` : '0%'}
+                </span>
+              </div>
+            </div>
+            
+            <div className="bg-gray-50 rounded-lg p-3 shadow-sm">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">{t.expensesTotal}</h3>
+              <div className="flex justify-between items-center">
+                <span className="text-base font-semibold text-gray-800">€{totalExpenses.toLocaleString()}</span>
+                <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full">
+                  {totalRevenue > 0 ? `${(totalExpenses / totalRevenue * 100).toFixed(1)}%` : '0%'}
+                </span>
+              </div>
+            </div>
+            
+            <div className="bg-blue-50 rounded-lg p-3 shadow-sm">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">{t.netProfit}</h3>
+              <div className="flex justify-between items-center">
+                <span className={`text-base font-semibold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  €{netProfit.toLocaleString()}
+                </span>
+                <span className={`text-xs ${netProfit >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} px-2 py-1 rounded-full`}>
+                  {totalRevenue > 0 ? `${(netProfit / totalRevenue * 100).toFixed(1)}%` : '0%'}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Monthly Overview */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-800">{t.monthlyOverview}</h2>
+        <div className="px-4 py-3 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-800">{t.monthlyOverview}</h2>
         </div>
-        <div className="p-6">
-          <div className="overflow-x-auto">
-            {Object.keys(monthlyData).length === 0 ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="text-gray-500">{t.noMonthlyData}</div>
-              </div>
-            ) : (
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">{t.month}</th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.income}</th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.payments}</th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.revenue}</th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.expenses}</th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-500">{t.profit}</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {Object.values(monthlyData).map((data, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{formatMonth(data.month)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">€{data.income.toLocaleString()}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">€{data.payments.toLocaleString()}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">€{data.revenue.toLocaleString()}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">€{data.expenses.toLocaleString()}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                        €{(data.revenue - data.expenses).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+        <div className="p-4">
+          {Object.keys(monthlyData).length === 0 ? (
+            <div className="flex items-center justify-center h-20">
+              <div className="text-gray-500 text-sm">{t.noMonthlyData}</div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {Object.values(monthlyData).map((data, index) => {
+                const profit = data.revenue - data.expenses;
+                return (
+                  <div key={index} className="bg-gray-50 rounded-lg p-3 shadow-sm">
+                    <h3 className="text-sm font-medium text-gray-700 mb-2">{formatMonth(data.month)}</h3>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                      <div>
+                        <p className="text-xs text-gray-500">{t.income}</p>
+                        <p className="text-sm font-semibold">€{data.income.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">{t.payments}</p>
+                        <p className="text-sm font-semibold">€{data.payments.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">{t.revenue}</p>
+                        <p className="text-sm font-semibold">€{data.revenue.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">{t.expenses}</p>
+                        <p className="text-sm font-semibold">€{data.expenses.toLocaleString()}</p>
+                      </div>
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-500">{t.profit}</span>
+                        <span className={`text-sm font-semibold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          €{profit.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1267,113 +1274,106 @@ const Finance = () => {
   return (
     <div className="bg-gray-100 min-h-screen">
       {/* Success Alert */}
-      <div className={`fixed bottom-8 right-8 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-opacity duration-300 ${showAddSuccess ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`fixed bottom-3 right-3 left-3 bg-green-600 text-white px-3 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300 ${showAddSuccess ? 'opacity-100' : 'opacity-0'}`}>
         <div className="flex items-center">
-          <svg className="h-6 w-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-5 w-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
           </svg>
-          {successMessage}
+          <span className="text-sm">{successMessage}</span>
         </div>
       </div>
 
       {/* Header */}
-      <div className="bg-white shadow-md">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold text-gray-800">{t.financeManagement}</h1>
-          <p className="text-gray-500 mt-1">{t.companyDashboard}</p>
+      <div className="bg-white shadow">
+        <div className="flex items-center justify-between px-4 py-3">
+          <button 
+            className="p-2 text-gray-600"
+            onClick={toggleMobileMenu}
+          >
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+          <h1 className="text-xl font-bold text-gray-800">Finance</h1>
+          <div className="w-8"></div> {/* Empty div for balance */}
         </div>
       </div>
 
-      {/* Mobile Menu Button */}
-      <div className="md:hidden fixed bottom-4 right-4 z-40">
-        <button
-          className="bg-blue-600 text-white p-4 rounded-full shadow-lg"
-          onClick={toggleMobileMenu}
-        >
-          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            {isMobileMenuOpen ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path>
-            )}
-          </svg>
-        </button>
+      {/* Page Title Area */}
+      <div className="bg-white border-b border-gray-200 px-4 py-4">
+        <h2 className="text-lg font-bold text-gray-800">{t.financeManagement}</h2>
+        <p className="text-gray-500 text-sm">{t.companyDashboard}</p>
       </div>
 
-      {/* Mobile Menu */}
+      {/* Mobile Menu Drawer */}
       {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-30" onClick={toggleMobileMenu}>
-          <div className="absolute right-0 top-0 bottom-0 w-64 bg-white shadow-lg p-6" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-gray-800">{t.menu}</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-30" onClick={toggleMobileMenu}>
+          <div className="absolute left-0 top-0 bottom-0 w-64 bg-white shadow-lg p-5" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-5">
+              <h2 className="text-lg font-semibold text-gray-800">{t.menu}</h2>
               <button 
                 className="p-2 rounded-md text-gray-600 hover:bg-gray-100"
                 onClick={toggleMobileMenu}
               >
-                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
               </button>
             </div>
-            <nav className="space-y-4">
+            <nav className="space-y-2">
               <button 
-                className={`w-full flex items-center px-4 py-3 rounded-lg ${viewMode === 'dashboard' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
+                className={`w-full flex items-center px-3 py-2 rounded-lg ${viewMode === 'dashboard' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
                 onClick={() => { setViewMode('dashboard'); toggleMobileMenu(); }}
               >
-                <svg className="h-6 w-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
                 </svg>
                 <div className="text-left">
                   <div className="font-medium">{t.dashboard}</div>
-                  <div className="text-xs text-gray-500">{t.dashboardHelp}</div>
                 </div>
               </button>
               <button 
-                className={`w-full flex items-center px-4 py-3 rounded-lg ${viewMode === 'transactions' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
+                className={`w-full flex items-center px-3 py-2 rounded-lg ${viewMode === 'transactions' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
                 onClick={() => { setViewMode('transactions'); toggleMobileMenu(); }}
               >
-                <svg className="h-6 w-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                 </svg>
                 <div className="text-left">
                   <div className="font-medium">{t.transactions}</div>
-                  <div className="text-xs text-gray-500">{t.transactionsHelp}</div>
                 </div>
               </button>
               <button 
-                className={`w-full flex items-center px-4 py-3 rounded-lg ${viewMode === 'categories' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
+                className={`w-full flex items-center px-3 py-2 rounded-lg ${viewMode === 'categories' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
                 onClick={() => { setViewMode('categories'); toggleMobileMenu(); }}
               >
-                <svg className="h-6 w-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                 </svg>
                 <div className="text-left">
                   <div className="font-medium">{t.categoryPayments}</div>
-                  <div className="text-xs text-gray-500">{t.categoriesHelp}</div>
                 </div>
               </button>
               <button 
-                className={`w-full flex items-center px-4 py-3 rounded-lg ${viewMode === 'expenses' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
+                className={`w-full flex items-center px-3 py-2 rounded-lg ${viewMode === 'expenses' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
                 onClick={() => { setViewMode('expenses'); toggleMobileMenu(); }}
               >
-                <svg className="h-6 w-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
                 <div className="text-left">
                   <div className="font-medium">{t.expenses}</div>
-                  <div className="text-xs text-gray-500">{t.expensesHelp}</div>
                 </div>
               </button>
               <button 
-                className={`w-full flex items-center px-4 py-3 rounded-lg ${viewMode === 'reports' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
+                className={`w-full flex items-center px-3 py-2 rounded-lg ${viewMode === 'reports' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
                 onClick={() => { setViewMode('reports'); toggleMobileMenu(); }}
               >
-                <svg className="h-6 w-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                 </svg>
                 <div className="text-left">
                   <div className="font-medium">{t.reports}</div>
-                  <div className="text-xs text-gray-500">{t.reportsHelp}</div>
                 </div>
               </button>
             </nav>
@@ -1381,81 +1381,60 @@ const Finance = () => {
         </div>
       )}
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Desktop Navigation */}
-        <div className="hidden md:flex bg-white rounded-lg shadow-md overflow-hidden mb-6">
-          <button
-            className={`flex flex-col items-center py-4 px-8 transition-colors ${
-              viewMode === 'dashboard'
-                ? 'text-blue-600 bg-blue-50 border-b-4 border-blue-500'
-                : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50 border-b-4 border-transparent'
-            }`}
+      {/* Bottom Navigation for Mobile */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20">
+        <div className="grid grid-cols-5 h-14">
+          <button 
+            className={`flex flex-col items-center justify-center ${viewMode === 'dashboard' ? 'text-blue-600' : 'text-gray-600'}`}
             onClick={() => setViewMode('dashboard')}
           >
-            <svg className="h-6 w-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
             </svg>
-            {t.dashboard}
+            <span className="text-xs mt-1">{t.dashboard}</span>
           </button>
-          <button
-            className={`flex flex-col items-center py-4 px-8 transition-colors ${
-              viewMode === 'transactions'
-                ? 'text-blue-600 bg-blue-50 border-b-4 border-blue-500'
-                : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50 border-b-4 border-transparent'
-            }`}
+          <button 
+            className={`flex flex-col items-center justify-center ${viewMode === 'transactions' ? 'text-blue-600' : 'text-gray-600'}`}
             onClick={() => setViewMode('transactions')}
           >
-            <svg className="h-6 w-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
             </svg>
-            {t.transactions}
+            <span className="text-xs mt-1">{t.transactions}</span>
           </button>
-          <button
-            className={`flex flex-col items-center py-4 px-8 transition-colors ${
-              viewMode === 'categories'
-                ? 'text-blue-600 bg-blue-50 border-b-4 border-blue-500'
-                : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50 border-b-4 border-transparent'
-            }`}
+          <button 
+            className={`flex flex-col items-center justify-center ${viewMode === 'categories' ? 'text-blue-600' : 'text-gray-600'}`}
             onClick={() => setViewMode('categories')}
           >
-            <svg className="h-6 w-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
             </svg>
-            {t.categoryPayments}
+            <span className="text-xs mt-1">{t.categoryPayments}</span>
           </button>
-          <button
-            className={`flex flex-col items-center py-4 px-8 transition-colors ${
-              viewMode === 'expenses'
-                ? 'text-blue-600 bg-blue-50 border-b-4 border-blue-500'
-                : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50 border-b-4 border-transparent'
-            }`}
+          <button 
+            className={`flex flex-col items-center justify-center ${viewMode === 'expenses' ? 'text-blue-600' : 'text-gray-600'}`}
             onClick={() => setViewMode('expenses')}
           >
-            <svg className="h-6 w-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
-            {t.expenses}
+            <span className="text-xs mt-1">{t.expenses}</span>
           </button>
-          <button
-            className={`flex flex-col items-center py-4 px-8 transition-colors ${
-              viewMode === 'reports'
-                ? 'text-blue-600 bg-blue-50 border-b-4 border-blue-500'
-                : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50 border-b-4 border-transparent'
-            }`}
+          <button 
+            className={`flex flex-col items-center justify-center ${viewMode === 'reports' ? 'text-blue-600' : 'text-gray-600'}`}
             onClick={() => setViewMode('reports')}
           >
-            <svg className="h-6 w-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
             </svg>
-            {t.reports}
+            <span className="text-xs mt-1">{t.reports}</span>
           </button>
         </div>
+      </div>
 
-        {/* Content */}
-        <div>
-          {renderContent()}
-        </div>
+      {/* Main Content - With padding to accommodate bottom nav */}
+      <div className="px-4 py-4 pb-20">
+        {renderContent()}
       </div>
     </div>
   );
