@@ -191,6 +191,12 @@ function PropertyDetail() {
     }
   };
   
+  // Format price to handle millions properly
+  const formatPrice = (price) => {
+    if (!price) return '';
+    return price.toLocaleString();
+  };
+  
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -251,7 +257,7 @@ function PropertyDetail() {
   };
   
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="w-full px-4 sm:px-6 max-w-6xl mx-auto">
       {/* Back to Properties link at the top */}
       <div className="mb-4">
         <Link to="/services/properties-for-sale" className="text-indigo-600 hover:underline flex items-center">
@@ -263,9 +269,9 @@ function PropertyDetail() {
       </div>
       
       {/* Header with actions */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4 sm:mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-800">{property.title}</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-800">{property.title}</h1>
           <p className="text-gray-600">{property.location}</p>
         </div>
         <div className="flex space-x-3">
@@ -290,17 +296,17 @@ function PropertyDetail() {
         </div>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8">
         {/* Left column - Images and details */}
-        <div className="col-span-2 space-y-6">
+        <div className="col-span-1 lg:col-span-2 space-y-4 sm:space-y-6">
           {/* Image gallery */}
           {property.images && property.images.length > 0 ? (
             <div className="space-y-4">
-              <div className="bg-gray-100 rounded-lg overflow-hidden aspect-w-16 aspect-h-9 relative">
+              <div className="bg-gray-100 rounded-lg overflow-hidden relative">
                 <img 
                   src={property.images[activeImageIndex]} 
                   alt={property.title}
-                  className="object-cover w-full h-64"
+                  className="w-full h-48 sm:h-64 object-cover"
                 />
                 
                 {/* Navigation arrows */}
@@ -309,16 +315,18 @@ function PropertyDetail() {
                     <button 
                       onClick={() => setActiveImageIndex(prev => (prev === 0 ? property.images.length - 1 : prev - 1))}
                       className="absolute left-2 top-1/2 transform -translate-y-1/2 p-2 rounded-full bg-white bg-opacity-70 hover:bg-opacity-100 shadow"
+                      aria-label="Previous image"
                     >
-                      <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                       </svg>
                     </button>
                     <button 
                       onClick={() => setActiveImageIndex(prev => (prev === property.images.length - 1 ? 0 : prev + 1))}
                       className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 rounded-full bg-white bg-opacity-70 hover:bg-opacity-100 shadow"
+                      aria-label="Next image"
                     >
-                      <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </button>
@@ -326,14 +334,14 @@ function PropertyDetail() {
                 )}
               </div>
               
-              {/* Thumbnails */}
+              {/* Thumbnails - scrollable on mobile */}
               {property.images.length > 1 && (
-                <div className="flex space-x-2 overflow-x-auto py-2">
+                <div className="flex space-x-2 overflow-x-auto py-2 no-scrollbar">
                   {property.images.map((image, index) => (
                     <div 
                       key={index}
                       onClick={() => setActiveImageIndex(index)}
-                      className={`cursor-pointer rounded-md overflow-hidden w-20 h-20 flex-shrink-0 ${index === activeImageIndex ? 'ring-2 ring-indigo-600' : ''}`}
+                      className={`cursor-pointer rounded-md overflow-hidden w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 ${index === activeImageIndex ? 'ring-2 ring-indigo-600' : ''}`}
                     >
                       <img 
                         src={image} 
@@ -346,16 +354,16 @@ function PropertyDetail() {
               )}
             </div>
           ) : (
-            <div className="bg-gray-100 rounded-lg overflow-hidden aspect-w-16 aspect-h-9 flex items-center justify-center">
-              <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <div className="bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center h-48 sm:h-64">
+              <svg className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
           )}
           
           {/* Property description */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">{t.description}</h2>
+          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">{t.description}</h2>
             <div className="prose max-w-none">
               {property.description ? (
                 <p className="text-gray-700">{property.description}</p>
@@ -367,8 +375,8 @@ function PropertyDetail() {
           
           {/* Documents */}
           {property.documents && property.documents.length > 0 && (
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">{t.documents}</h2>
+            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">{t.documents}</h2>
               <div className="space-y-3">
                 {property.documents.map((doc, index) => (
                   <a 
@@ -378,10 +386,10 @@ function PropertyDetail() {
                     rel="noopener noreferrer"
                     className="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-md"
                   >
-                    <svg className="w-5 h-5 mr-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <svg className="w-5 h-5 mr-3 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    <span className="text-indigo-600">{doc.name || `${t.document} ${index + 1}`}</span>
+                    <span className="text-indigo-600 truncate">{doc.name || `${t.document} ${index + 1}`}</span>
                   </a>
                 ))}
               </div>
@@ -390,12 +398,12 @@ function PropertyDetail() {
           
           {/* Type-specific details */}
           {property.type === 'villa' && property.amenities && property.amenities.length > 0 && (
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">{t.amenities}</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">{t.amenities}</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                 {property.amenities.map((amenity, index) => (
                   <div key={index} className="flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <svg className="w-5 h-5 mr-2 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                     <span className="text-gray-700">
@@ -408,18 +416,18 @@ function PropertyDetail() {
           )}
         </div>
         
-        {/* Right column - Key details */}
-        <div className="col-span-1 space-y-6">
+        {/* Right column - Key details (sticky on desktop, regular on mobile) */}
+        <div className="col-span-1 space-y-4 sm:space-y-6">
           {/* Price and key details card */}
-          <div className="bg-white rounded-lg shadow-md p-6 sticky top-6">
-            <div className="mb-6">
-              <span className="text-3xl font-bold text-indigo-600">€{property.price?.toLocaleString()}</span>
-              <span className="text-gray-500 ml-2">
-                {property.size && `(€${Math.round(property.price / property.size).toLocaleString()}/m²)`}
+          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 lg:sticky lg:top-6">
+            <div className="mb-4 sm:mb-6">
+              <span className="text-2xl sm:text-3xl font-bold text-indigo-600">{formatPrice(property.price)} €</span>
+              <span className="text-gray-500 ml-2 text-sm sm:text-base block sm:inline-block mt-1 sm:mt-0">
+                {property.size && `(${Math.round(property.price / property.size).toLocaleString()} €/m²)`}
               </span>
             </div>
             
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {/* Property type */}
               <div className="flex justify-between border-b border-gray-100 pb-2">
                 <span className="text-gray-600">{t.propertyType}</span>
@@ -501,24 +509,24 @@ function PropertyDetail() {
               )}
             </div>
             
-            {/* Contact buttons */}
-            <div className="mt-6 space-y-3">
-              <button className="w-full py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center justify-center">
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            {/* Contact buttons - stacked on mobile, spacing adjusted */}
+            <div className="mt-4 sm:mt-6 space-y-3">
+              <button className="w-full py-2 sm:py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center justify-center">
+                <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                 </svg>
                 {t.contactAboutProperty}
               </button>
               
-              <button className="w-full py-3 border border-indigo-600 text-indigo-600 rounded-md hover:bg-indigo-50 flex items-center justify-center">
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <button className="w-full py-2 sm:py-3 border border-indigo-600 text-indigo-600 rounded-md hover:bg-indigo-50 flex items-center justify-center">
+                <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 {t.scheduleViewing}
               </button>
               
-              <button className="w-full py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 flex items-center justify-center">
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <button className="w-full py-2 sm:py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 flex items-center justify-center">
+                <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                 </svg>
                 {t.shareProperty}
@@ -527,8 +535,6 @@ function PropertyDetail() {
           </div>
         </div>
       </div>
-      
-      {/* Removed duplicate bottom link */}
     </div>
   );
 }

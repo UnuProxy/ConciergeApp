@@ -19,10 +19,62 @@ function Villas() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [currentPdfVilla, setCurrentPdfVilla] = useState(null);
   
-  
-  const loadImageAsBase64 = () => {
-    // Simply return a flag that tells the calling function to use a placeholder
-    return Promise.resolve("USE_PLACEHOLDER");
+  // CORS-aware image loading function
+  const loadImageAsBase64 = async (url) => {
+    if (!url) return null;
+    
+    try {
+      console.log("Loading image from:", url);
+      
+      // Create an image element
+      const img = new Image();
+      
+      // Use a promise to handle the async image loading
+      return new Promise((resolve, reject) => {
+        // Set up listeners before setting src
+        img.onload = function() {
+          try {
+            // Create a canvas to draw the image
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            
+            // Get the data URL and extract just the base64 part
+            try {
+              const dataURL = canvas.toDataURL('image/jpeg', 0.85);
+              resolve(dataURL);
+            } catch (err) {
+              console.error("Canvas error:", err);
+              reject(err);
+            }
+          } catch (err) {
+            console.error("Canvas setup error:", err);
+            reject(err);
+          }
+        };
+        
+        img.onerror = function(e) {
+          console.error("Image load error:", e);
+          reject(new Error(`Failed to load image: ${url}`));
+        };
+        
+        // Set crossOrigin BEFORE setting src
+        img.crossOrigin = 'Anonymous';
+        
+        // Add a cache-busting parameter to the URL to avoid caching issues
+        const cacheBustUrl = url.includes('?') 
+          ? `${url}&cacheBust=${new Date().getTime()}` 
+          : `${url}?cacheBust=${new Date().getTime()}`;
+        
+        img.src = cacheBustUrl;
+      });
+    } catch (error) {
+      console.error("Error in loadImageAsBase64:", error);
+      return null;
+    }
   };
   
   // Use a simple flat form structure to avoid nesting problems
