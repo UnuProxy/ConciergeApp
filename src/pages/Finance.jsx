@@ -3,40 +3,21 @@ import { collection, getDocs, query, where, getFirestore, addDoc } from 'firebas
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
 /**
- * Mobile-first Finance component
- * This component is fully optimized for mobile devices with responsive design
+ * Mobile App Interface Finance Component
+ * Designed to mimic native mobile app UI patterns
  */
 const Finance = () => {
-  // State for component data
+  // State management
   const [reservations, setReservations] = useState([]);
   const [categoryPayments, setCategoryPayments] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeSubView, setActiveSubView] = useState(null);
   const [companyId, setCompanyId] = useState(null);
   const [userEmail, setUserEmail] = useState(null);
-  const [showAddSuccess, setShowAddSuccess] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: '' });
   
-  // Get language from localStorage or use default (Romanian)
-  const [language, setLanguage] = useState(() => {
-    return localStorage.getItem('appLanguage') || 'ro';
-  });
-
-  // Listen for language changes from other components
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const currentLang = localStorage.getItem('appLanguage') || 'ro';
-      setLanguage(currentLang);
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, []);
-
   // Form states
   const [newExpense, setNewExpense] = useState({
     category: 'office',
@@ -51,80 +32,75 @@ const Finance = () => {
     date: new Date().toISOString().split('T')[0],
     description: '',
   });
+  
+  // Get language from localStorage
+  const [language, setLanguage] = useState(() => {
+    return localStorage.getItem('appLanguage') || 'ro';
+  });
+
+  // Listen for language changes
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setLanguage(localStorage.getItem('appLanguage') || 'ro');
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   // Translations
   const translations = {
     ro: {
       // Page titles
-      financeManagement: 'Gestionare Financiară',
+      financeTitle: 'Finanțe',
       companyDashboard: 'Panou de Control',
-      dashboard: 'Panou Principal',
+      
+      // Tab navigation
+      dashboard: 'Panou',
       transactions: 'Tranzacții',
-      categoryPayments: 'Plăți pe Categorii',
+      categories: 'Categorii',
       expenses: 'Cheltuieli',
       reports: 'Rapoarte',
-      loading: 'Se încarcă...',
       
-      // Summary cards
-      totalIncome: 'Venit Total',
-      paymentsTotal: 'Plăți Totale',
-      revenue: 'Venit Net',
-      expensesTotal: 'Cheltuieli Totale',
+      // Action titles
+      addExpense: 'Adaugă Cheltuială',
+      addPayment: 'Adaugă Plată',
+      back: 'Înapoi',
+      
+      // Dashboard
+      summary: 'Sumar',
+      income: 'Venit',
+      payments: 'Plăți',
+      revenue: 'Profit',
+      expensesTotal: 'Cheltuieli',
       netProfit: 'Profit Net',
-      
-      // Dashboard view
-      monthlyTrends: 'Tendințe Lunare',
-      incomeByCategory: 'Venit pe Categorii',
-      expensesByCategory: 'Cheltuieli pe Categorii',
       recentTransactions: 'Tranzacții Recente',
       viewAll: 'Vezi Toate',
       
-      // Transactions view
-      transactionsTitle: 'Tranzacții',
-      date: 'Data',
-      service: 'Serviciu',
-      description: 'Descriere',
-      income: 'Venit',
-      noTransactions: 'Nu s-au găsit tranzacții.',
+      // Transactions
+      noTransactions: 'Nu există tranzacții',
       total: 'Total',
+      date: 'Data',
       
-      // Category view
-      categoryOverview: 'Privire de Ansamblu pe Categorii',
+      // Categories
+      categoryOverview: 'Privire Generală',
       category: 'Categorie',
-      transactionCount: 'Număr Tranzacții',
-      payments: 'Plăți',
       margin: 'Marjă',
-      addCategoryPayment: 'Adaugă Plată pe Categorie',
-      selectCategory: 'Selectează Categoria',
-      amountInput: 'Sumă (€)',
-      paymentDescription: 'Descriere Plată',
-      paymentPlaceholder: 'ex. Plată către proprietarul vilei',
-      addPayment: 'Adaugă Plată',
+      noPayments: 'Nu există plăți',
+      selectCategory: 'Selectează categoria',
+      amount: 'Sumă (€)',
+      description: 'Descriere',
+      paymentPlaceholder: 'ex. Plată către proprietar',
+      savePayment: 'Salvează Plată',
+      payment: 'Plată',
       paymentHistory: 'Istoric Plăți',
-      noPayments: 'Nu s-au găsit plăți.',
       
-      
-      // Expenses view
-      addNewExpense: 'Adaugă Cheltuială Nouă',
-      expenseCategory: 'Categorie Cheltuială',
+      // Expenses
+      noExpenses: 'Nu există cheltuieli',
+      expenseCategory: 'Categorie',
       expenseAmount: 'Sumă (€)',
-      expenseDate: 'Data',
       expenseDescription: 'Descriere',
-      expensePlaceholder: 'ex. Plată chirie birou',
-      addExpense: 'Adaugă Cheltuială',
-      noExpenses: 'Nu s-au găsit cheltuieli.',
-      expenseTotal: 'Total Cheltuieli',
-      
-      // Reports view
-      monthlyOverview: 'Privire de Ansamblu Lunară',
-      month: 'Luna',
-      profit: 'Profit',
-      noMonthlyData: 'Nu există date lunare disponibile.',
-      financialSummary: 'Rezumat Financiar',
-      metric: 'Indicator',
-      amountValue: 'Sumă',
-      percentage: 'Procent',
-      grossRevenue: 'Venit Brut',
+      expensePlaceholder: 'ex. Chirie birou',
+      saveExpense: 'Salvează Cheltuială',
       
       // Expense categories
       office: 'Birou',
@@ -134,93 +110,73 @@ const Finance = () => {
       travel: 'Transport',
       other: 'Altele',
       
-      // Messages
-      noCompanyFound: 'Nu s-a găsit nicio companie pentru utilizatorul curent',
-      selectCategoryAndAmount: 'Vă rugăm să selectați o categorie și să introduceți o sumă',
-      paymentAddedSuccess: 'Plata a fost adăugată cu succes!',
-      paymentAddedError: 'Eroare la adăugarea plății. Vă rugăm să încercați din nou.',
-      expenseAddedSuccess: 'Cheltuiala a fost adăugată cu succes!',
-      expenseAddedError: 'Eroare la adăugarea cheltuielii. Vă rugăm să încercați din nou.',
-      menu: 'Meniu',
+      // Reports
+      financialSummary: 'Sumar Financiar',
+      monthlyOverview: 'Privire Lunară',
+      noMonthlyData: 'Nu există date lunare',
+      month: 'Luna',
+      profit: 'Profit',
       
-      // Help text
-      dashboardHelp: 'Vizualizare generală a finanțelor companiei',
-      transactionsHelp: 'Lista tuturor rezervărilor și veniturilor',
-      categoriesHelp: 'Gestionare plăți pe categorii de servicii',
-      expensesHelp: 'Adăugare și vizualizare cheltuieli',
-      reportsHelp: 'Rapoarte financiare detaliate',
+      // Messages
+      loading: 'Se încarcă...',
+      paymentAdded: 'Plată adăugată cu succes!',
+      expenseAdded: 'Cheltuială adăugată cu succes!',
+      errorCompanyNotFound: 'Nu s-a găsit compania',
+      errorValidation: 'Completează toate câmpurile',
+      errorSaving: 'Eroare la salvare. Încearcă din nou.'
     },
     en: {
       // Page titles
-      financeManagement: 'Finance Management',
+      financeTitle: 'Finance',
       companyDashboard: 'Company Dashboard',
-      dashboard: 'Main Dashboard',
+      
+      // Tab navigation
+      dashboard: 'Dashboard',
       transactions: 'Transactions',
-      categoryPayments: 'Category Payments',
+      categories: 'Categories',
       expenses: 'Expenses',
       reports: 'Reports',
-      loading: 'Loading...',
       
-      // Summary cards
-      totalIncome: 'Total Income',
-      paymentsTotal: 'Total Payments',
+      // Action titles
+      addExpense: 'Add Expense',
+      addPayment: 'Add Payment',
+      back: 'Back',
+      
+      // Dashboard
+      summary: 'Summary',
+      income: 'Income',
+      payments: 'Payments',
       revenue: 'Revenue',
-      expensesTotal: 'Total Expenses',
+      expensesTotal: 'Expenses',
       netProfit: 'Net Profit',
-      
-      // Dashboard view
-      monthlyTrends: 'Monthly Trends',
-      incomeByCategory: 'Income by Category',
-      expensesByCategory: 'Expenses by Category',
       recentTransactions: 'Recent Transactions',
       viewAll: 'View All',
       
-      // Transactions view
-      transactionsTitle: 'Transactions',
-      date: 'Date',
-      service: 'Service',
-      description: 'Description',
-      income: 'Income',
-      noTransactions: 'No transactions found.',
+      // Transactions
+      noTransactions: 'No transactions found',
       total: 'Total',
+      date: 'Date',
       
-      // Category view
-      categoryOverview: 'Category Overview',
+      // Categories
+      categoryOverview: 'Overview',
       category: 'Category',
-      transactionCount: 'Transactions',
-      payments: 'Payments',
       margin: 'Margin',
-      addCategoryPayment: 'Add Category Payment',
-      selectCategory: 'Select Category',
-      amountInput: 'Amount (€)',
-      paymentDescription: 'Description',
-      paymentPlaceholder: 'e.g. Payment to villa owner',
-      addPayment: 'Add Payment',
+      noPayments: 'No payments found',
+      selectCategory: 'Select category',
+      amount: 'Amount (€)',
+      description: 'Description',
+      paymentPlaceholder: 'e.g. Payment to owner',
+      savePayment: 'Save Payment',
+      payment: 'Payment',
       paymentHistory: 'Payment History',
-      noPayments: 'No payments found.',
-     
       
-      // Expenses view
-      addNewExpense: 'Add New Expense',
+      // Expenses
+      noExpenses: 'No expenses found',
       expenseCategory: 'Category',
       expenseAmount: 'Amount (€)',
-      expenseDate: 'Date',
       expenseDescription: 'Description',
-      expensePlaceholder: 'e.g. Office rent payment',
-      addExpense: 'Add Expense',
-      noExpenses: 'No expenses found.',
-      expenseTotal: 'Total Expenses',
-      
-      // Reports view
-      monthlyOverview: 'Monthly Overview',
-      month: 'Month',
-      profit: 'Profit',
-      noMonthlyData: 'No monthly data available.',
-      financialSummary: 'Financial Summary',
-      metric: 'Metric',
-      amountValue: 'Amount',
-      percentage: 'Percentage',
-      grossRevenue: 'Gross Revenue',
+      expensePlaceholder: 'e.g. Office rent',
+      saveExpense: 'Save Expense',
       
       // Expense categories
       office: 'Office',
@@ -230,50 +186,43 @@ const Finance = () => {
       travel: 'Travel',
       other: 'Other',
       
-      // Messages
-      noCompanyFound: 'No company found for current user',
-      selectCategoryAndAmount: 'Please select a category and enter an amount',
-      paymentAddedSuccess: 'Payment added successfully!',
-      paymentAddedError: 'Error adding payment. Please try again.',
-      expenseAddedSuccess: 'Expense added successfully!',
-      expenseAddedError: 'Error adding expense. Please try again.',
-      menu: 'Menu',
+      // Reports
+      financialSummary: 'Financial Summary',
+      monthlyOverview: 'Monthly Overview',
+      noMonthlyData: 'No monthly data available',
+      month: 'Month',
+      profit: 'Profit',
       
-      // Help text
-      dashboardHelp: 'Overview of your company finances',
-      transactionsHelp: 'List of all bookings and income',
-      categoriesHelp: 'Manage payments for service categories',
-      expensesHelp: 'Add and view company expenses',
-      reportsHelp: 'Detailed financial reports',
+      // Messages
+      loading: 'Loading...',
+      paymentAdded: 'Payment added successfully!',
+      expenseAdded: 'Expense added successfully!',
+      errorCompanyNotFound: 'Company not found',
+      errorValidation: 'Please fill all fields',
+      errorSaving: 'Error saving. Please try again.'
     }
   };
 
-  // Get current translation
+  // Get translation
   const t = translations[language];
 
-  // Reference to Firestore database
+  // Firebase
   const db = getFirestore();
   const auth = getAuth();
   
-  // Get current user and their company ID
+  // Get user and company
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUserEmail(user.email);
         
-        // Find company that matches the user's email
         try {
           const companiesRef = collection(db, 'companies');
           const q = query(companiesRef, where("contactEmail", "==", user.email));
           const querySnapshot = await getDocs(q);
           
           if (!querySnapshot.empty) {
-            // Get the first company that matches (there should only be one)
-            const companyDoc = querySnapshot.docs[0];
-            setCompanyId(companyDoc.id);
-            console.log(`Found company: ${companyDoc.id} for user: ${user.email}`);
-          } else {
-            console.error("No company found for this user email");
+            setCompanyId(querySnapshot.docs[0].id);
           }
         } catch (error) {
           console.error("Error finding company:", error);
@@ -290,11 +239,10 @@ const Finance = () => {
   // Fetch data
   useEffect(() => {
     const fetchData = async () => {
-      if (!companyId) return; // Only fetch if we have a company ID
+      if (!companyId) return;
       
       try {
         setLoading(true);
-        console.log(`Fetching data for company: ${companyId}`);
         
         // Fetch reservations
         const reservationsRef = collection(db, 'reservations');
@@ -309,58 +257,48 @@ const Finance = () => {
             clientIncome: data.paidAmount || 0,
             service: data.accommodationType || 'Unknown',
             date: data.createdAt ? new Date(data.createdAt.seconds * 1000).toISOString().split('T')[0] : '',
-            description: `${data.accommodationType || 'Booking'} - Check In: ${data.checkIn || 'N/A'}, Check Out: ${data.checkOut || 'N/A'}`
+            description: `${data.accommodationType || 'Booking'} - ${data.checkIn || 'N/A'} to ${data.checkOut || 'N/A'}`
           };
         });
         
         setReservations(reservationsList);
         
         // Fetch category payments
-        try {
-          const paymentsRef = collection(db, 'categoryPayments');
-          const paymentsQuery = query(paymentsRef, where("companyId", "==", companyId));
-          const paymentsSnapshot = await getDocs(paymentsQuery);
-          
-          const paymentsList = paymentsSnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              ...data,
-              category: data.category || 'Unknown',
-              amount: data.amount || 0,
-              date: data.date ? new Date(data.date.seconds * 1000).toISOString().split('T')[0] : '',
-              description: data.description || ''
-            };
-          });
-          
-          setCategoryPayments(paymentsList);
-        } catch (error) {
-          console.error("Error fetching category payments:", error);
-          setCategoryPayments([]);
-        }
+        const paymentsRef = collection(db, 'categoryPayments');
+        const paymentsQuery = query(paymentsRef, where("companyId", "==", companyId));
+        const paymentsSnapshot = await getDocs(paymentsQuery);
+        
+        const paymentsList = paymentsSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            category: data.category || 'Unknown',
+            amount: data.amount || 0,
+            date: data.date ? new Date(data.date.seconds * 1000).toISOString().split('T')[0] : '',
+            description: data.description || ''
+          };
+        });
+        
+        setCategoryPayments(paymentsList);
         
         // Fetch expenses
-        try {
-          const expensesRef = collection(db, 'expenses');
-          const expensesQuery = query(expensesRef, where("companyId", "==", companyId));
-          const expensesSnapshot = await getDocs(expensesQuery);
-          
-          const expensesList = expensesSnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              ...data,
-              amount: data.amount || 0,
-              date: data.date ? new Date(data.date.seconds * 1000).toISOString().split('T')[0] : '',
-              description: data.description || ''
-            };
-          });
-          
-          setExpenses(expensesList);
-        } catch (error) {
-          console.error("Error fetching expenses:", error);
-          setExpenses([]);
-        }
+        const expensesRef = collection(db, 'expenses');
+        const expensesQuery = query(expensesRef, where("companyId", "==", companyId));
+        const expensesSnapshot = await getDocs(expensesQuery);
+        
+        const expensesList = expensesSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            amount: data.amount || 0,
+            date: data.date ? new Date(data.date.seconds * 1000).toISOString().split('T')[0] : '',
+            description: data.description || ''
+          };
+        });
+        
+        setExpenses(expensesList);
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -371,21 +309,17 @@ const Finance = () => {
     fetchData();
   }, [db, companyId]);
 
-  // Group reservations by category
+  // Calculate summary data
   const categoryIncomeData = reservations.reduce((acc, r) => {
     const category = r.service;
     if (!acc[category]) {
-      acc[category] = {
-        income: 0,
-        count: 0
-      };
+      acc[category] = { income: 0, count: 0 };
     }
     acc[category].income += r.clientIncome;
     acc[category].count += 1;
     return acc;
   }, {});
   
-  // Add payments by category
   const categoryPaymentData = categoryPayments.reduce((acc, p) => {
     const category = p.category;
     if (!acc[category]) {
@@ -395,7 +329,6 @@ const Finance = () => {
     return acc;
   }, {});
   
-  // Calculate revenue by category
   const categoryRevenueData = Object.keys(categoryIncomeData).map(category => {
     const income = categoryIncomeData[category].income;
     const payment = categoryPaymentData[category] || 0;
@@ -412,7 +345,6 @@ const Finance = () => {
     };
   });
   
-  // Calculate totals
   const totalIncome = Object.values(categoryIncomeData).reduce((sum, data) => sum + data.income, 0);
   const totalPayments = Object.values(categoryPaymentData).reduce((sum, amount) => sum + amount, 0);
   const totalRevenue = totalIncome - totalPayments;
@@ -426,122 +358,105 @@ const Finance = () => {
     return date.toLocaleDateString(language === 'ro' ? 'ro-RO' : 'en-US');
   };
   
-  // Show success message
-  const showSuccessMessage = (message) => {
-    setSuccessMessage(message);
-    setShowAddSuccess(true);
-    setTimeout(() => {
-      setShowAddSuccess(false);
-    }, 3000);
+  // Show toast message
+  const showToast = (message) => {
+    setToast({ show: true, message });
+    setTimeout(() => setToast({ show: false, message: '' }), 3000);
   };
   
-  // Handle adding a new payment
+  // Add new payment
   const handleAddPayment = async () => {
+    if (!companyId) {
+      alert(t.errorCompanyNotFound);
+      return;
+    }
+    
+    if (!newPayment.category || !newPayment.amount) {
+      alert(t.errorValidation);
+      return;
+    }
+    
     try {
-      if (!companyId) {
-        alert(t.noCompanyFound);
-        return;
-      }
+      await addDoc(collection(db, 'categoryPayments'), {
+        companyId,
+        category: newPayment.category,
+        amount: parseFloat(newPayment.amount),
+        date: new Date(newPayment.date),
+        description: newPayment.description,
+        createdAt: new Date()
+      });
       
-      if (!newPayment.category || !newPayment.amount) {
-        alert(t.selectCategoryAndAmount);
-        return;
-      }
+      const payment = {
+        id: `payment-${Date.now()}`,
+        companyId,
+        ...newPayment,
+        amount: parseFloat(newPayment.amount)
+      };
       
-      try {
-        // Create a new document in categoryPayments collection
-        await addDoc(collection(db, 'categoryPayments'), {
-          companyId,
-          category: newPayment.category,
-          amount: parseFloat(newPayment.amount),
-          date: new Date(newPayment.date),
-          description: newPayment.description,
-          createdAt: new Date()
-        });
-        
-        // Also add to state for immediate UI update
-        const payment = {
-          id: `payment-${Date.now()}`,
-          companyId,
-          ...newPayment,
-          amount: parseFloat(newPayment.amount)
-        };
-        
-        setCategoryPayments([...categoryPayments, payment]);
-        
-        // Reset form
-        setNewPayment({
-          category: '',
-          amount: '',
-          date: new Date().toISOString().split('T')[0],
-          description: '',
-        });
-        
-        // Show success message
-        showSuccessMessage(t.paymentAddedSuccess);
-      } catch (error) {
-        console.error("Error saving payment to Firestore:", error);
-        alert(t.paymentAddedError);
-      }
+      setCategoryPayments([...categoryPayments, payment]);
+      
+      setNewPayment({
+        category: '',
+        amount: '',
+        date: new Date().toISOString().split('T')[0],
+        description: '',
+      });
+      
+      showToast(t.paymentAdded);
+      setActiveSubView(null);
     } catch (error) {
       console.error("Error adding payment:", error);
+      alert(t.errorSaving);
     }
   };
   
-  // Handle adding a new expense
+  // Add new expense
   const handleAddExpense = async () => {
+    if (!companyId) {
+      alert(t.errorCompanyNotFound);
+      return;
+    }
+    
+    if (!newExpense.category || !newExpense.amount) {
+      alert(t.errorValidation);
+      return;
+    }
+    
     try {
-      if (!companyId) {
-        alert(t.noCompanyFound);
-        return;
-      }
+      await addDoc(collection(db, 'expenses'), {
+        companyId,
+        category: newExpense.category,
+        amount: parseFloat(newExpense.amount),
+        date: new Date(newExpense.date),
+        description: newExpense.description,
+        createdAt: new Date()
+      });
       
-      if (!newExpense.category || !newExpense.amount) {
-        alert(t.selectCategoryAndAmount);
-        return;
-      }
+      const expense = {
+        id: `expense-${Date.now()}`,
+        companyId,
+        ...newExpense,
+        amount: parseFloat(newExpense.amount)
+      };
       
-      try {
-        // Save to Firestore
-        await addDoc(collection(db, 'expenses'), {
-          companyId,
-          category: newExpense.category,
-          amount: parseFloat(newExpense.amount),
-          date: new Date(newExpense.date),
-          description: newExpense.description,
-          createdAt: new Date()
-        });
-        
-        // Update local state
-        const expense = {
-          id: `expense-${Date.now()}`,
-          companyId,
-          ...newExpense,
-          amount: parseFloat(newExpense.amount)
-        };
-        
-        setExpenses([...expenses, expense]);
-        
-        // Reset form
-        setNewExpense({
-          category: 'office',
-          amount: '',
-          date: new Date().toISOString().split('T')[0],
-          description: '',
-        });
-        
-        // Show success message
-        showSuccessMessage(t.expenseAddedSuccess);
-      } catch (error) {
-        console.error("Error saving expense to Firestore:", error);
-        alert(t.expenseAddedError);
-      }
+      setExpenses([...expenses, expense]);
+      
+      setNewExpense({
+        category: 'office',
+        amount: '',
+        date: new Date().toISOString().split('T')[0],
+        description: '',
+      });
+      
+      showToast(t.expenseAdded);
+      setActiveSubView(null);
     } catch (error) {
       console.error("Error adding expense:", error);
+      alert(t.errorSaving);
     }
   };
 
-  // Data for monthly overview
+  // Monthly data for reports
   const monthlyData = reservations.reduce((acc, r) => {
     if (!r.date) return acc;
     
@@ -552,14 +467,15 @@ const Finance = () => {
         income: 0,
         payments: 0,
         revenue: 0,
-        expenses: 0
+        expenses: 0,
+        profit: 0
       };
     }
     acc[month].income += (r.clientIncome || 0);
     return acc;
   }, {});
   
-  // Add category payments to monthly data
+  // Add payments to monthly data
   categoryPayments.forEach(payment => {
     if (!payment.date) return;
     
@@ -569,19 +485,19 @@ const Finance = () => {
     }
   });
   
-  // Calculate revenue for each month
+  // Add expenses and calculate profits
   Object.keys(monthlyData).forEach(month => {
     monthlyData[month].revenue = monthlyData[month].income - monthlyData[month].payments;
-  });
-  
-  // Add expenses to monthly data
-  expenses.forEach(expense => {
-    if (!expense.date) return;
     
-    const month = expense.date.substring(0, 7);
-    if (monthlyData[month]) {
-      monthlyData[month].expenses += (expense.amount || 0);
-    }
+    // Add expenses
+    expenses.forEach(expense => {
+      if (expense.date && expense.date.substring(0, 7) === month) {
+        monthlyData[month].expenses += (expense.amount || 0);
+      }
+    });
+    
+    // Calculate profit
+    monthlyData[month].profit = monthlyData[month].revenue - monthlyData[month].expenses;
   });
   
   // Format month name
@@ -589,8 +505,10 @@ const Finance = () => {
     if (!monthStr) return '';
     
     const monthNames = {
-      ro: ['Ianuarie', 'Februarie', 'Martie', 'Aprilie', 'Mai', 'Iunie', 'Iulie', 'August', 'Septembrie', 'Octombrie', 'Noiembrie', 'Decembrie'],
-      en: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+      ro: ['Ianuarie', 'Februarie', 'Martie', 'Aprilie', 'Mai', 'Iunie', 
+           'Iulie', 'August', 'Septembrie', 'Octombrie', 'Noiembrie', 'Decembrie'],
+      en: ['January', 'February', 'March', 'April', 'May', 'June',
+           'July', 'August', 'September', 'October', 'November', 'December']
     };
     
     const [year, month] = monthStr.split('-');
@@ -611,160 +529,187 @@ const Finance = () => {
     }
   };
 
-  // Toggle mobile menu
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
+  // Navigation helper
+  const navigate = (tab, subView = null) => {
+    setActiveTab(tab);
+    setActiveSubView(subView);
+    window.scrollTo(0, 0);
   };
 
-  // Render loading spinner
-  const renderLoading = () => (
-    <div className="flex flex-col justify-center items-center h-48">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-500 mb-3"></div>
-      <div className="text-base text-gray-600">{t.loading}</div>
-    </div>
-  );
+  // Add floating action button
+  const renderFloatingActionButton = () => {
+    if (activeSubView !== null) return null;
+    
+    if (activeTab === 'expenses') {
+      return (
+        <button 
+          onClick={() => setActiveSubView('add')}
+          className="fixed right-4 bottom-24 bg-blue-600 text-white p-4 rounded-full shadow-lg z-10"
+          aria-label={t.addExpense}
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+          </svg>
+        </button>
+      );
+    } else if (activeTab === 'categories') {
+      return (
+        <button 
+          onClick={() => setActiveSubView('add')}
+          className="fixed right-4 bottom-24 bg-blue-600 text-white p-4 rounded-full shadow-lg z-10"
+          aria-label={t.addPayment}
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+          </svg>
+        </button>
+      );
+    }
+    
+    return null;
+  };
+
+  // Loading screen
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
+        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-gray-600">{t.loading}</p>
+      </div>
+    );
+  }
 
   // Render dashboard view
   const renderDashboard = () => (
-    <div className="space-y-5">
-      {/* Summary Cards - 2x2 Grid for mobile */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center justify-center mb-2">
-            <div className="bg-blue-100 rounded-full p-2.5">
-              <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-            </div>
-          </div>
-          <p className="text-center text-sm font-medium text-gray-500 mb-1">{t.totalIncome}</p>
-          <p className="text-center text-xl font-bold text-gray-800">€{totalIncome.toLocaleString()}</p>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center justify-center mb-2">
-            <div className="bg-red-100 rounded-full p-2.5">
-              <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
-              </svg>
-            </div>
-          </div>
-          <p className="text-center text-sm font-medium text-gray-500 mb-1">{t.paymentsTotal}</p>
-          <p className="text-center text-xl font-bold text-gray-800">€{totalPayments.toLocaleString()}</p>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center justify-center mb-2">
-            <div className="bg-green-100 rounded-full p-2.5">
-              <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-              </svg>
-            </div>
-          </div>
-          <p className="text-center text-sm font-medium text-gray-500 mb-1">{t.revenue}</p>
-          <p className="text-center text-xl font-bold text-gray-800">€{totalRevenue.toLocaleString()}</p>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center justify-center mb-2">
-            <div className="bg-purple-100 rounded-full p-2.5">
-              <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-            </div>
-          </div>
-          <p className="text-center text-sm font-medium text-gray-500 mb-1">{t.netProfit}</p>
-          <p className={`text-center text-xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            €{netProfit.toLocaleString()}
-          </p>
-        </div>
-      </div>
-
-      {/* Category Overview - Mobile friendly Card View */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-800">{t.categoryOverview}</h2>
-        </div>
-        
-        <div className="p-4 space-y-4">
-          {categoryRevenueData.map((data, index) => (
-            <div key={index} className="bg-gray-50 rounded-lg p-4 shadow-sm">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="font-medium text-gray-700 capitalize">{data.category}</h3>
-                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                  {data.count} {t.transactionCount}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <p className="text-gray-500">{t.income}</p>
-                  <p className="font-semibold">€{data.income.toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">{t.payments}</p>
-                  <p className="font-semibold">€{data.payment.toLocaleString()}</p>
-                </div>
-              </div>
-              <div className="mt-2 pt-2 border-t border-gray-200">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500 text-sm">{t.margin}</span>
-                  <span className="font-semibold text-sm">{data.margin.toFixed(1)}%</span>
-                </div>
+    <div className="space-y-5 pb-20">
+      {/* Summary Cards */}
+      <div>
+        <h2 className="text-lg font-bold mb-3">{t.summary}</h2>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-white rounded-xl p-4 shadow-sm">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-gray-500 text-sm">{t.income}</span>
+              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
               </div>
             </div>
-          ))}
+            <p className="text-xl font-bold">€{totalIncome.toLocaleString()}</p>
+          </div>
           
-          {/* Total Card */}
-          <div className="bg-blue-50 rounded-lg p-4 shadow-sm">
-            <h3 className="font-medium text-gray-700 mb-2">{t.total}</h3>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <p className="text-gray-500">{t.income}</p>
-                <p className="font-semibold">€{totalIncome.toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-gray-500">{t.payments}</p>
-                <p className="font-semibold">€{totalPayments.toLocaleString()}</p>
+          <div className="bg-white rounded-xl p-4 shadow-sm">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-gray-500 text-sm">{t.revenue}</span>
+              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                </svg>
               </div>
             </div>
-            <div className="mt-2 pt-2 border-t border-gray-200">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-sm">{t.margin}</span>
-                <span className="font-semibold text-sm">
-                  {totalIncome > 0 ? `${(totalRevenue / totalIncome * 100).toFixed(1)}%` : '0%'}
-                </span>
+            <p className="text-xl font-bold">€{totalRevenue.toLocaleString()}</p>
+          </div>
+          
+          <div className="bg-white rounded-xl p-4 shadow-sm">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-gray-500 text-sm">{t.expensesTotal}</span>
+              <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                </svg>
               </div>
             </div>
+            <p className="text-xl font-bold">€{totalExpenses.toLocaleString()}</p>
+          </div>
+          
+          <div className="bg-white rounded-xl p-4 shadow-sm">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-gray-500 text-sm">{t.netProfit}</span>
+              <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+              </div>
+            </div>
+            <p className={`text-xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              €{netProfit.toLocaleString()}
+            </p>
           </div>
         </div>
       </div>
 
       {/* Recent Transactions */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="flex justify-between items-center px-4 py-3 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-800">{t.recentTransactions}</h3>
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="flex justify-between items-center px-4 py-3 border-b border-gray-100">
+          <h2 className="font-bold">{t.recentTransactions}</h2>
           <button 
-            className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors"
-            onClick={() => setViewMode('transactions')}
+            onClick={() => navigate('transactions')}
+            className="text-blue-600 text-sm font-medium"
           >
             {t.viewAll}
           </button>
         </div>
+        
         <div className="p-4">
           {reservations.length === 0 ? (
-            <div className="flex items-center justify-center h-20">
-              <div className="text-gray-500 text-sm">{t.noTransactions}</div>
+            <div className="py-8 text-center text-gray-500">
+              {t.noTransactions}
             </div>
           ) : (
             <div className="space-y-3">
-              {reservations.slice(0, 3).map(reservation => (
-                <div key={reservation.id} className="bg-gray-50 rounded-lg p-3 shadow-sm">
-                  <div className="flex justify-between mb-1">
-                    <div className="text-sm font-semibold capitalize text-gray-700">{reservation.service}</div>
-                    <div className="text-xs text-gray-500">{formatDate(reservation.date)}</div>
+              {reservations.slice(0, 3).map(item => (
+                <div key={item.id} className="flex justify-between p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <div className="font-medium text-sm capitalize">{item.service}</div>
+                    <div className="text-xs text-gray-500 mt-1">{formatDate(item.date)}</div>
                   </div>
-                  <div className="text-xs text-gray-500 mb-2 truncate">{reservation.description}</div>
-                  <div className="text-right font-semibold text-gray-700">€{reservation.clientIncome.toLocaleString()}</div>
+                  <div className="text-right font-bold">
+                    €{item.clientIncome.toLocaleString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Category Summary */}
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="flex justify-between items-center px-4 py-3 border-b border-gray-100">
+          <h2 className="font-bold">{t.categoryOverview}</h2>
+          <button 
+            onClick={() => navigate('categories')}
+            className="text-blue-600 text-sm font-medium"
+          >
+            {t.viewAll}
+          </button>
+        </div>
+        
+        <div className="p-4">
+          {categoryRevenueData.length === 0 ? (
+            <div className="py-8 text-center text-gray-500">
+              {t.noTransactions}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {categoryRevenueData.slice(0, 3).map((item, index) => (
+                <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <div className="font-medium text-sm capitalize">{item.category}</div>
+                    <div className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                      {item.count}
+                    </div>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <div>
+                      <div className="text-xs text-gray-500">{t.income}</div>
+                      <div className="font-medium">€{item.income.toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">{t.margin}</div>
+                      <div className="font-medium">{item.margin.toFixed(1)}%</div>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -774,185 +719,36 @@ const Finance = () => {
     </div>
   );
 
-  // Render transactions view - Card style for mobile
+  // Render transactions view
   const renderTransactions = () => (
-    <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <h2 className="text-lg font-semibold text-gray-800">{t.transactionsTitle}</h2>
-        <p className="text-gray-500 text-xs mt-1">
-          {t.transactionsHelp}
-        </p>
-      </div>
-      
-      <div className="p-4">
-        {reservations.length === 0 ? (
-          <div className="flex items-center justify-center h-32">
-            <div className="text-gray-500">{t.noTransactions}</div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {reservations.map(reservation => (
-              <div key={reservation.id} className="bg-gray-50 rounded-lg p-3 shadow-sm">
-                <div className="flex justify-between mb-1">
-                  <div className="text-sm font-semibold capitalize text-gray-700">{reservation.service}</div>
-                  <div className="text-xs text-gray-500">{formatDate(reservation.date)}</div>
-                </div>
-                <div className="text-xs text-gray-500 mb-2 truncate">{reservation.description}</div>
-                <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                  <div className="text-xs font-medium text-gray-500">{t.income}</div>
-                  <div className="text-sm font-semibold text-gray-700">€{reservation.clientIncome.toLocaleString()}</div>
-                </div>
-              </div>
-            ))}
-            
-            {/* Total Card */}
-            <div className="bg-blue-50 rounded-lg p-3 shadow-sm">
-              <div className="flex justify-between items-center">
-                <div className="text-sm font-medium text-gray-700">{t.total}</div>
-                <div className="text-sm font-semibold text-gray-700">€{totalIncome.toLocaleString()}</div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  // Render category payments view
-  const renderCategoryPayments = () => (
-    <div className="space-y-5">
-      {/* Category Overview */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-          <h2 className="text-lg font-semibold text-gray-800">{t.categoryOverview}</h2>
-          <p className="text-gray-500 text-xs mt-1">
-            {t.categoriesHelp}
-          </p>
-        </div>
-        
-        <div className="p-4 space-y-3">
-          {categoryRevenueData.map((data, index) => (
-            <div key={index} className="bg-gray-50 rounded-lg p-3 shadow-sm">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="font-medium text-gray-700 capitalize">{data.category}</h3>
-                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                  {data.count}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <p className="text-xs text-gray-500">{t.income}</p>
-                  <p className="text-sm font-semibold">€{data.income.toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">{t.payments}</p>
-                  <p className="text-sm font-semibold">€{data.payment.toLocaleString()}</p>
-                </div>
-              </div>
-              <div className="mt-2 pt-2 border-t border-gray-200">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-gray-500">{t.margin}</span>
-                  <span className="text-xs font-semibold">{data.margin.toFixed(1)}%</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      
-      {/* Add Category Payment Form */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-          <h2 className="text-lg font-semibold text-gray-800">{t.addCategoryPayment}</h2>
-        </div>
-        <div className="p-4">
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t.category}</label>
-              <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                value={newPayment.category}
-                onChange={(e) => setNewPayment({...newPayment, category: e.target.value})}
-              >
-                <option value="">{t.selectCategory}</option>
-                {Object.keys(categoryIncomeData).map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t.amountInput}</label>
-              <input
-                type="number"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                value={newPayment.amount}
-                onChange={(e) => setNewPayment({...newPayment, amount: e.target.value})}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t.date}</label>
-              <input
-                type="date"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                value={newPayment.date}
-                onChange={(e) => setNewPayment({...newPayment, date: e.target.value})}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t.paymentDescription}</label>
-              <input
-                type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                value={newPayment.description}
-                onChange={(e) => setNewPayment({...newPayment, description: e.target.value})}
-                placeholder={t.paymentPlaceholder}
-              />
-            </div>
-          </div>
-          
-          <div className="mt-5">
-            <button
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 font-medium text-sm transition-colors"
-              onClick={handleAddPayment}
-            >
-              {t.addPayment}
-            </button>
-          </div>
-        </div>
-      </div>
-      
-      {/* Payment History */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-          <h2 className="text-lg font-semibold text-gray-800">{t.paymentHistory}</h2>
+    <div className="space-y-4 pb-20">
+      <div className="bg-white rounded-xl shadow-sm">
+        <div className="px-4 py-3 border-b border-gray-100">
+          <h2 className="font-bold">{t.transactions}</h2>
         </div>
         
         <div className="p-4">
-          {categoryPayments.length === 0 ? (
-            <div className="flex items-center justify-center h-20">
-              <div className="text-gray-500 text-sm">{t.noPayments}</div>
-            </div>
+          {reservations.length === 0 ? (
+            <div className="py-8 text-center text-gray-500">{t.noTransactions}</div>
           ) : (
             <div className="space-y-3">
-              {categoryPayments.map(payment => (
-                <div key={payment.id} className="bg-gray-50 rounded-lg p-3 shadow-sm">
-                  <div className="flex justify-between mb-1">
-                    <div className="text-sm font-semibold capitalize text-gray-700">{payment.category}</div>
-                    <div className="text-xs text-gray-500">{formatDate(payment.date)}</div>
+              {reservations.map(item => (
+                <div key={item.id} className="p-3 bg-gray-50 rounded-lg">
+                  <div className="flex justify-between">
+                    <div className="font-medium text-sm capitalize">{item.service}</div>
+                    <div className="text-xs text-gray-500">{formatDate(item.date)}</div>
                   </div>
-                  <div className="text-xs text-gray-500 mb-2 truncate">{payment.description}</div>
-                  <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                    <div className="text-xs font-medium text-gray-500">{t.amount}</div>
-                    <div className="text-sm font-semibold text-gray-700">€{payment.amount.toLocaleString()}</div>
+                  <div className="text-xs text-gray-500 mt-1 mb-2 line-clamp-1">{item.description}</div>
+                  <div className="text-right font-bold text-lg">
+                    €{item.clientIncome.toLocaleString()}
                   </div>
                 </div>
               ))}
               
-              {/* Total Card */}
-              <div className="bg-blue-50 rounded-lg p-3 shadow-sm">
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                 <div className="flex justify-between items-center">
-                  <div className="text-sm font-medium text-gray-700">{t.paymentsTotal}</div>
-                  <div className="text-sm font-semibold text-gray-700">€{totalPayments.toLocaleString()}</div>
+                  <div className="font-medium">{t.total}</div>
+                  <div className="font-bold text-lg">€{totalIncome.toLocaleString()}</div>
                 </div>
               </div>
             </div>
@@ -962,286 +758,466 @@ const Finance = () => {
     </div>
   );
 
-  // Render expenses view
-  const renderExpenses = () => (
-    <div className="space-y-5">
-      {/* Add New Expense */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-          <h2 className="text-lg font-semibold text-gray-800">{t.addNewExpense}</h2>
-          <p className="text-gray-500 text-xs mt-1">
-            {t.expensesHelp}
-          </p>
-        </div>
-        <div className="p-4">
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t.expenseCategory}</label>
-              <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                value={newExpense.category}
-                onChange={(e) => setNewExpense({...newExpense, category: e.target.value})}
+  // Render categories view
+  const renderCategories = () => {
+    if (activeSubView === 'add') {
+      return (
+        <div className="pb-20">
+          <div className="bg-white rounded-xl shadow-sm">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center">
+              <button 
+                onClick={() => setActiveSubView(null)}
+                className="mr-2"
               >
-                <option value="office">{t.office}</option>
-                <option value="utilities">{t.utilities}</option>
-                <option value="marketing">{t.marketing}</option>
-                <option value="salary">{t.salary}</option>
-                <option value="travel">{t.travel}</option>
-                <option value="other">{t.other}</option>
-              </select>
+                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+              </button>
+              <h2 className="font-bold">{t.addPayment}</h2>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t.expenseAmount}</label>
-              <input
-                type="number"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                value={newExpense.amount}
-                onChange={(e) => setNewExpense({...newExpense, amount: e.target.value})}
-              />
+            
+            <div className="p-4">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.category}</label>
+                  <select
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm"
+                    value={newPayment.category}
+                    onChange={(e) => setNewPayment({...newPayment, category: e.target.value})}
+                  >
+                    <option value="">{t.selectCategory}</option>
+                    {Object.keys(categoryIncomeData).map(category => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.amount}</label>
+                  <input
+                    type="number"
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm"
+                    value={newPayment.amount}
+                    onChange={(e) => setNewPayment({...newPayment, amount: e.target.value})}
+                    placeholder="0.00"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.date}</label>
+                  <input
+                    type="date"
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm"
+                    value={newPayment.date}
+                    onChange={(e) => setNewPayment({...newPayment, date: e.target.value})}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.description}</label>
+                  <input
+                    type="text"
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm"
+                    value={newPayment.description}
+                    onChange={(e) => setNewPayment({...newPayment, description: e.target.value})}
+                    placeholder={t.paymentPlaceholder}
+                  />
+                </div>
+                
+                <button
+                  className="w-full mt-4 py-3 bg-blue-600 text-white font-medium rounded-lg"
+                  onClick={handleAddPayment}
+                >
+                  {t.savePayment}
+                </button>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t.expenseDate}</label>
-              <input
-                type="date"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                value={newExpense.date}
-                onChange={(e) => setNewExpense({...newExpense, date: e.target.value})}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t.expenseDescription}</label>
-              <input
-                type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                value={newExpense.description}
-                onChange={(e) => setNewExpense({...newExpense, description: e.target.value})}
-                placeholder={t.expensePlaceholder}
-              />
-            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="space-y-4 pb-20">
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <h2 className="font-bold">{t.categories}</h2>
           </div>
           
-          <div className="mt-5">
-            <button
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 font-medium text-sm transition-colors"
-              onClick={handleAddExpense}
-            >
-              {t.addExpense}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Expenses List */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-          <h2 className="text-lg font-semibold text-gray-800">{t.expenses}</h2>
-        </div>
-        
-        <div className="p-4">
-          {expenses.length === 0 ? (
-            <div className="flex items-center justify-center h-20">
-              <div className="text-gray-500 text-sm">{t.noExpenses}</div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {expenses.map(expense => (
-                <div key={expense.id} className="bg-gray-50 rounded-lg p-3 shadow-sm">
-                  <div className="flex justify-between mb-1">
-                    <div className="text-sm font-semibold capitalize text-gray-700">
-                      {getExpenseCategoryName(expense.category)}
+          <div className="p-4">
+            {categoryRevenueData.length === 0 ? (
+              <div className="py-8 text-center text-gray-500">
+                {t.noTransactions}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {categoryRevenueData.map((item, index) => (
+                  <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="font-medium capitalize">{item.category}</div>
+                      <div className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                        {item.count}
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500">{formatDate(expense.date)}</div>
-                  </div>
-                  <div className="text-xs text-gray-500 mb-2 truncate">{expense.description}</div>
-                  <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                    <div className="text-xs font-medium text-gray-500">{t.amount}</div>
-                    <div className="text-sm font-semibold text-gray-700">€{expense.amount.toLocaleString()}</div>
-                  </div>
-                </div>
-              ))}
-              
-              {/* Total Card */}
-              <div className="bg-blue-50 rounded-lg p-3 shadow-sm">
-                <div className="flex justify-between items-center">
-                  <div className="text-sm font-medium text-gray-700">{t.expenseTotal}</div>
-                  <div className="text-sm font-semibold text-gray-700">€{totalExpenses.toLocaleString()}</div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-      
-      {/* Expenses by Category */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-800">{t.expensesByCategory}</h2>
-        </div>
-        <div className="p-4">
-          <div className="space-y-3">
-            {Object.keys(expenses.reduce((acc, expense) => {
-              const key = expense.category;
-              if (!acc[key]) {
-                acc[key] = 0;
-              }
-              acc[key] += expense.amount;
-              return acc;
-            }, {})).map((category, index) => {
-              const amount = expenses
-                .filter(e => e.category === category)
-                .reduce((sum, e) => sum + e.amount, 0);
-              const percentage = totalExpenses > 0 ? amount / totalExpenses * 100 : 0;
-              
-              return (
-                <div key={index} className="bg-gray-50 rounded-lg p-3 shadow-sm">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-sm font-medium text-gray-700 capitalize">
-                      {getExpenseCategoryName(category)}
-                    </h3>
-                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                      {percentage.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="mt-1">
-                    <div className="bg-gray-200 h-2 rounded-full overflow-hidden">
-                      <div 
-                        className="bg-blue-500 h-full rounded-full" 
-                        style={{ width: `${percentage}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                  <div className="mt-2 flex justify-between items-center">
-                    <span className="text-xs text-gray-500">{t.amount}</span>
-                    <span className="text-sm font-semibold">€{amount.toLocaleString()}</span>
-                  </div>
-                </div>
-              );
-            })}
-            
-            {/* Total Card */}
-            <div className="bg-blue-50 rounded-lg p-3 shadow-sm">
-              <div className="flex justify-between items-center">
-                <div className="text-sm font-medium text-gray-700">{t.total}</div>
-                <div className="text-sm font-semibold text-gray-700">€{totalExpenses.toLocaleString()}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Render reports view
-  const renderReports = () => (
-    <div className="space-y-5">
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-800">{t.financialSummary}</h2>
-          <p className="text-gray-500 text-xs mt-1">
-            {t.reportsHelp}
-          </p>
-        </div>
-        <div className="p-4">
-          <div className="space-y-3">
-            <div className="bg-gray-50 rounded-lg p-3 shadow-sm">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">{t.totalIncome}</h3>
-              <div className="flex justify-between items-center">
-                <span className="text-base font-semibold text-gray-800">€{totalIncome.toLocaleString()}</span>
-                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">100%</span>
-              </div>
-            </div>
-            
-            <div className="bg-gray-50 rounded-lg p-3 shadow-sm">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">{t.paymentsTotal}</h3>
-              <div className="flex justify-between items-center">
-                <span className="text-base font-semibold text-gray-800">€{totalPayments.toLocaleString()}</span>
-                <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">
-                  {totalIncome > 0 ? `${(totalPayments / totalIncome * 100).toFixed(1)}%` : '0%'}
-                </span>
-              </div>
-            </div>
-            
-            <div className="bg-gray-50 rounded-lg p-3 shadow-sm">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">{t.grossRevenue}</h3>
-              <div className="flex justify-between items-center">
-                <span className="text-base font-semibold text-gray-800">€{totalRevenue.toLocaleString()}</span>
-                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                  {totalIncome > 0 ? `${(totalRevenue / totalIncome * 100).toFixed(1)}%` : '0%'}
-                </span>
-              </div>
-            </div>
-            
-            <div className="bg-gray-50 rounded-lg p-3 shadow-sm">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">{t.expensesTotal}</h3>
-              <div className="flex justify-between items-center">
-                <span className="text-base font-semibold text-gray-800">€{totalExpenses.toLocaleString()}</span>
-                <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full">
-                  {totalRevenue > 0 ? `${(totalExpenses / totalRevenue * 100).toFixed(1)}%` : '0%'}
-                </span>
-              </div>
-            </div>
-            
-            <div className="bg-blue-50 rounded-lg p-3 shadow-sm">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">{t.netProfit}</h3>
-              <div className="flex justify-between items-center">
-                <span className={`text-base font-semibold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  €{netProfit.toLocaleString()}
-                </span>
-                <span className={`text-xs ${netProfit >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} px-2 py-1 rounded-full`}>
-                  {totalRevenue > 0 ? `${(netProfit / totalRevenue * 100).toFixed(1)}%` : '0%'}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Monthly Overview */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-800">{t.monthlyOverview}</h2>
-        </div>
-        <div className="p-4">
-          {Object.keys(monthlyData).length === 0 ? (
-            <div className="flex items-center justify-center h-20">
-              <div className="text-gray-500 text-sm">{t.noMonthlyData}</div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {Object.values(monthlyData).map((data, index) => {
-                const profit = data.revenue - data.expenses;
-                return (
-                  <div key={index} className="bg-gray-50 rounded-lg p-3 shadow-sm">
-                    <h3 className="text-sm font-medium text-gray-700 mb-2">{formatMonth(data.month)}</h3>
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                    <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <p className="text-xs text-gray-500">{t.income}</p>
-                        <p className="text-sm font-semibold">€{data.income.toLocaleString()}</p>
+                        <div className="text-xs text-gray-500">{t.income}</div>
+                        <div className="font-medium">€{item.income.toLocaleString()}</div>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">{t.payments}</p>
-                        <p className="text-sm font-semibold">€{data.payments.toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">{t.revenue}</p>
-                        <p className="text-sm font-semibold">€{data.revenue.toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">{t.expenses}</p>
-                        <p className="text-sm font-semibold">€{data.expenses.toLocaleString()}</p>
+                        <div className="text-xs text-gray-500">{t.payments}</div>
+                        <div className="font-medium">€{item.payment.toLocaleString()}</div>
                       </div>
                     </div>
                     <div className="mt-2 pt-2 border-t border-gray-200">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-500">{t.profit}</span>
-                        <span className={`text-sm font-semibold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          €{profit.toLocaleString()}
-                        </span>
+                        <span className="text-xs text-gray-500">{t.margin}</span>
+                        <span className="font-medium">{item.margin.toFixed(1)}%</span>
                       </div>
                     </div>
                   </div>
-                );
-              })}
+                ))}
+                
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="font-medium">{t.total}</div>
+                    <div className="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded-full">
+                      {reservations.length}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <div className="text-xs text-gray-500">{t.income}</div>
+                      <div className="font-medium">€{totalIncome.toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">{t.payments}</div>
+                      <div className="font-medium">€{totalPayments.toLocaleString()}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <h2 className="font-bold">{t.paymentHistory}</h2>
+          </div>
+          
+          <div className="p-4">
+            {categoryPayments.length === 0 ? (
+              <div className="py-8 text-center text-gray-500">
+                {t.noPayments}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {categoryPayments.map(item => (
+                  <div key={item.id} className="p-3 bg-gray-50 rounded-lg">
+                    <div className="flex justify-between">
+                      <div className="font-medium text-sm capitalize">{item.category}</div>
+                      <div className="text-xs text-gray-500">{formatDate(item.date)}</div>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1 mb-2 line-clamp-1">{item.description}</div>
+                    <div className="text-right font-bold">
+                      €{item.amount.toLocaleString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Render expenses view
+  const renderExpenses = () => {
+    if (activeSubView === 'add') {
+      return (
+        <div className="pb-20">
+          <div className="bg-white rounded-xl shadow-sm">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center">
+              <button 
+                onClick={() => setActiveSubView(null)}
+                className="mr-2"
+              >
+                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+              </button>
+              <h2 className="font-bold">{t.addExpense}</h2>
+            </div>
+            
+            <div className="p-4">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.expenseCategory}</label>
+                  <select
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm"
+                    value={newExpense.category}
+                    onChange={(e) => setNewExpense({...newExpense, category: e.target.value})}
+                  >
+                    <option value="office">{t.office}</option>
+                    <option value="utilities">{t.utilities}</option>
+                    <option value="marketing">{t.marketing}</option>
+                    <option value="salary">{t.salary}</option>
+                    <option value="travel">{t.travel}</option>
+                    <option value="other">{t.other}</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.expenseAmount}</label>
+                  <input
+                    type="number"
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm"
+                    value={newExpense.amount}
+                    onChange={(e) => setNewExpense({...newExpense, amount: e.target.value})}
+                    placeholder="0.00"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.date}</label>
+                  <input
+                    type="date"
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm"
+                    value={newExpense.date}
+                    onChange={(e) => setNewExpense({...newExpense, date: e.target.value})}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.expenseDescription}</label>
+                  <input
+                    type="text"
+                    className="w-full p-3 border border-gray-300 rounded-lg text-sm"
+                    value={newExpense.description}
+                    onChange={(e) => setNewExpense({...newExpense, description: e.target.value})}
+                    placeholder={t.expensePlaceholder}
+                  />
+                </div>
+                
+                <button
+                  className="w-full mt-4 py-3 bg-blue-600 text-white font-medium rounded-lg"
+                  onClick={handleAddExpense}
+                >
+                  {t.saveExpense}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="space-y-4 pb-20">
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <h2 className="font-bold">{t.expenses}</h2>
+          </div>
+          
+          <div className="p-4">
+            {expenses.length === 0 ? (
+              <div className="py-8 text-center text-gray-500">
+                {t.noExpenses}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {expenses.map(item => (
+                  <div key={item.id} className="p-3 bg-gray-50 rounded-lg">
+                    <div className="flex justify-between">
+                      <div className="font-medium text-sm capitalize">{getExpenseCategoryName(item.category)}</div>
+                      <div className="text-xs text-gray-500">{formatDate(item.date)}</div>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1 mb-2 line-clamp-1">{item.description}</div>
+                    <div className="text-right font-bold">
+                      €{item.amount.toLocaleString()}
+                    </div>
+                  </div>
+                ))}
+                
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <div className="font-medium">{t.total}</div>
+                    <div className="font-bold">€{totalExpenses.toLocaleString()}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <h2 className="font-bold">{t.expensesByCategory}</h2>
+          </div>
+          
+          <div className="p-4">
+            {expenses.length === 0 ? (
+              <div className="py-8 text-center text-gray-500">
+                {t.noExpenses}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {Object.keys(expenses.reduce((acc, expense) => {
+                  const key = expense.category;
+                  if (!acc[key]) {
+                    acc[key] = 0;
+                  }
+                  acc[key] += expense.amount;
+                  return acc;
+                }, {})).map((category, index) => {
+                  const amount = expenses
+                    .filter(e => e.category === category)
+                    .reduce((sum, e) => sum + e.amount, 0);
+                  const percentage = totalExpenses > 0 ? amount / totalExpenses * 100 : 0;
+                  
+                  return (
+                    <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="font-medium capitalize">{getExpenseCategoryName(category)}</div>
+                        <div className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                          {percentage.toFixed(1)}%
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full" 
+                            style={{ width: `${percentage}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center mt-2">
+                        <div className="text-xs text-gray-500">{t.amount}</div>
+                        <div className="font-medium">€{amount.toLocaleString()}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Render reports view
+  const renderReports = () => (
+    <div className="space-y-4 pb-20">
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100">
+          <h2 className="font-bold">{t.financialSummary}</h2>
+        </div>
+        
+        <div className="p-4">
+          <div className="space-y-3">
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <div className="text-sm text-gray-500">{t.income}</div>
+              <div className="text-xl font-bold mt-1">€{totalIncome.toLocaleString()}</div>
+              <div className="w-full bg-blue-100 mt-2 rounded-full h-2">
+                <div className="bg-blue-600 h-2 rounded-full w-full"></div>
+              </div>
+            </div>
+            
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <div className="text-sm text-gray-500">{t.payments}</div>
+              <div className="text-xl font-bold mt-1">€{totalPayments.toLocaleString()}</div>
+              <div className="w-full bg-blue-100 mt-2 rounded-full h-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full" 
+                  style={{ width: `${totalIncome > 0 ? (totalPayments / totalIncome * 100) : 0}%` }}
+                ></div>
+              </div>
+            </div>
+            
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <div className="text-sm text-gray-500">{t.revenue}</div>
+              <div className="text-xl font-bold mt-1">€{totalRevenue.toLocaleString()}</div>
+              <div className="w-full bg-blue-100 mt-2 rounded-full h-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full" 
+                  style={{ width: `${totalIncome > 0 ? (totalRevenue / totalIncome * 100) : 0}%` }}
+                ></div>
+              </div>
+            </div>
+            
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <div className="text-sm text-gray-500">{t.expensesTotal}</div>
+              <div className="text-xl font-bold mt-1">€{totalExpenses.toLocaleString()}</div>
+              <div className="w-full bg-blue-100 mt-2 rounded-full h-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full" 
+                  style={{ width: `${totalRevenue > 0 ? (totalExpenses / totalRevenue * 100) : 0}%` }}
+                ></div>
+              </div>
+            </div>
+            
+            <div className="p-3 bg-blue-50 rounded-lg">
+              <div className="text-sm text-gray-500">{t.netProfit}</div>
+              <div className={`text-xl font-bold mt-1 ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                €{netProfit.toLocaleString()}
+              </div>
+              <div className="w-full bg-blue-100 mt-2 rounded-full h-2">
+                <div 
+                  className={`${netProfit >= 0 ? 'bg-green-600' : 'bg-red-600'} h-2 rounded-full`}
+                  style={{ width: `${totalRevenue > 0 ? Math.min(Math.abs(netProfit / totalRevenue * 100), 100) : 0}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100">
+          <h2 className="font-bold">{t.monthlyOverview}</h2>
+        </div>
+        
+        <div className="p-4">
+          {Object.keys(monthlyData).length === 0 ? (
+            <div className="py-8 text-center text-gray-500">
+              {t.noMonthlyData}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {Object.values(monthlyData).map((data, index) => (
+                <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                  <div className="font-medium mb-2">{formatMonth(data.month)}</div>
+                  <div className="grid grid-cols-2 gap-y-2 gap-x-3">
+                    <div>
+                      <div className="text-xs text-gray-500">{t.income}</div>
+                      <div className="font-medium">€{data.income.toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">{t.payments}</div>
+                      <div className="font-medium">€{data.payments.toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">{t.revenue}</div>
+                      <div className="font-medium">€{data.revenue.toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500">{t.expensesTotal}</div>
+                      <div className="font-medium">€{data.expenses.toLocaleString()}</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <div className="text-xs text-gray-500">{t.profit}</div>
+                      <div className={`font-medium ${data.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        €{data.profit.toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -1249,19 +1225,13 @@ const Finance = () => {
     </div>
   );
 
-  // Render appropriate view based on viewMode
-  const renderContent = () => {
-    if (loading) {
-      return renderLoading();
-    }
-
-    switch (viewMode) {
-      case 'dashboard':
-        return renderDashboard();
+  // Get appropriate view based on active tab
+  const getActiveView = () => {
+    switch (activeTab) {
       case 'transactions':
         return renderTransactions();
       case 'categories':
-        return renderCategoryPayments();
+        return renderCategories();
       case 'expenses':
         return renderExpenses();
       case 'reports':
@@ -1273,168 +1243,81 @@ const Finance = () => {
 
   return (
     <div className="bg-gray-100 min-h-screen">
-      {/* Success Alert */}
-      <div className={`fixed bottom-3 right-3 left-3 bg-green-600 text-white px-3 py-2 rounded-lg shadow-lg z-50 transition-opacity duration-300 ${showAddSuccess ? 'opacity-100' : 'opacity-0'}`}>
-        <div className="flex items-center">
-          <svg className="h-5 w-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-          </svg>
-          <span className="text-sm">{successMessage}</span>
-        </div>
-      </div>
-
       {/* Header */}
-      <div className="bg-white shadow">
-        <div className="flex items-center justify-between px-4 py-3">
-          <button 
-            className="p-2 text-gray-600"
-            onClick={toggleMobileMenu}
-          >
-            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path>
-            </svg>
-          </button>
-          <h1 className="text-xl font-bold text-gray-800">Finance</h1>
-          <div className="w-8"></div> {/* Empty div for balance */}
-        </div>
+      <div className="bg-white px-4 py-3 shadow sticky top-0 z-20">
+        <h1 className="text-lg font-bold">{t.financeTitle}</h1>
+        <p className="text-xs text-gray-500 mb-1">{t.companyDashboard}</p>
       </div>
-
-      {/* Page Title Area */}
-      <div className="bg-white border-b border-gray-200 px-4 py-4">
-        <h2 className="text-lg font-bold text-gray-800">{t.financeManagement}</h2>
-        <p className="text-gray-500 text-sm">{t.companyDashboard}</p>
+      
+      {/* Main content area */}
+      <div className="px-4 py-4">
+        {getActiveView()}
       </div>
-
-      {/* Mobile Menu Drawer */}
-      {isMobileMenuOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-30" onClick={toggleMobileMenu}>
-          <div className="absolute left-0 top-0 bottom-0 w-64 bg-white shadow-lg p-5" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-5">
-              <h2 className="text-lg font-semibold text-gray-800">{t.menu}</h2>
-              <button 
-                className="p-2 rounded-md text-gray-600 hover:bg-gray-100"
-                onClick={toggleMobileMenu}
-              >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-              </button>
-            </div>
-            <nav className="space-y-2">
-              <button 
-                className={`w-full flex items-center px-3 py-2 rounded-lg ${viewMode === 'dashboard' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
-                onClick={() => { setViewMode('dashboard'); toggleMobileMenu(); }}
-              >
-                <svg className="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
-                </svg>
-                <div className="text-left">
-                  <div className="font-medium">{t.dashboard}</div>
-                </div>
-              </button>
-              <button 
-                className={`w-full flex items-center px-3 py-2 rounded-lg ${viewMode === 'transactions' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
-                onClick={() => { setViewMode('transactions'); toggleMobileMenu(); }}
-              >
-                <svg className="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                </svg>
-                <div className="text-left">
-                  <div className="font-medium">{t.transactions}</div>
-                </div>
-              </button>
-              <button 
-                className={`w-full flex items-center px-3 py-2 rounded-lg ${viewMode === 'categories' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
-                onClick={() => { setViewMode('categories'); toggleMobileMenu(); }}
-              >
-                <svg className="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-                </svg>
-                <div className="text-left">
-                  <div className="font-medium">{t.categoryPayments}</div>
-                </div>
-              </button>
-              <button 
-                className={`w-full flex items-center px-3 py-2 rounded-lg ${viewMode === 'expenses' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
-                onClick={() => { setViewMode('expenses'); toggleMobileMenu(); }}
-              >
-                <svg className="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <div className="text-left">
-                  <div className="font-medium">{t.expenses}</div>
-                </div>
-              </button>
-              <button 
-                className={`w-full flex items-center px-3 py-2 rounded-lg ${viewMode === 'reports' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
-                onClick={() => { setViewMode('reports'); toggleMobileMenu(); }}
-              >
-                <svg className="h-5 w-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-                <div className="text-left">
-                  <div className="font-medium">{t.reports}</div>
-                </div>
-              </button>
-            </nav>
-          </div>
-        </div>
-      )}
-
-      {/* Bottom Navigation for Mobile */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20">
-        <div className="grid grid-cols-5 h-14">
+      
+      {/* Bottom Tab Bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-30">
+        <div className="grid grid-cols-5">
           <button 
-            className={`flex flex-col items-center justify-center ${viewMode === 'dashboard' ? 'text-blue-600' : 'text-gray-600'}`}
-            onClick={() => setViewMode('dashboard')}
+            onClick={() => navigate('dashboard')}
+            className={`flex flex-col items-center justify-center py-2 ${activeTab === 'dashboard' ? 'text-blue-600' : 'text-gray-500'}`}
           >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
             </svg>
             <span className="text-xs mt-1">{t.dashboard}</span>
           </button>
+          
           <button 
-            className={`flex flex-col items-center justify-center ${viewMode === 'transactions' ? 'text-blue-600' : 'text-gray-600'}`}
-            onClick={() => setViewMode('transactions')}
+            onClick={() => navigate('transactions')}
+            className={`flex flex-col items-center justify-center py-2 ${activeTab === 'transactions' ? 'text-blue-600' : 'text-gray-500'}`}
           >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
             </svg>
             <span className="text-xs mt-1">{t.transactions}</span>
           </button>
+          
           <button 
-            className={`flex flex-col items-center justify-center ${viewMode === 'categories' ? 'text-blue-600' : 'text-gray-600'}`}
-            onClick={() => setViewMode('categories')}
+            onClick={() => navigate('categories')}
+            className={`flex flex-col items-center justify-center py-2 ${activeTab === 'categories' ? 'text-blue-600' : 'text-gray-500'}`}
           >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
             </svg>
-            <span className="text-xs mt-1">{t.categoryPayments}</span>
+            <span className="text-xs mt-1">{t.categories}</span>
           </button>
+          
           <button 
-            className={`flex flex-col items-center justify-center ${viewMode === 'expenses' ? 'text-blue-600' : 'text-gray-600'}`}
-            onClick={() => setViewMode('expenses')}
+            onClick={() => navigate('expenses')}
+            className={`flex flex-col items-center justify-center py-2 ${activeTab === 'expenses' ? 'text-blue-600' : 'text-gray-500'}`}
           >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
             <span className="text-xs mt-1">{t.expenses}</span>
           </button>
+          
           <button 
-            className={`flex flex-col items-center justify-center ${viewMode === 'reports' ? 'text-blue-600' : 'text-gray-600'}`}
-            onClick={() => setViewMode('reports')}
+            onClick={() => navigate('reports')}
+            className={`flex flex-col items-center justify-center py-2 ${activeTab === 'reports' ? 'text-blue-600' : 'text-gray-500'}`}
           >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
             </svg>
             <span className="text-xs mt-1">{t.reports}</span>
           </button>
         </div>
       </div>
-
-      {/* Main Content - With padding to accommodate bottom nav */}
-      <div className="px-4 py-4 pb-20">
-        {renderContent()}
+      
+      {/* Floating Action Button */}
+      {renderFloatingActionButton()}
+      
+      {/* Toast notification */}
+      <div className={`fixed bottom-20 left-4 right-4 bg-green-600 text-white rounded-lg px-4 py-3 shadow-lg transition-opacity duration-300 flex items-center z-20 ${toast.show ? 'opacity-100' : 'opacity-0'}`}>
+        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+        <div>{toast.message}</div>
       </div>
     </div>
   );
