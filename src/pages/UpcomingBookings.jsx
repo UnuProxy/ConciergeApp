@@ -1,4 +1,635 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+// FIXED: Enhanced shopping expense handler - fixed total calculation
+  const handleAddShoppingExpense = async (client, shoppingExpense) => {
+    if (!client || !shoppingExpense) {
+      console.error("Missing client or shopping data");
+      return false;
+    }
+    
+    // Find the most recent booking
+    let targetBooking = null;
+    if (client.bookings.length > 0) {
+      targetBooking = [...client.bookings].sort((a, b) => {
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      })[0];
+    } else {
+      showNotificationMessage(t.noBookingFound || "No booking found for this client", "error");
+      return false;
+    }
+    
+    try {
+      console.log("Adding shopping expense to booking:", targetBooking.id);
+      
+      // Verify this booking belongs to the user's company
+      const bookingRef = doc(db, 'reservations', targetBooking.id);
+      const bookingDoc = await getDoc(bookingRef);
+      
+      if (!bookingDoc.exists()) {
+        throw new Error(t.bookingNotFound || 'Booking not found');
+      }
+      
+      const bookingData = bookingDoc.data();
+      
+      // Security check: Verify company ID
+      if (bookingData.companyId !== userCompanyId) {
+        throw new Error(t.notAuthorizedToModify || 'You are not authorized to modify this booking');
+      }
+      
+      // Calculate total values - FIXED: preserve paid amounts
+      const currentTotal = bookingData.totalValue || 0;
+      const newTotal = currentTotal + shoppingExpense.totalValue;
+      const paidAmount = bookingData.paidAmount || 0; // Preserve paid amount
+      
+      // Create a services array if it doesn't exist
+      const services = Array.isArray(bookingData.services) ? [...bookingData.services] : [];
+      
+      // Add the shopping expense to services array with regular Date instead of serverTimestamp
+      const currentDate = new Date();
+      
+      // Create service object WITHOUT serverTimestamp - add a unique ID
+      const newService = {
+        ...shoppingExpense,
+        id: 'shopping_' + Date.now(), // Add a unique ID
+        createdAt: currentDate
+      };
+      
+      services.push(newService);
+      
+      // Update the booking in Firestore - only use serverTimestamp for top-level fields
+      await updateDoc(bookingRef, {
+        services: services,
+        totalValue: newTotal,
+        // KEEP paidAmount unchanged
+        updatedAt: serverTimestamp()
+      });
+      
+      // Update local state - FIXED: preserve paid amount in bookings state
+      setBookings(prev => {
+        return prev.map(booking => {
+          if (booking.id === targetBooking.id) {
+            // Create updated services array including the new shopping expense
+            const updatedServices = Array.isArray(booking.services) 
+              ? [...booking.services, newService]
+              : [newService];
+              
+            return {
+              ...booking,
+              services: updatedServices,
+              totalValue: newTotal,
+              // Maintain the existing paidAmount
+              paidAmount: booking.paidAmount || 0
+            };
+          }
+          return booking;
+        });
+      });
+      
+      // Update client groups - FIXED: preserve paid amounts in client state
+      setClientGroups(prev => {
+        const clientId = client.clientId;
+        if (!prev[clientId]) return prev;
+        
+        const updatedGroup = { ...prev[clientId] };
+        
+        // Update the booking
+        updatedGroup.bookings = updatedGroup.bookings.map(b => {
+          if (b.id === targetBooking.id) {
+            return {
+              ...b,
+              services: Array.isArray(b.services) ? [...b.services, newService] : [newService],
+              totalValue: newTotal,
+              // Maintain paid amount
+              paidAmount: b.paidAmount || 0
+            };
+          }
+          return b;
+        });
+        
+        // Add the service to client's services array
+        updatedGroup.services = [...updatedGroup.services, {
+          ...newService,
+          bookingId: targetBooking.id
+        }];
+        
+        // Update client totals - FIXED: preserve paid amount
+        const oldTotalValue = updatedGroup.totalValue;
+        updatedGroup.totalValue += shoppingExpense.totalValue;
+        
+        // Keep paidAmount the same
+        const paidAmount = updatedGroup.paidAmount;
+        updatedGroup.dueAmount = updatedGroup.totalValue - paidAmount;
+        
+        // Update client payment status
+        if (paidAmount >= updatedGroup.totalValue) {
+          updatedGroup.paymentStatus = 'paid';
+        } else if (paidAmount > 0) {
+          updatedGroup.paymentStatus = 'partiallyPaid';
+        } else {
+          updatedGroup.paymentStatus = 'notPaid';
+        }
+        
+        // Update last activity timestamp
+        updatedGroup.lastActivity = new Date();
+        
+        return { ...prev, [clientId]: updatedGroup };
+      });
+      
+      console.log('Successfully added shopping expense to booking:', targetBooking.id);
+      showNotificationMessage(t.shoppingExpenseSuccess || "Shopping expense added successfully");
+      return true;
+    } catch (err) {
+      console.error('Error adding shopping expense:', err);
+      showNotificationMessage(t.failedAddShopping || "Error adding shopping expense: " + err.message, "error");
+      return false;
+    }
+  };
+  
+  // FIXED: Enhanced service adding function with preserved paid amounts
+  const handleQuickServiceAdd = async (client, serviceData) => {
+    if (!client || !serviceData) {
+      console.error("Missing client or service data");
+      return false;
+    }
+    
+    // Find the most recent booking
+    let targetBooking = null;
+    if (client.bookings.length > 0) {
+      targetBooking = [...client.bookings].sort((a, b) => {
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      })[0];
+    } else {
+      showNotificationMessage(t.noBookingFound || "No booking found for this client", "error");
+      return false;
+    }
+    
+    try {
+      console.log("Adding service to booking:", targetBooking.id);
+      
+      // Verify this booking belongs to the user's company
+      const bookingRef = doc(db, 'reservations', targetBooking.id);
+      const bookingDoc = await getDoc(bookingRef);
+      
+      if (!bookingDoc.exists()) {
+        throw new Error(t.bookingNotFound || 'Booking not found');
+      }
+      
+      const bookingData = bookingDoc.data();
+      
+      // Security check: Verify company ID
+      if (bookingData.companyId !== userCompanyId) {
+        throw new Error(t.notAuthorizedToModify || 'You are not authorized to modify this booking');
+      }
+      
+      // Prepare the service data with computed values - use Date instead of serverTimestamp
+      const currentDate = new Date();
+      const preparedService = {
+        ...serviceData,
+        id: serviceData.type + '_' + Date.now(), // Add a unique ID
+        createdAt: currentDate,
+        companyId: userCompanyId,
+        status: serviceData.status || 'confirmed',
+        totalValue: parseFloat(serviceData.price) * parseInt(serviceData.quantity)
+      };
+      
+      // Calculate total values for the booking
+      const currentTotal = bookingData.totalValue || 0;
+      const newTotal = currentTotal + preparedService.totalValue;
+      const paidAmount = bookingData.paidAmount || 0; // Preserve paid amount
+      
+      // Create a services array if it doesn't exist
+      const services = Array.isArray(bookingData.services) ? [...bookingData.services] : [];
+      
+      // Add the service to services array
+      services.push(preparedService);
+      
+      // Update the booking in Firestore - only use serverTimestamp for top-level fields
+      await updateDoc(bookingRef, {
+        services: services,
+        totalValue: newTotal,
+        // KEEP paidAmount unchanged
+        updatedAt: serverTimestamp()
+      });
+      
+      // Update local state - FIXED: preserve paid amount
+      setBookings(prev => {
+        return prev.map(booking => {
+          if (booking.id === targetBooking.id) {
+            // Create updated services array including the new service
+            const updatedServices = Array.isArray(booking.services) 
+              ? [...booking.services, preparedService]
+              : [preparedService];
+              
+            return {
+              ...booking,
+              services: updatedServices,
+              totalValue: newTotal,
+              // Maintain the existing paidAmount
+              paidAmount: booking.paidAmount || 0
+            };
+          }
+          return booking;
+        });
+      });
+      
+      // Update client groups - FIXED: preserve paid amount
+      setClientGroups(prev => {
+        const clientId = client.clientId;
+        if (!prev[clientId]) return prev;
+        
+        const updatedGroup = { ...prev[clientId] };
+        
+        // Update the booking
+        updatedGroup.bookings = updatedGroup.bookings.map(b => {
+          if (b.id === targetBooking.id) {
+            return {
+              ...b,
+              services: Array.isArray(b.services) ? [...b.services, preparedService] : [preparedService],
+              totalValue: newTotal,
+              // Maintain paid amount
+              paidAmount: b.paidAmount || 0
+            };
+          }
+          return b;
+        });
+        
+        // Add the service to client's services array
+        updatedGroup.services = [...updatedGroup.services, {
+          ...preparedService,
+          bookingId: targetBooking.id
+        }];
+        
+        // Update client totals - FIXED: preserve paid amount
+        const oldTotalValue = updatedGroup.totalValue;
+        updatedGroup.totalValue += preparedService.totalValue;
+        
+        // Keep paidAmount the same
+        const paidAmount = updatedGroup.paidAmount;
+        updatedGroup.dueAmount = updatedGroup.totalValue - paidAmount;
+        
+        // Update client payment status
+        if (paidAmount >= updatedGroup.totalValue) {
+          updatedGroup.paymentStatus = 'paid';
+        } else if (paidAmount > 0) {
+          updatedGroup.paymentStatus = 'partiallyPaid';
+        } else {
+          updatedGroup.paymentStatus = 'notPaid';
+        }
+        
+        // Update last activity timestamp
+        updatedGroup.lastActivity = new Date();
+        
+        return { ...prev, [clientId]: updatedGroup };
+      });
+      
+      console.log('Successfully added service to booking:', targetBooking.id);
+      showNotificationMessage(t.serviceAddedSuccess || "Service added successfully");
+      return true;
+    } catch (err) {
+      console.error('Error adding service:', err);
+      showNotificationMessage(t.failedAddService || "Error adding service: " + err.message, "error");
+      return false;
+    }
+  };  // FIXED: Improved booking deletion function
+  const handleDeleteBooking = async (client, booking) => {
+    if (!client || !booking || !booking.id) {
+      console.error("Missing client or booking data");
+      return false;
+    }
+    
+    // Show confirmation dialog with more details to prevent accidental deletion
+    if (!window.confirm(`${t.deleteBookingConfirm} ${client.clientName}?\n\n${t.deleteBookingWarning}`)) {
+      return false;
+    }
+    
+    try {
+      console.log("Deleting booking:", booking.id, "for company:", userCompanyId);
+      
+      // Verify this booking belongs to the user's company
+      const bookingRef = doc(db, 'reservations', booking.id);
+      const bookingDoc = await getDoc(bookingRef);
+      
+      if (!bookingDoc.exists()) {
+        throw new Error(t.bookingNotFound || 'Booking not found');
+      }
+      
+      const bookingData = bookingDoc.data();
+      
+      // Security check: Verify company ID
+      if (bookingData.companyId !== userCompanyId) {
+        throw new Error(t.notAuthorizedToModify || 'You are not authorized to delete this booking');
+      }
+      
+      // Delete the booking document from Firestore
+      await deleteDoc(bookingRef);
+      
+      // Update local state: remove the booking from bookings array
+      setBookings(prev => prev.filter(b => b.id !== booking.id));
+      
+      // Update clientGroups: remove the booking from the client's bookings array
+      setClientGroups(prev => {
+        const clientId = client.clientId;
+        if (!prev[clientId]) return prev;
+        
+        const updatedGroup = { ...prev[clientId] };
+        
+        // Remove the booking
+        updatedGroup.bookings = updatedGroup.bookings.filter(b => b.id !== booking.id);
+        
+        // Remove services associated with this booking
+        updatedGroup.services = updatedGroup.services.filter(
+          service => service.bookingId !== booking.id
+        );
+        
+        // Remove payments associated with this booking
+        updatedGroup.paymentHistory = updatedGroup.paymentHistory.filter(
+          payment => payment.bookingId !== booking.id
+        );
+        
+        // If client has no more bookings, remove the client group
+        if (updatedGroup.bookings.length === 0) {
+          const newGroups = { ...prev };
+          delete newGroups[clientId];
+          return newGroups;
+        }
+        
+        // Otherwise, recalculate totals from remaining bookings
+        updatedGroup.totalValue = 0;
+        updatedGroup.paidAmount = 0;
+        
+        updatedGroup.bookings.forEach(booking => {
+          updatedGroup.totalValue += booking.totalValue || 0;
+          updatedGroup.paidAmount += booking.paidAmount || 0;
+        });
+        
+        updatedGroup.dueAmount = Math.max(0, updatedGroup.totalValue - updatedGroup.paidAmount);
+        
+        // Update payment status
+        if (updatedGroup.paidAmount >= updatedGroup.totalValue) {
+          updatedGroup.paymentStatus = 'paid';
+        } else if (updatedGroup.paidAmount > 0) {
+          updatedGroup.paymentStatus = 'partiallyPaid';
+        } else {
+          updatedGroup.paymentStatus = 'notPaid';
+        }
+        
+        return { ...prev, [clientId]: updatedGroup };
+      });
+      
+      // Show success notification
+      showNotificationMessage(t.bookingDeletedSuccess || 'Booking successfully deleted');
+      closeBottomSheet();
+      return true;
+    } catch (err) {
+      console.error('Error deleting booking:', err);
+      showNotificationMessage(`${t.error}: ${err.message}`, 'error');
+      throw err;
+    }
+  };
+  
+  // FIXED: Improved service deletion function
+  const handleDeleteService = async (client, service) => {
+    if (!service || !client || !service.bookingId) {
+      console.error("Missing client, service, or booking ID");
+      return false;
+    }
+    
+    // Show confirmation dialog
+    if (!window.confirm(`${t.deleteServiceConfirm} "${service.name}"?`)) {
+      return false;
+    }
+    
+    try {
+      console.log("Deleting service from booking:", service.bookingId);
+      
+      // Verify this booking belongs to the user's company
+      const bookingRef = doc(db, 'reservations', service.bookingId);
+      const bookingDoc = await getDoc(bookingRef);
+      
+      if (!bookingDoc.exists()) {
+        throw new Error(t.bookingNotFound || 'Booking not found');
+      }
+      
+      const bookingData = bookingDoc.data();
+      
+      // Security check: Verify company ID
+      if (bookingData.companyId !== userCompanyId) {
+        throw new Error(t.notAuthorizedToModify || 'You are not authorized to modify this booking');
+      }
+      
+      // Find the service in services array - FIXED: better service identification
+      const services = bookingData.services || [];
+      let serviceIndex = -1;
+      
+      // First try to find by direct comparison
+      if (service.id) {
+        serviceIndex = services.findIndex(s => s.id === service.id);
+      }
+      
+      // If not found by id, try to find by name + date/createdAt
+      if (serviceIndex === -1) {
+        serviceIndex = services.findIndex(s => {
+          // Convert timestamps for comparison
+          const sCreatedAt = s.createdAt?.toDate?.() ? s.createdAt.toDate() : s.createdAt;
+          const serviceCreatedAt = service.createdAt instanceof Date ? service.createdAt : new Date(service.createdAt);
+          
+          // Match by name and creation time if available
+          return s.name === service.name && 
+                 ((sCreatedAt && serviceCreatedAt && 
+                   Math.abs(new Date(sCreatedAt).getTime() - serviceCreatedAt.getTime()) < 1000) || 
+                  (s.type === service.type && s.price === service.price && s.quantity === service.quantity));
+        });
+      }
+      
+      if (serviceIndex === -1) {
+        throw new Error('Service not found in booking');
+      }
+      
+      // Calculate the total to subtract
+      const serviceTotal = services[serviceIndex].price * services[serviceIndex].quantity;
+      
+      // Remove the service from array
+      services.splice(serviceIndex, 1);
+      
+      // Calculate new booking total
+      const currentTotal = bookingData.totalValue || 0;
+      const newBookingTotal = Math.max(0, currentTotal - serviceTotal);
+      
+      // Update booking in Firestore
+      await updateDoc(bookingRef, {
+        services,
+        totalValue: newBookingTotal,
+        updatedAt: serverTimestamp()
+      });
+      
+      console.log("Service deleted successfully, updating local state");
+      
+      // Update local state
+      setBookings(prev => {
+        return prev.map(booking => {
+          if (booking.id === service.bookingId) {
+            // Remove the service from this booking
+            const updatedServices = (booking.services || []).filter((s, idx) => idx !== serviceIndex);
+            
+            return {
+              ...booking,
+              services: updatedServices,
+              totalValue: Math.max(0, booking.totalValue - serviceTotal)
+            };
+          }
+          return booking;
+        });
+      });
+      
+      // Update client groups
+      setClientGroups(prev => {
+        const clientId = client.clientId;
+        if (!prev[clientId]) return prev;
+        
+        const updatedGroup = { ...prev[clientId] };
+        
+        // Update the booking
+        updatedGroup.bookings = updatedGroup.bookings.map(b => {
+          if (b.id === service.bookingId) {
+            // Create updated services array
+            const updatedBookingServices = Array.isArray(b.services) 
+              ? b.services.filter((s, idx) => !(s.name === service.name && 
+                                              s.price === service.price &&
+                                              s.quantity === service.quantity))
+              : [];
+              
+            return {
+              ...b,
+              services: updatedBookingServices,
+              totalValue: Math.max(0, b.totalValue - serviceTotal)
+            };
+          }
+          return b;
+        });
+        
+        // Remove the service from client's services array - FIXED: better service identification
+        updatedGroup.services = updatedGroup.services.filter(s => {
+          if (s.bookingId !== service.bookingId) return true;
+          if (s.id && s.id === service.id) return false;
+          
+          const sCreatedAt = s.createdAt instanceof Date ? s.createdAt : new Date(s.createdAt);
+          const serviceCreatedAt = service.createdAt instanceof Date ? service.createdAt : new Date(service.createdAt);
+          
+          // Keep if it's not the service we're deleting
+          return !(s.name === service.name && 
+                  Math.abs(sCreatedAt.getTime() - serviceCreatedAt.getTime()) < 1000);
+        });
+        
+        // Update client totals
+        const totalValue = Math.max(0, updatedGroup.totalValue - serviceTotal);
+        updatedGroup.totalValue = totalValue;
+        updatedGroup.dueAmount = Math.max(0, totalValue - updatedGroup.paidAmount);
+        
+        // Update client payment status
+        if (updatedGroup.paidAmount >= totalValue) {
+          updatedGroup.paymentStatus = 'paid';
+        } else if (updatedGroup.paidAmount > 0) {
+          updatedGroup.paymentStatus = 'partiallyPaid';
+        } else {
+          updatedGroup.paymentStatus = 'notPaid';
+        }
+        
+        return { ...prev, [clientId]: updatedGroup };
+      });
+      
+      showNotificationMessage(t.serviceDeletedSuccess || 'Service deleted successfully');
+      closeBottomSheet();
+      return true;
+    } catch (err) {
+      console.error('Error deleting service:', err);
+      showNotificationMessage(t.serviceDeleteFailed || 'Service deletion failed: ' + err.message, 'error');
+      return false;
+    }
+  };  // Bottom sheet handling
+  const showBottomSheetWithContent = (content, item, secondaryItem = null) => {
+    setBottomSheetContent(content);
+    setSelectedItem(item);
+    
+    if (content === 'edit-payment') {
+      setSelectedPayment(secondaryItem);
+      setPaymentData({
+        amount: secondaryItem?.amount || 0,
+        method: secondaryItem?.method || 'cash',
+        notes: secondaryItem?.notes || '',
+        receiptNumber: secondaryItem?.receiptNumber || '',
+        createdAt: secondaryItem?.date || new Date(),
+        modifiedAt: new Date()
+      });
+    } else if (content === 'edit-service') {
+      setSelectedService(secondaryItem);
+    } else if (content === 'quick-payment') {
+      setPaymentData({
+        amount: item?.dueAmount || 0,
+        method: 'cash',
+        notes: '',
+        receiptNumber: '',
+        createdAt: new Date(),
+        modifiedAt: new Date()
+      });
+    }
+    
+    setShowBottomSheet(true);
+  };
+  
+  const closeBottomSheet = () => {
+    setShowBottomSheet(false);
+    setTimeout(() => {
+      setBottomSheetContent(null);
+      setSelectedItem(null);
+      setSelectedPayment(null);
+      setSelectedService(null);
+    }, 300);
+  };
+  
+  // Click handlers
+  const viewClientDetails = (clientId) => {
+    const client = clientGroups[clientId];
+    if (client) {
+      showBottomSheetWithContent('client-details', client);
+    }
+  };
+  
+  const openPaymentModal = (client) => {
+    if (client) {
+      const dueAmount = client.dueAmount;
+      setPaymentData({
+        amount: dueAmount,
+        method: 'cash',
+        notes: '',
+        receiptNumber: '',
+        createdAt: new Date(),
+        modifiedAt: new Date()
+      });
+      showBottomSheetWithContent('quick-payment', client);
+    }
+  };
+  
+  const openEditPaymentModal = (client, payment) => {
+    if (client && payment) {
+      showBottomSheetWithContent('edit-payment', client, payment);
+    }
+  };
+  
+  const openAddServiceModal = (client) => {
+    if (client) {
+      showBottomSheetWithContent('add-service', client);
+    }
+  };
+  
+  const openEditServiceModal = (client, service) => {
+    if (client && service) {
+      showBottomSheetWithContent('edit-service', client, service);
+    }
+  };
+  
+  const openAddShoppingModal = (client) => {
+    if (client) {
+      showBottomSheetWithContent('add-shopping', client);
+    }
+  };import { useState, useEffect, useRef, useMemo } from 'react';
 import { useSwipeable } from 'react-swipeable';
 import {
   collection,
@@ -20,7 +651,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMediaQuery } from 'react-responsive';
 import React from 'react';
 
-// Simple helper to safely render text that might be a language object
+// Helper function to safely render text from language objects
 function safeRender(value) {
   if (value && typeof value === 'object') {
     // Handle language objects
@@ -33,7 +664,7 @@ function safeRender(value) {
   return value;
 }
 
-// Simplified status colors with enhanced styling
+// Status colors with enhanced styling
 const statusColors = {
   confirmed: { cssClass: 'bg-green-100 text-green-800 border-green-200' },
   pending: { cssClass: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
@@ -162,7 +793,8 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
     status: 'confirmed',
     notes: ''
   });
-  // Fetch categories first - FIXED: added this missing function
+
+  // Fetch categories first
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -181,9 +813,6 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
           { id: 'custom', name: t.customService || 'Custom Service', icon: 'services' }
         ];
         
-        // You could also fetch categories from Firestore if needed
-        // For now, we'll use the standard categories
-        
         setCategories(standardCategories);
         setLoading(false);
       } catch (err) {
@@ -195,6 +824,7 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
     
     fetchCategories();
   }, [userCompanyId, t]);
+
   // Fetch services for selected category
   useEffect(() => {
     const fetchServices = async () => {
@@ -264,7 +894,6 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
             });
           } catch (err) {
             console.error(`Error fetching from ${selectedCategory.id} collection:`, err);
-            // Continue anyway - this is just a bonus attempt
           }
         }
         
@@ -287,6 +916,7 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
     
     fetchServices();
   }, [selectedCategory, userCompanyId, t]);
+
   const handleCategorySelect = (category) => {
     setSelectedCategory(category);
     setServiceData(prev => ({ ...prev, category: category.id }));
@@ -297,6 +927,7 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
       setStep('services');
     }
   };
+
   const handleServiceSelect = (service) => {
     // Pre-fill form with service data
     setServiceData({
@@ -316,9 +947,11 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
     
     setStep('details');
   };
+
   const handleAddCustom = () => {
     setStep('custom');
   };
+
   const handleSubmit = () => {
     // Calculate total price
     const totalPrice = serviceData.price * serviceData.quantity;
@@ -345,6 +978,7 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
     // Send back to parent component
     onServiceAdded(newService);
   };
+
   // RENDER CATEGORY SELECTION
   const renderCategorySelection = () => (
     <div>
@@ -358,10 +992,10 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
           {categories.map(category => (
             <button
-            key={category.id}
-            onClick={() => handleCategorySelect(category)}
-            className="p-4 md:p-3 border rounded-lg flex flex-col items-center hover:bg-blue-50 hover:border-blue-300 transition-colors"
-          >
+              key={category.id}
+              onClick={() => handleCategorySelect(category)}
+              className="p-4 md:p-3 border rounded-lg flex flex-col items-center hover:bg-blue-50 hover:border-blue-300 transition-colors"
+            >
               <CategoryIcon type={category.icon} size="large" />
               <span className="mt-2 text-center">{category.name}</span>
             </button>
@@ -370,6 +1004,7 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
       )}
     </div>
   );
+
   // RENDER SERVICES LIST
   const renderServicesList = () => (
     <div>
@@ -438,6 +1073,7 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
       )}
     </div>
   );
+
   // RENDER SERVICE DETAILS FORM
   const renderServiceDetailsForm = () => (
     <div>
@@ -530,6 +1166,7 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
       </div>
     </div>
   );
+
   // RENDER CUSTOM SERVICE FORM
   const renderCustomForm = () => (
     <div>
@@ -675,6 +1312,7 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
       </div>
     </div>
   );
+
   // MAIN COMPONENT RENDER
   return (
     <div className="p-4">
@@ -877,196 +1515,280 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
   );
 };
 
-// CLIENT CARD COMPONENT - Previously missing
-const ClientCard = ({ client }) => {
+// CLIENT CARD COMPONENT
+const ClientCard = ({ client, onClick }) => {
   // Get translations from the context
-  const language = localStorage.getItem('appLanguage') || 'ro';
+  const language = localStorage.getItem('appLanguage') || 'en';
   
   // Translations for the component
   const translations = {
+    en: {
+      paid: "Paid",
+      partiallyPaid: "Partially Paid",
+      notPaid: "Not Paid",
+      guests: "guests",
+      paymentProgress: "Payment Progress",
+      servicesAndExtras: "Services & Extras",
+      more: "more",
+      details: "Details",
+      pay: "Pay",
+      service: "Service",
+      shop: "Shop",
+      today: "Today",
+      tomorrow: "Tomorrow",
+      inDays: "In",
+      days: "days",
+      yesterday: "Yesterday",
+      daysAgo: "days ago"
+    },
     ro: {
-      // General
-      viewingDataFor: "Vizualizare date pentru compania:",
-      bookingManager: "Manager Rezervări",
-      loading: "Se încarcă rezervările...",
-      error: "Eroare",
-      errorLoading: "Eroare la încărcarea rezervărilor:",
-      
-      // Authentication errors
-      authError: "Eroare de autentificare",
-      userNotAuthenticated: "Utilizatorul nu este autentificat",
-      userNotAuthorized: "Utilizatorul nu este autorizat să acceseze această aplicație",
-      noCompanyAssociation: "Utilizatorul nu are asociere cu o companie",
-      signOut: "Deconectare",
-      
-      // Filters & Search
-      search: "Caută client, rezervare...",
-      sortBy: "Sortează după",
-      sortByDate: "Sortează după Dată",
-      sortByClientName: "Sortează după Numele Clientului",
-      sortByRecentActivity: "Sortează după Activitate Recentă",
-      sortByValue: "Sortează după Valoare",
-      
-      // Tab filters
-      upcoming: "Viitoare",
-      activeNow: "Active Acum",
-      past: "Trecute",
-      all: "Toate",
-      
-      // Results
-      found: "S-au găsit",
-      bookings: "rezervări",
-      booking: "rezervare",
-      matching: "care se potrivesc cu",
-      
-      // Empty states
-      noBookingsFound: "Nu s-au găsit rezervări",
-      noUpcomingBookings: "Nu există rezervări viitoare programate.",
-      noActiveBookings: "Nu există rezervări active în acest moment.",
-      noPastBookings: "Nu există rezervări trecute de afișat.",
-      noMatchingBookings: "Nu există rezervări care să corespundă criteriilor de căutare.",
-      tryChangingSearch: "Încercați să modificați interogarea de căutare",
-      
-      // Client Card
+      paid: "Plătit",
+      partiallyPaid: "Parțial Plătit",
+      notPaid: "Neplătit",
       guests: "oaspeți",
       paymentProgress: "Progres Plată",
       servicesAndExtras: "Servicii și Extra",
       more: "mai multe",
-      
-      // Action buttons
       details: "Detalii",
-      paid: "Plătit",
       pay: "Plătește",
       service: "Serviciu",
       shop: "Cumpărături",
-      
-      // Bottom Sheet Titles
-      clientDetails: "Detalii Client",
-      addPayment: "Adaugă Plată",
-      editPayment: "Editează Plată",
-      addService: "Adaugă Serviciu",
-      serviceDetails: "Detalii Serviciu",
-      addShoppingExpense: "Adaugă Cheltuieli Cumpărături",
-      
-      // Client Details
-      clientId: "ID Client:",
-      contactInformation: "Informații de Contact",
-      totalValue: "Valoare totală",
-      checkIn: "Check-in:",
-      checkOut: "Check-out:",
-      deleteBooking: "Șterge Rezervarea",
-      noAdditionalServices: "Fără servicii adiționale",
-      paymentHistory: "Istoric Plăți",
-      noPaymentsRecorded: "Nu există plăți înregistrate",
-      addToBooking: "Adaugă la Rezervare",
-      paymentsTotal: "Total Plăți",
-      
-      // Payments
-      client: "Client:",
-      amountDue: "Sumă de plată:",
-      paymentAmount: "Suma Plății",
-      paymentMethod: "Metoda de Plată",
-      cash: "Numerar",
-      card: "Card",
-      transfer: "Transfer",
-      crypto: "Crypto",
-      receiptNumber: "Număr Chitanță (opțional)",
-      enterReceiptNumber: "Introduceți numărul chitanței dacă este disponibil",
-      notes: "Note (opțional)",
-      addPaymentDetails: "Adăugați detalii de plată sau referință",
-      completePayment: "Finalizează Plata",
-      
-      // Services
-      date: "Data:",
-      quantity: "Cantitate",
-      deleteService: "Șterge Serviciul",
-      
-      // Shopping Form
-      storeName: "Numele Magazinului*",
-      storeNamePlaceholder: "Ex. Gucci, Supermarket, Farmacie",
-      itemsPurchased: "Articole Cumpărate*",
-      itemsPurchasedPlaceholder: "Lista articolelor cumpărate",
-      totalAmount: "Suma Totală*",
-      receiptAvailable: "Chitanță disponibilă",
-      additionalNotes: "Note adiționale",
-      cancel: "Anulează",
-      adding: "Se adaugă...",
-      shoppingAt: "Cumpărături la",
-      
-      // Messages
-      noClientSelected: "Niciun client selectat",
-      serviceAddedSuccess: "Serviciu adăugat cu succes",
-      failedAddService: "Eroare la adăugarea serviciului",
-      shoppingExpenseSuccess: "Cheltuială de cumpărături adăugată cu succes",
-      failedAddShopping: "Eroare la adăugarea cheltuielii de cumpărături",
-      paymentSuccess: "Plată procesată cu succes",
-      noClientsFound: "Nu s-au găsit clienți",
-      pleaseEnterStore: "Vă rugăm să introduceți numele magazinului",
-      pleaseEnterItems: "Vă rugăm să introduceți articolele cumpărate",
-      pleaseEnterValidAmount: "Vă rugăm să introduceți o sumă validă",
-      // Add these new translation keys here
-      bookingDeletedSuccess: "Rezervare ștearsă cu succes",
-      serviceDeletedSuccess: "Serviciu șters cu succes",
-      serviceDeleteFailed: "Ștergerea serviciului a eșuat",
-      bookingNotFound: "Rezervarea nu a fost găsită",
-      notAuthorizedToModify: "Nu sunteți autorizat să modificați această rezervare",
-      noBookingFound: "Nu s-a găsit nicio rezervare pentru acest client",
-      paymentFailed: "Plata a eșuat",
-      
-      // Confirmation messages
-      deleteBookingConfirm: "Sigur doriți să ștergeți rezervarea pentru",
-      deleteBookingWarning: "Această acțiune va elimina definitiv toate serviciile, plățile și detaliile rezervării. Această acțiune nu poate fi anulată.",
-      deleteServiceConfirm: "Sigur doriți să ștergeți serviciul",
-      
-      // Service Selection
-      selectServiceCategory: "Selectați Categoria de Servicii",
-      servicesTitle: "Servicii",
-      customService: "Serviciu Personalizat",
-      serviceName: "Numele Serviciului*",
-      description: "Descriere",
-      pricePerUnit: "Preț per",
-      serviceTotalAmount: "Suma Totală",
-      hourly: "Orar",
-      daily: "Zilnic",
-      nightly: "Nocturn",
-      item: "Articol",
-      noServicesFound: "Nu s-au găsit servicii",
-      addCustom: "Adaugă personalizat",
-      enterServiceName: "Introduceți numele serviciului",
-      enterServiceDescription: "Introduceți descrierea serviciului",
-      price: "Preț*",
-      unit: "Unitate",
-      addSpecialRequirements: "Adăugați cerințe sau informații speciale",
-      failedToLoadCategories: "Nu s-au putut încărca categoriile de servicii",
-      
-      // Categories
-      villas: "Vile",
-      cars: "Mașini",
-      boats: "Bărci și Iahturi",
-      chefs: "Bucătari",
-      restaurants: "Restaurante",
-      tours: "Tururi",
-      massages: "Masaje",
-      shopping: "Cumpărături",
-      
-      // Payment Status
-      partiallyPaid: "Parțial Plătit",
-      notPaid: "Neplătit",
-      
-      // Booking Status
-      confirmed: "Confirmat",
-      pending: "În așteptare",
-      cancelled: "Anulat",
-      booked: "Rezervat",
-      
-      // Time indicators
       today: "Astăzi",
       tomorrow: "Mâine",
       inDays: "În",
       days: "zile",
       yesterday: "Ieri",
       daysAgo: "zile în urmă"
-    },
+    }
+  };
+  
+  const t = translations[language];
+  
+  // Get check-in date from the earliest upcoming booking if it exists
+  const earliestBooking = [...client.bookings].sort((a, b) => 
+    new Date(a.checkIn || 0) - new Date(b.checkIn || 0)
+  )[0] || {};
+  
+  // Helper functions
+  const formatShortDate = (dateStr) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString(language === 'en' ? 'en-GB' : 'ro-RO', {
+      day: '2-digit',
+      month: '2-digit'
+    });
+  };
+  
+  const getDaysLeft = (date) => {
+    if (!date) return '';
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const checkInDate = new Date(date);
+    checkInDate.setHours(0, 0, 0, 0);
+    const diffTime = checkInDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      return t.today;
+    } else if (diffDays === 1) {
+      return t.tomorrow;
+    } else if (diffDays > 1) {
+      return `${t.inDays} ${diffDays} ${t.days}`;
+    } else if (diffDays === -1) {
+      return t.yesterday;
+    } else if (diffDays < -1) {
+      return `${Math.abs(diffDays)} ${t.daysAgo}`;
+    } else {
+      return '';
+    }
+  };
+  
+  const getClientInitials = (name) => {
+    if (!name) return '';
+    const parts = name.split(' ');
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
+  
+  const getPaymentStatusText = (status) => {
+    if (!status) return '';
+    
+    switch(status) {
+      case 'paid': return t.paid;
+      case 'partiallyPaid': return t.partiallyPaid;
+      case 'notPaid': return t.notPaid;
+      default: return safeRender(status);
+    }
+  };
+  
+  const getPaymentStatusBadgeClass = (status) => {
+    return paymentStatusColors[status]?.cssClass || 'bg-gray-100 text-gray-800';
+  };
+  
+  const getBorderColorClass = (status) => {
+    if (status === 'paid') return 'border-green-500';
+    if (status === 'partiallyPaid') return 'border-yellow-500';
+    return 'border-red-500';
+  };
+  
+  return (
+    <div className={`bg-white rounded-lg shadow-sm overflow-hidden border-l-4 w-full max-w-full ${getBorderColorClass(client.paymentStatus)}`}>
+      {/* Client header with avatar and details */}
+      <div className="p-4">
+        <div className="flex justify-between">
+          <div className="flex items-center flex-1 min-w-0">
+            <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-white text-sm font-semibold ${
+              client.paymentStatus === 'paid' ? 'bg-green-500' : 
+              client.paymentStatus === 'partiallyPaid' ? 'bg-yellow-500' : 
+              'bg-red-500'
+            }`}>
+              {getClientInitials(client.clientName)}
+            </div>
+            <div className="ml-3 truncate flex-1 min-w-0">
+              <h3 className="font-medium leading-tight truncate">{safeRender(client.clientName)}</h3>
+              <div className="flex items-center mt-1 flex-wrap gap-1">
+                <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusBadgeClass(client.paymentStatus)}`}>
+                  {getPaymentStatusText(client.paymentStatus)}
+                </div>
+                
+                {earliestBooking.checkIn && (
+                  <div className="ml-2 text-xs text-gray-600 flex items-center">
+                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16"></path>
+                    </svg>
+                    {formatShortDate(earliestBooking.checkIn)}
+                    {earliestBooking.checkOut && ` - ${formatShortDate(earliestBooking.checkOut)}`}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-lg font-bold">{client.totalValue.toLocaleString()} €</div>
+            {client.paymentStatus !== 'paid' && (
+              <div className="text-xs text-red-600 font-medium mt-1">
+                {getDaysLeft(earliestBooking.checkIn)}
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Payment progress bar */}
+        {client.totalValue > 0 && (
+          <div className="mt-3">
+            <div className="flex justify-between items-center text-xs mb-1">
+              <span className="text-gray-600">{t.paymentProgress}</span>
+              <span className="font-medium">{client.paidAmount.toLocaleString()} / {client.totalValue.toLocaleString()} €</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className={`h-2 rounded-full ${
+                  client.paymentStatus === 'paid' ? 'bg-green-500' : 
+                  client.paymentStatus === 'partiallyPaid' ? 'bg-yellow-500' : 
+                  'bg-red-500'
+                }`}
+                style={{ width: `${Math.min(100, (client.paidAmount / client.totalValue) * 100)}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
+        
+        {/* Services summary */}
+        {client.services.length > 0 && (
+          <div className="mt-3">
+            <div className="text-xs text-gray-600 mb-1">{t.servicesAndExtras}</div>
+            <div className="flex flex-wrap gap-2 text-xs">
+              {client.services.slice(0, 3).map((service, idx) => (
+                <div key={idx} className="px-2 py-1 bg-gray-100 rounded-md">
+                  {safeRender(service.name)}
+                </div>
+              ))}
+              {client.services.length > 3 && (
+                <div className="px-2 py-1 bg-gray-100 rounded-md text-gray-500">
+                  +{client.services.length - 3} {t.more}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* Action buttons - call global window functions */}
+      <div className="flex border-t bg-gray-50">
+        <button 
+          className="flex-1 py-3 md:py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center justify-center"
+          onClick={() => window.viewClientDetails(client.clientId)}
+        >
+          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {t.details}
+        </button>
+        
+        <button 
+          className={`flex-1 py-2 text-center text-sm font-medium transition-colors flex items-center justify-center ${
+            client.paymentStatus === 'paid' 
+              ? 'text-green-700 bg-green-50'
+              : 'text-gray-700 hover:bg-gray-100'
+          }`}
+          onClick={() => client.paymentStatus !== 'paid' ? window.openPaymentModal(client) : null}
+          disabled={client.paymentStatus === 'paid'}
+        >
+          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
+          </svg>
+          {client.paymentStatus === 'paid' ? t.paid : t.pay}
+        </button>
+        
+        <button 
+          className="flex-1 py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center justify-center"
+          onClick={() => window.openAddServiceModal(client)}
+        >
+          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          {t.service}
+        </button>
+        
+        <button 
+          className="flex-1 py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center justify-center"
+          onClick={() => window.openAddShoppingModal(client)}
+        >
+          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+          </svg>
+          {t.shop}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// MAIN BOOKINGS COMPONENT
+const UpcomingBookings = () => {
+  // Auth state and company association
+  const [userCompanyId, setUserCompanyId] = useState(null);
+  const [userRole, setUserRole] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState(null);
+  
+  // Language handling
+  const [language, setLanguage] = useState(() => {
+    return localStorage.getItem('appLanguage') || 'en';
+  });
+  // Listen for language changes from settings page
+  useEffect(() => {
+    const handleLanguageChange = () => {
+      setLanguage(localStorage.getItem('appLanguage') || 'en');
+    };
+    
+    window.addEventListener('storage', handleLanguageChange);
+    return () => window.removeEventListener('storage', handleLanguageChange);
+  }, []);
+  // Translations for the component
+  const translations = {
     en: {
       // General
       viewingDataFor: "Viewing data for company:",
@@ -1187,7 +1909,6 @@ const ClientCard = ({ client }) => {
       pleaseEnterStore: "Please enter a store name",
       pleaseEnterItems: "Please enter items purchased",
       pleaseEnterValidAmount: "Please enter a valid amount",
-      // Add these new translation keys here
       bookingDeletedSuccess: "Booking successfully deleted",
       serviceDeletedSuccess: "Service deleted successfully",
       serviceDeleteFailed: "Service deletion failed",
@@ -1249,237 +1970,7 @@ const ClientCard = ({ client }) => {
       days: "days",
       yesterday: "Yesterday",
       daysAgo: "days ago"
-    }
-  };
-  
-  const t = translations[language];
-  
-  // Get check-in date from the earliest upcoming booking if it exists
-  const earliestBooking = [...client.bookings].sort((a, b) => 
-    new Date(a.checkIn || 0) - new Date(b.checkIn || 0)
-  )[0] || {};
-  
-  // Helper functions
-  const formatShortDate = (dateStr) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString(language === 'en' ? 'en-GB' : 'ro-RO', {
-      day: '2-digit',
-      month: '2-digit'
-    });
-  };
-  
-  const getDaysLeft = (date) => {
-    if (!date) return '';
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const checkInDate = new Date(date);
-    checkInDate.setHours(0, 0, 0, 0);
-    const diffTime = checkInDate - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 0) {
-      return t.today;
-    } else if (diffDays === 1) {
-      return t.tomorrow;
-    } else if (diffDays > 1) {
-      return `${t.inDays} ${diffDays} ${t.days}`;
-    } else if (diffDays === -1) {
-      return t.yesterday;
-    } else if (diffDays < -1) {
-      return `${Math.abs(diffDays)} ${t.daysAgo}`;
-    } else {
-      return '';
-    }
-  };
-  
-  const getClientInitials = (name) => {
-    if (!name) return '';
-    const parts = name.split(' ');
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
-  };
-  
-  const getPaymentStatusText = (status) => {
-    if (!status) return '';
-    
-    switch(status) {
-      case 'paid': return t.paid;
-      case 'partiallyPaid': return t.partiallyPaid;
-      case 'notPaid': return t.notPaid;
-      default: return safeRender(status);
-    }
-  };
-  
-  const getPaymentStatusBadgeClass = (status) => {
-    return paymentStatusColors[status]?.cssClass || 'bg-gray-100 text-gray-800';
-  };
-  
-  const getBorderColorClass = (status) => {
-    if (status === 'paid') return 'border-green-500';
-    if (status === 'partiallyPaid') return 'border-yellow-500';
-    return 'border-red-500';
-  };
-  
-  // Return to main component scope to use its functions
-  return (
-    <div className={`bg-white rounded-lg shadow-sm overflow-hidden border-l-4 w-full max-w-full ${getBorderColorClass(client.paymentStatus)}`}>
-      {/* Client header with avatar and details */}
-      <div className="p-4">
-        <div className="flex justify-between">
-  <div className="flex items-center flex-1 min-w-0">
-    <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-white text-sm font-semibold ${
-      client.paymentStatus === 'paid' ? 'bg-green-500' : 
-      client.paymentStatus === 'partiallyPaid' ? 'bg-yellow-500' : 
-      'bg-red-500'
-    }`}>
-      {getClientInitials(client.clientName)}
-    </div>
-    <div className="ml-3 truncate flex-1 min-w-0">
-      <h3 className="font-medium leading-tight truncate">{safeRender(client.clientName)}</h3>
-      <div className="flex items-center mt-1 flex-wrap gap-1">
-                <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusBadgeClass(client.paymentStatus)}`}>
-                  {getPaymentStatusText(client.paymentStatus)}
-                </div>
-                
-                {earliestBooking.checkIn && (
-                  <div className="ml-2 text-xs text-gray-600 flex items-center">
-                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16"></path>
-                    </svg>
-                    {formatShortDate(earliestBooking.checkIn)}
-                    {earliestBooking.checkOut && ` - ${formatShortDate(earliestBooking.checkOut)}`}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-lg font-bold">{client.totalValue.toLocaleString()} €</div>
-            {client.paymentStatus !== 'paid' && (
-              <div className="text-xs text-red-600 font-medium mt-1">
-                {getDaysLeft(earliestBooking.checkIn)}
-              </div>
-            )}
-          </div>
-        </div>
-        
-        {/* Payment progress bar */}
-        {client.totalValue > 0 && (
-          <div className="mt-3">
-            <div className="flex justify-between items-center text-xs mb-1">
-              <span className="text-gray-600">{t.paymentProgress}</span>
-              <span className="font-medium">{client.paidAmount.toLocaleString()} / {client.totalValue.toLocaleString()} €</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className={`h-2 rounded-full ${
-                  client.paymentStatus === 'paid' ? 'bg-green-500' : 
-                  client.paymentStatus === 'partiallyPaid' ? 'bg-yellow-500' : 
-                  'bg-red-500'
-                }`}
-                style={{ width: `${Math.min(100, (client.paidAmount / client.totalValue) * 100)}%` }}
-              ></div>
-            </div>
-          </div>
-        )}
-        
-        {/* Services summary */}
-        {client.services.length > 0 && (
-          <div className="mt-3">
-            <div className="text-xs text-gray-600 mb-1">{t.servicesAndExtras}</div>
-            <div className="flex flex-wrap gap-2 text-xs">
-              {client.services.slice(0, 3).map((service, idx) => (
-                <div key={idx} className="px-2 py-1 bg-gray-100 rounded-md">
-                  {safeRender(service.name)}
-                </div>
-              ))}
-              {client.services.length > 3 && (
-                <div className="px-2 py-1 bg-gray-100 rounded-md text-gray-500">
-                  +{client.services.length - 3} {t.more}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-      
-      {/* Action buttons - call parent component functions */}
-      <div className="flex border-t bg-gray-50">
-  <button 
-    className="flex-1 py-3 md:py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center justify-center"
-    onClick={() => window.viewClientDetails(client.clientId)}
-  >
-          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          {t.details}
-        </button>
-        
-        <button 
-          className={`flex-1 py-2 text-center text-sm font-medium transition-colors flex items-center justify-center ${
-            client.paymentStatus === 'paid' 
-              ? 'text-green-700 bg-green-50'
-              : 'text-gray-700 hover:bg-gray-100'
-          }`}
-          onClick={() => client.paymentStatus !== 'paid' ? window.openPaymentModal(client) : null}
-          disabled={client.paymentStatus === 'paid'}
-        >
-          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
-          </svg>
-          {client.paymentStatus === 'paid' ? t.paid : t.pay}
-        </button>
-        
-        <button 
-          className="flex-1 py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center justify-center"
-          onClick={() => window.openAddServiceModal(client)}
-        >
-          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-          {t.service}
-        </button>
-        
-        <button 
-          className="flex-1 py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center justify-center"
-          onClick={() => window.openAddShoppingModal(client)}
-        >
-          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-          </svg>
-          {t.shop}
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// MAIN BOOKINGS COMPONENT
-const UpcomingBookings = () => {
-  // Auth state and company association
-  const [userCompanyId, setUserCompanyId] = useState(null);
-  const [userRole, setUserRole] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [authError, setAuthError] = useState(null);
-  
-  // Language handling
-  const [language, setLanguage] = useState(() => {
-    return localStorage.getItem('appLanguage') || 'ro';
-  });
-  // Listen for language changes from settings page
-  useEffect(() => {
-    const handleLanguageChange = () => {
-      setLanguage(localStorage.getItem('appLanguage') || 'ro');
-    };
-    
-    window.addEventListener('storage', handleLanguageChange);
-    return () => window.removeEventListener('storage', handleLanguageChange);
-  }, []);
-  // Translations for the component
-  const translations = {
+    },
     ro: {
       // General
       viewingDataFor: "Vizualizare date pentru compania:",
@@ -1542,6 +2033,7 @@ const UpcomingBookings = () => {
       editPayment: "Editează Plată",
       addService: "Adaugă Serviciu",
       serviceDetails: "Detalii Serviciu",
+      addShoppingExpense: "Adaugă Cheltuieli Cumpărături",
       
       // Client Details
       clientId: "ID Client:",
@@ -1554,6 +2046,7 @@ const UpcomingBookings = () => {
       paymentHistory: "Istoric Plăți",
       noPaymentsRecorded: "Nu există plăți înregistrate",
       addToBooking: "Adaugă la Rezervare",
+      paymentsTotal: "Total Plăți",
       
       // Payments
       client: "Client:",
@@ -1584,10 +2077,8 @@ const UpcomingBookings = () => {
       receiptAvailable: "Chitanță disponibilă",
       additionalNotes: "Note adiționale",
       cancel: "Anulează",
-      // Fix: Removed duplicate key "addShoppingExpense" here
       adding: "Se adaugă...",
       shoppingAt: "Cumpărături la",
-      addShoppingExpense: "Adaugă Cheltuială Cumpărături", // Only one instance of this key
       
       // Messages
       noClientSelected: "Niciun client selectat",
@@ -1600,6 +2091,13 @@ const UpcomingBookings = () => {
       pleaseEnterStore: "Vă rugăm să introduceți numele magazinului",
       pleaseEnterItems: "Vă rugăm să introduceți articolele cumpărate",
       pleaseEnterValidAmount: "Vă rugăm să introduceți o sumă validă",
+      bookingDeletedSuccess: "Rezervare ștearsă cu succes",
+      serviceDeletedSuccess: "Serviciu șters cu succes",
+      serviceDeleteFailed: "Ștergerea serviciului a eșuat",
+      bookingNotFound: "Rezervarea nu a fost găsită",
+      notAuthorizedToModify: "Nu sunteți autorizat să modificați această rezervare",
+      noBookingFound: "Nu s-a găsit nicio rezervare pentru acest client",
+      paymentFailed: "Plata a eșuat",
       
       // Confirmation messages
       deleteBookingConfirm: "Sigur doriți să ștergeți rezervarea pentru",
@@ -1654,184 +2152,9 @@ const UpcomingBookings = () => {
       days: "zile",
       yesterday: "Ieri",
       daysAgo: "zile în urmă"
-    },
-    en: {
-      // General
-      viewingDataFor: "Viewing data for company:",
-      bookingManager: "Booking Manager",
-      loading: "Loading bookings...",
-      error: "Error",
-      errorLoading: "Error loading bookings:",
-      
-      // Authentication errors
-      authError: "Authentication Error",
-      userNotAuthenticated: "User not authenticated",
-      userNotAuthorized: "User not authorized to access this application",
-      noCompanyAssociation: "User has no company association",
-      signOut: "Sign Out",
-      
-      // Filters & Search
-      search: "Search client, booking...",
-      sortBy: "Sort by",
-      sortByDate: "Sort by Date",
-      sortByClientName: "Sort by Client Name",
-      sortByRecentActivity: "Sort by Recent Activity",
-      sortByValue: "Sort by Value",
-      
-      // Tab filters
-      upcoming: "Upcoming",
-      activeNow: "Active Now",
-      past: "Past",
-      all: "All",
-      
-      // Results
-      found: "Found",
-      bookings: "bookings",
-      booking: "booking",
-      matching: "matching",
-      
-      // Empty states
-      noBookingsFound: "No bookings found",
-      noUpcomingBookings: "There are no upcoming bookings scheduled.",
-      noActiveBookings: "There are no active bookings at the moment.",
-      noPastBookings: "There are no past bookings to display.",
-      noMatchingBookings: "There are no bookings that match your search criteria.",
-      tryChangingSearch: "Try changing your search query",
-      
-      // Client Card
-      guests: "guests",
-      paymentProgress: "Payment Progress",
-      servicesAndExtras: "Services & Extras",
-      more: "more",
-      
-      // Action buttons
-      details: "Details",
-      paid: "Paid",
-      pay: "Pay",
-      service: "Service",
-      shop: "Shop",
-      
-      // Bottom Sheet Titles
-      clientDetails: "Client Details",
-      addPayment: "Add Payment",
-      editPayment: "Edit Payment",
-      addService: "Add Service",
-      serviceDetails: "Service Details",
-      
-      // Client Details
-      clientId: "Client ID:",
-      contactInformation: "Contact Information",
-      totalValue: "Total value",
-      checkIn: "Check-in:",
-      checkOut: "Check-out:",
-      deleteBooking: "Delete Booking",
-      noAdditionalServices: "No additional services",
-      paymentHistory: "Payment History",
-      noPaymentsRecorded: "No payments recorded",
-      addToBooking: "Add to Booking",
-      
-      // Payments
-      client: "Client:",
-      amountDue: "Amount Due:",
-      paymentAmount: "Payment Amount",
-      paymentMethod: "Payment Method",
-      cash: "Cash",
-      card: "Card",
-      transfer: "Transfer",
-      crypto: "Crypto",
-      receiptNumber: "Receipt Number (optional)",
-      enterReceiptNumber: "Enter receipt number if available",
-      notes: "Notes (optional)",
-      addPaymentDetails: "Add payment details or reference",
-      completePayment: "Complete Payment",
-      
-      // Services
-      date: "Date:",
-      quantity: "Quantity",
-      deleteService: "Delete Service",
-      
-      // Shopping Form
-      storeName: "Store Name*",
-      storeNamePlaceholder: "E.g. Gucci, Supermarket, Pharmacy",
-      itemsPurchased: "Items Purchased*",
-      itemsPurchasedPlaceholder: "List of items purchased",
-      totalAmount: "Total Amount*",
-      receiptAvailable: "Receipt available",
-      additionalNotes: "Additional notes",
-      cancel: "Cancel",
-      // Fix: Removed duplicate key "addShoppingExpense" here
-      adding: "Adding...",
-      shoppingAt: "Shopping at",
-      addShoppingExpense: "Add Shopping Expense", // Only one instance of this key
-      
-      // Messages
-      noClientSelected: "No client selected",
-      serviceAddedSuccess: "Service added successfully",
-      failedAddService: "Failed to add service",
-      shoppingExpenseSuccess: "Shopping expense added successfully",
-      failedAddShopping: "Failed to add shopping expense",
-      paymentSuccess: "Payment processed successfully",
-      noClientsFound: "No clients found",
-      pleaseEnterStore: "Please enter a store name",
-      pleaseEnterItems: "Please enter items purchased",
-      pleaseEnterValidAmount: "Please enter a valid amount",
-      
-      // Confirmation messages
-      deleteBookingConfirm: "Are you sure you want to delete the booking for",
-      deleteBookingWarning: "This will permanently remove all services, payments, and booking details. This action cannot be undone.",
-      deleteServiceConfirm: "Are you sure you want to delete the service",
-      
-      // Service Selection
-      selectServiceCategory: "Select Service Category",
-      servicesTitle: "Services",
-      customService: "Custom Service",
-      serviceName: "Service Name*",
-      description: "Description",
-      pricePerUnit: "Price per",
-      serviceTotalAmount: "Total Amount",
-      hourly: "Hourly",
-      daily: "Daily",
-      nightly: "Nightly",
-      item: "Item",
-      noServicesFound: "No services found",
-      addCustom: "Add Custom",
-      enterServiceName: "Enter service name",
-      enterServiceDescription: "Enter service description",
-      price: "Price*",
-      unit: "Unit",
-      addSpecialRequirements: "Add any special requirements or information",
-      failedToLoadCategories: "Failed to load service categories",
-      
-      // Categories
-      villas: "Villas",
-      cars: "Cars",
-      boats: "Boats & Yachts",
-      chefs: "Chefs",
-      restaurants: "Restaurants",
-      tours: "Tours",
-      massages: "Massages",
-      shopping: "Shopping",
-      
-      // Payment Status
-      partiallyPaid: "Partially Paid",
-      notPaid: "Not Paid",
-      
-      // Booking Status
-      confirmed: "Confirmed",
-      pending: "Pending",
-      cancelled: "Cancelled",
-      booked: "Booked",
-      
-      // Time indicators
-      today: "Today",
-      tomorrow: "Tomorrow",
-      inDays: "In",
-      days: "days",
-      yesterday: "Yesterday",
-      daysAgo: "days ago"
     }
   };
-  // Get current translations
+  
   const t = useMemo(() => translations[language], [language]);
   
   // Navigation and responsive design
@@ -2354,7 +2677,7 @@ const UpcomingBookings = () => {
         const dateA = a.lastActivity ? new Date(a.lastActivity) : new Date(0);
         const dateB = b.lastActivity ? new Date(b.lastActivity) : new Date(0);
         return dateB - dateA; // Most recent first
-      } else if (sortOption === 'totalValue') {
+      } else if (sortOption === 'value') {
         return b.totalValue - a.totalValue; // Highest value first
       }
       return 0;
