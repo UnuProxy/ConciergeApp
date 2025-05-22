@@ -1,3 +1,39 @@
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useSwipeable } from 'react-swipeable';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
+  updateDoc,
+  arrayUnion,
+  serverTimestamp,
+  orderBy,
+  limit,
+  addDoc,
+  deleteDoc
+} from 'firebase/firestore';
+import { db, auth } from '../firebase/config';
+import { useNavigate } from 'react-router-dom';
+import { useMediaQuery } from 'react-responsive';
+import React from 'react';
+
+// Helper function to safely render text from language objects
+function safeRender(value) {
+  if (value && typeof value === 'object') {
+    // Handle language objects
+    if (value.en !== undefined || value.ro !== undefined) {
+      return value.ro || value.en || '';
+    }
+    // Handle other objects
+    return JSON.stringify(value);
+  }
+  return value;
+}
+
+
 // FIXED: Enhanced shopping expense handler - fixed total calculation
   const handleAddShoppingExpense = async (client, shoppingExpense) => {
     if (!client || !shoppingExpense) {
@@ -629,40 +665,7 @@
     if (client) {
       showBottomSheetWithContent('add-shopping', client);
     }
-  };import { useState, useEffect, useRef, useMemo } from 'react';
-import { useSwipeable } from 'react-swipeable';
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  doc,
-  getDoc,
-  updateDoc,
-  arrayUnion,
-  serverTimestamp,
-  orderBy,
-  limit,
-  addDoc,
-  deleteDoc
-} from 'firebase/firestore';
-import { db, auth } from '../firebase/config';
-import { useNavigate } from 'react-router-dom';
-import { useMediaQuery } from 'react-responsive';
-import React from 'react';
-
-// Helper function to safely render text from language objects
-function safeRender(value) {
-  if (value && typeof value === 'object') {
-    // Handle language objects
-    if (value.en !== undefined || value.ro !== undefined) {
-      return value.ro || value.en || '';
-    }
-    // Handle other objects
-    return JSON.stringify(value);
-  }
-  return value;
-}
+  };
 
 // Status colors with enhanced styling
 const statusColors = {
@@ -827,20 +830,20 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
 
   // Fetch services for selected category
   useEffect(() => {
-    const fetchServices = async () => {
-      if (!selectedCategory || selectedCategory.id === 'custom') return;
+  const fetchServices = async () => {
+    if (!selectedCategory || selectedCategory.id === 'custom') return;
+    
+    try {
+      setLoading(true);
+      console.log(`Fetching services for category ${selectedCategory.id} and company ${userCompanyId}...`);
       
-      try {
-        setLoading(true);
-        console.log(`Fetching services for category ${selectedCategory.id} and company ${userCompanyId}...`);
-        
-        // Create a query to fetch services from the selected category
-        const serviceQuery = query(
-          collection(db, 'services'),
-          where('companyId', '==', userCompanyId),
-          where('category', '==', selectedCategory.id),
-          where('active', '==', true)
-        );
+      // Create a query to fetch services from the selected category
+      const serviceQuery = query(
+        collection(db, 'services'),
+        where('companyId', '==', userCompanyId),
+        where('category', '==', selectedCategory.id),
+        where('active', '==', true)
+      );
         
         const serviceSnapshot = await getDocs(serviceQuery);
         const servicesData = [];
@@ -855,47 +858,60 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
         console.log(`Found ${servicesData.length} services in 'services' collection`);
         
         // If this is a standard category, also try to fetch from its dedicated collection
-        if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.id)) {
-          try {
-            console.log(`Fetching from dedicated '${selectedCategory.id}' collection...`);
-            
-            // Fix query to just filter by companyId
-            const dedicatedQuery = query(
-              collection(db, selectedCategory.id),
-              where('companyId', '==', userCompanyId)
-            );
-            
-            const dedicatedSnapshot = await getDocs(dedicatedQuery);
-            const dedicatedCount = dedicatedSnapshot.size;
-            
-            console.log(`Found ${dedicatedCount} items in '${selectedCategory.id}' collection`);
-            
-            dedicatedSnapshot.forEach(doc => {
-              const data = doc.data();
-              
-              // Debug information
-              console.log(`Processing item: ${doc.id}`, {
-                name: data.name?.en || data.name || doc.id,
-                price: data.price
-              });
-              
-              // Convert collection items to service format
-              servicesData.push({
-                id: doc.id,
-                name: data.name?.en || data.name || doc.id,
-                description: data.description?.en || data.description || '',
-                category: selectedCategory.id,
-                price: parseFloat(data.price || 0),
-                unit: selectedCategory.id === 'villas' ? 'nightly' : 
-                      selectedCategory.id === 'cars' || selectedCategory.id === 'boats' ? 'daily' : 'service',
-                brand: data.brand || '',
-                model: data.model || ''
-              });
-            });
-          } catch (err) {
-            console.error(`Error fetching from ${selectedCategory.id} collection:`, err);
-          }
-        }
+        // If this is a standard category, also try to fetch from its dedicated collection
+if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.id)) {
+  try {
+    console.log(`Fetching from dedicated '${selectedCategory.id}' collection...`);
+    
+    // UPDATED: Remove companyId filter since these collections may not have it
+    const dedicatedQuery = query(
+      collection(db, selectedCategory.id)
+      // No companyId filter here
+    );
+    
+    const dedicatedSnapshot = await getDocs(dedicatedQuery);
+    const dedicatedCount = dedicatedSnapshot.size;
+    
+    console.log(`Found ${dedicatedCount} items in '${selectedCategory.id}' collection`);
+    
+    dedicatedSnapshot.forEach(doc => {
+      const data = doc.data();
+      
+      // UPDATED: Extract price correctly based on collection type
+      let price = 0;
+      if (selectedCategory.id === 'villas' && data.priceConfigurations && data.priceConfigurations.length > 0) {
+        price = parseFloat(data.priceConfigurations[0].price || 0);
+      } else {
+        price = parseFloat(data.price || 0);
+      }
+      
+      // Debug information
+      console.log(`Processing item: ${doc.id}`, {
+        name: data.name?.en || data.name || doc.id,
+        price: price
+      });
+      
+      // Convert collection items to service format
+      servicesData.push({
+        id: doc.id,
+        name: data.name?.en || data.name || doc.id,
+        description: data.description?.en || data.description || '',
+        category: selectedCategory.id,
+        price: price, // UPDATED: Use extracted price
+        unit: selectedCategory.id === 'villas' ? 'nightly' : 
+              selectedCategory.id === 'cars' || selectedCategory.id === 'boats' ? 'daily' : 'service',
+        brand: data.brand || '',
+        model: data.model || '',
+        // ADDED: Include additional details for villas
+        bedrooms: data.bedrooms || '',
+        bathrooms: data.bathrooms || '',
+        address: typeof data.address === 'object' ? data.address.en : data.address || ''
+      });
+    });
+  } catch (err) {
+    console.error(`Error fetching from ${selectedCategory.id} collection:`, err);
+  }
+}
         
         // Sort services by name
         servicesData.sort((a, b) => {
@@ -4137,76 +4153,6 @@ const UpcomingBookings = () => {
         </div>
       )}
       
-      {/* Mobile navigation */}
-      {!isDesktop && (
-  <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-10" style={{paddingBottom: 'var(--sat-bottom, 0px)'}}>
-          <div className="grid grid-cols-4 h-16">
-            <button
-              className="flex flex-col items-center justify-center"
-              onClick={() => setTimeFilter('upcoming')}
-            >
-              <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <span className="text-xs mt-1">{t.upcoming}</span>
-            </button>
-            
-            <button
-              className="flex flex-col items-center justify-center"
-              onClick={() => {
-                const clients = getFilteredClients();
-                if (clients.length > 0) {
-                  openPaymentModal(clients[0]);
-                } else {
-                  showNotificationMessage(t.noClientsFound, 'error');
-                }
-              }}
-            >
-              <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
-              </svg>
-              <span className="text-xs mt-1">{t.pay}</span>
-            </button>
-            
-            <button
-              className="flex flex-col items-center justify-center"
-              onClick={() => {
-                const clients = getFilteredClients();
-                if (clients.length > 0) {
-                  openAddServiceModal(clients[0]);
-                } else {
-                  showNotificationMessage(t.noClientsFound, 'error');
-                }
-              }}
-            >
-              <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              <span className="text-xs mt-1">{t.service}</span>
-            </button>
-            
-            <button
-              className="flex flex-col items-center justify-center"
-              onClick={() => {
-                const clients = getFilteredClients();
-                if (clients.length > 0) {
-                  openAddShoppingModal(clients[0]);
-                } else {
-                  showNotificationMessage(t.noClientsFound, 'error');
-                }
-              }}
-            >
-              <svg className="w-6 h-6 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-              </svg>
-              <span className="text-xs mt-1">{t.shop}</span>
-            </button>
-          </div>
-          
-          {/* Add padding to prevent content from being hidden behind the menu */}
-          <div className="h-16"></div>
-        </div>
-      )}
     </div>
   );
 };

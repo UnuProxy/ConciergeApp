@@ -20,9 +20,9 @@ function AddProperty() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   
-  // Direct language handling without hooks
+  // Direct language handling without hooks - Fixed to match sidebar default
   const [language, setLanguage] = useState(() => {
-    return localStorage.getItem('appLanguage') || 'en';
+    return localStorage.getItem('appLanguage') || 'ro';
   });
   
   useEffect(() => {
@@ -615,7 +615,7 @@ function AddProperty() {
       
       // Add companyId if creating a new property
       if (!isEditing) {
-        propertyData.companyId = db.companyId;
+        
         propertyData.createdAt = serverTimestamp();
         propertyData.createdBy = db.currentUser?.uid;
       }

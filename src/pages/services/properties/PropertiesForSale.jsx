@@ -68,10 +68,7 @@ const PropertiesForSale = () => {
       }
       try {
         const propertiesRef = collection(db.firestore, 'properties');
-        const q = query(
-          propertiesRef,
-          where('companyId', '==', db.companyId)
-        );
+        const q = propertiesRef;
         const snapshot = await getDocs(q);
         const fetched = snapshot.docs.map(d => {
           const data = d.data();
