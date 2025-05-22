@@ -1731,53 +1731,53 @@ const ClientCard = ({ client, onClick }) => {
         )}
       </div>
       
-      {/* Action buttons - call global window functions */}
-      <div className="flex border-t bg-gray-50">
-        <button 
-          className="flex-1 py-3 md:py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center justify-center"
-          onClick={() => window.viewClientDetails(client.clientId)}
-        >
-          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          {t.details}
-        </button>
-        
-        <button 
-          className={`flex-1 py-2 text-center text-sm font-medium transition-colors flex items-center justify-center ${
-            client.paymentStatus === 'paid' 
-              ? 'text-green-700 bg-green-50'
-              : 'text-gray-700 hover:bg-gray-100'
-          }`}
-          onClick={() => client.paymentStatus !== 'paid' ? window.openPaymentModal(client) : null}
-          disabled={client.paymentStatus === 'paid'}
-        >
-          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
-          </svg>
-          {client.paymentStatus === 'paid' ? t.paid : t.pay}
-        </button>
-        
-        <button 
-          className="flex-1 py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center justify-center"
-          onClick={() => window.openAddServiceModal(client)}
-        >
-          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-          {t.service}
-        </button>
-        
-        <button 
-          className="flex-1 py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center justify-center"
-          onClick={() => window.openAddShoppingModal(client)}
-        >
-          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-          </svg>
-          {t.shop}
-        </button>
-      </div>
+      {/* Action buttons - Enhanced for mobile */}
+<div className="grid grid-cols-4 border-t bg-gray-50">
+  <button 
+    className="flex flex-col items-center justify-center py-3 text-gray-700 hover:bg-gray-100 transition-colors active:bg-gray-200"
+    onClick={() => window.viewClientDetails(client.clientId)}
+  >
+    <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+    <span className="text-xs font-medium">{t.details}</span>
+  </button>
+  
+  <button 
+    className={`flex flex-col items-center justify-center py-3 transition-colors active:bg-gray-200 ${
+      client.paymentStatus === 'paid' 
+        ? 'text-green-700 bg-green-50'
+        : 'text-gray-700 hover:bg-gray-100'
+    }`}
+    onClick={() => client.paymentStatus !== 'paid' ? window.openPaymentModal(client) : null}
+    disabled={client.paymentStatus === 'paid'}
+  >
+    <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
+    </svg>
+    <span className="text-xs font-medium">{client.paymentStatus === 'paid' ? t.paid : t.pay}</span>
+  </button>
+  
+  <button 
+    className="flex flex-col items-center justify-center py-3 text-gray-700 hover:bg-gray-100 transition-colors active:bg-gray-200"
+    onClick={() => window.openAddServiceModal(client)}
+  >
+    <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+    </svg>
+    <span className="text-xs font-medium">{t.service}</span>
+  </button>
+  
+  <button 
+    className="flex flex-col items-center justify-center py-3 text-gray-700 hover:bg-gray-100 transition-colors active:bg-gray-200"
+    onClick={() => window.openAddShoppingModal(client)}
+  >
+    <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+    </svg>
+    <span className="text-xs font-medium">{t.shop}</span>
+  </button>
+</div>
     </div>
   );
 };
@@ -3611,91 +3611,112 @@ const UpcomingBookings = () => {
   
   // Main component render
   return (
-    <div className="p-4 md:p-6 w-full max-w-screen-sm mx-auto bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
       <CompanyIndicator companyId={userCompanyId} t={t} />
       
       {/* Header with title and search */}
-      <div className="mb-6">
-  <div className="flex flex-col md:flex-row md:justify-between md:items-center">
-    <h2 className="text-2xl font-bold mb-4 md:mb-0">{t.bookingManager}</h2>
-    
-    <div className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-4">
-      {/* Search */}
-      <div className="relative w-full md:w-64">
-        <input
-          type="text"
-          placeholder={t.search}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 md:py-2 border border-gray-300 rounded-md text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <svg className="absolute left-3 top-3.5 md:top-2.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-        </svg>
-      </div>
-      
-      {/* Sort by */}
-      <select 
-        className="w-full md:w-auto p-3 md:p-2 border border-gray-300 rounded-md text-base md:text-sm"
-        value={sortOption}
-        onChange={(e) => setSortOption(e.target.value)}
-      >
-              <option value="date">{t.sortByDate}</option>
-              <option value="client">{t.sortByClientName}</option>
-              <option value="lastActivity">{t.sortByRecentActivity}</option>
-              <option value="totalValue">{t.sortByValue}</option>
-            </select>
-          </div>
-        </div>
-      </div>
-      
-      {/* Time-based filter tabs - made more intuitive with clear highlighting */}
-      <div className="flex overflow-x-auto mb-6 border overflow-hidden rounded-lg bg-white">
-  <button
-    className={`flex-1 py-3 px-2 md:px-4 font-medium text-center transition-colors whitespace-nowrap ${timeFilter === 'upcoming' ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'}`}
-    onClick={() => setTimeFilter('upcoming')}
-  >
-    <div className="flex items-center justify-center">
-      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+<div className="mb-4 md:mb-6">
+  <h2 className="text-xl md:text-2xl font-bold mb-4">{t.bookingManager}</h2>
+  
+  {/* Search Bar - Full Width on Mobile */}
+  <div className="mb-3">
+    <div className="relative">
+      <input
+        type="text"
+        placeholder={t.search}
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      />
+      <svg className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
       </svg>
-      <span className="text-sm">{t.upcoming}</span>
     </div>
-  </button>
-        <button
-          className={`flex-1 py-3 px-2 md:px-4 font-medium text-center transition-colors whitespace-nowrap ${timeFilter === 'active' ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'}`}
-          onClick={() => setTimeFilter('active')}
-        >
-          <div className="flex items-center justify-center">
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            {t.activeNow}
-          </div>
-        </button>
-        <button
-          className={`flex-1 py-3 px-2 md:px-4 font-medium text-center transition-colors whitespace-nowrap ${timeFilter === 'past' ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'}`}
-          onClick={() => setTimeFilter('past')}
-        >
-          <div className="flex items-center justify-center">
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            {t.past}
-          </div>
-        </button>
-        <button
-          className={`flex-1 py-3 px-2 md:px-4 font-medium text-center transition-colors whitespace-nowrap ${timeFilter === 'all' ? 'bg-blue-500 text-white' : 'hover:bg-gray-100'}`}
-          onClick={() => setTimeFilter('all')}
-        >
-          <div className="flex items-center justify-center">
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-            </svg>
-            {t.all}
-          </div>
-        </button>
+  </div>
+  
+  {/* Sort Dropdown - Full Width on Mobile */}
+  <div className="mb-4">
+    <select 
+      className="w-full p-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+      value={sortOption}
+      onChange={(e) => setSortOption(e.target.value)}
+    >
+      <option value="date">{t.sortByDate}</option>
+      <option value="client">{t.sortByClientName}</option>
+      <option value="lastActivity">{t.sortByRecentActivity}</option>
+      <option value="totalValue">{t.sortByValue}</option>
+    </select>
+  </div>
+</div>
+      
+      {/* Time-based filter tabs - Mobile Optimized */}
+<div className="mb-4">
+  <div className="grid grid-cols-4 gap-1 bg-gray-100 p-1 rounded-lg">
+    <button
+      className={`py-2.5 px-2 text-sm font-medium rounded-md transition-all duration-200 ${
+        timeFilter === 'upcoming' 
+          ? 'bg-blue-500 text-white shadow-sm' 
+          : 'text-gray-600 hover:text-gray-800 hover:bg-white'
+      }`}
+      onClick={() => setTimeFilter('upcoming')}
+    >
+      <div className="flex flex-col items-center">
+        <svg className="w-4 h-4 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+        <span className="text-xs">{t.upcoming}</span>
       </div>
+    </button>
+    
+    <button
+      className={`py-2.5 px-2 text-sm font-medium rounded-md transition-all duration-200 ${
+        timeFilter === 'active' 
+          ? 'bg-blue-500 text-white shadow-sm' 
+          : 'text-gray-600 hover:text-gray-800 hover:bg-white'
+      }`}
+      onClick={() => setTimeFilter('active')}
+    >
+      <div className="flex flex-col items-center">
+        <svg className="w-4 h-4 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span className="text-xs">{t.activeNow}</span>
+      </div>
+    </button>
+    
+    <button
+      className={`py-2.5 px-2 text-sm font-medium rounded-md transition-all duration-200 ${
+        timeFilter === 'past' 
+          ? 'bg-blue-500 text-white shadow-sm' 
+          : 'text-gray-600 hover:text-gray-800 hover:bg-white'
+      }`}
+      onClick={() => setTimeFilter('past')}
+    >
+      <div className="flex flex-col items-center">
+        <svg className="w-4 h-4 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span className="text-xs">{t.past}</span>
+      </div>
+    </button>
+    
+    <button
+      className={`py-2.5 px-2 text-sm font-medium rounded-md transition-all duration-200 ${
+        timeFilter === 'all' 
+          ? 'bg-blue-500 text-white shadow-sm' 
+          : 'text-gray-600 hover:text-gray-800 hover:bg-white'
+      }`}
+      onClick={() => setTimeFilter('all')}
+    >
+      <div className="flex flex-col items-center">
+        <svg className="w-4 h-4 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+        </svg>
+        <span className="text-xs">{t.all}</span>
+      </div>
+    </button>
+  </div>
+</div>
       
       {/* Results count */}
       <div className="mb-4">
@@ -3713,11 +3734,11 @@ const UpcomingBookings = () => {
       
       {/* Bottom Sheet with Enhanced Content */}
       {showBottomSheet && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end justify-center md:items-center">
+       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end md:items-center md:justify-center">
   <div 
-    className="bg-white rounded-t-xl md:rounded-xl w-full md:max-w-lg h-[85vh] md:h-auto max-h-[90vh] overflow-y-auto animate-slide-up"
-    ref={bottomSheetRef}
-  >
+  className="bg-white rounded-t-2xl md:rounded-xl w-full md:max-w-lg h-[90vh] md:h-auto md:max-h-[90vh] overflow-hidden animate-slide-up"
+  ref={bottomSheetRef}
+>
             {/* Bottom Sheet Header */}
             <div className="p-4 border-b sticky top-0 bg-white z-10">
               <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-3 md:hidden"></div>
