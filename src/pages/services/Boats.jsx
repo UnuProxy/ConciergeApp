@@ -111,19 +111,19 @@ const styles = {
     height: '1rem'
   },
   buttonPrimary: {
-    backgroundColor: '#3b82f6',
-    color: 'white',
-    fontWeight: '500',
-    padding: '0.625rem 1rem',
-    borderRadius: '6px',
-    border: 'none',
-    cursor: 'pointer',
-    minHeight: '2.5rem',
-    width: '100%',
-    '@media (min-width: 640px)': {
-      width: 'auto'
-    }
-  },
+  backgroundColor: '#3b82f6',
+  color: 'white',
+  fontWeight: '500',
+  padding: '0.625rem 1rem',
+  borderRadius: '6px',
+  border: 'none',
+  cursor: 'pointer',
+  minHeight: '2.5rem',
+  width: 'auto',
+  '@media (max-width: 639px)': {
+    width: '100%'
+  }
+},
   buttonSecondary: {
     backgroundColor: '#f3f4f6',
     color: '#1f2937',
@@ -2599,16 +2599,14 @@ function Boats() {
       {!isAddingBoat && !isEditingBoat && (
         <div>
           <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.5rem',
-            marginBottom: '1.25rem',
-            '@media (min-width: 640px)': {
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }
-          }}>
+          display: 'flex',
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '0.5rem',
+          marginBottom: '1.25rem',
+          flexWrap: 'wrap'
+        }}>
             <h2 className="subtitle">{t.boatList.subtitle}</h2>
             <button
               type="button"

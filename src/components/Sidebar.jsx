@@ -45,6 +45,7 @@ function Sidebar({ open, setOpen }) {
       collaborators: 'Colaboratori',
       services: 'Servicii',
       rentalVillas: 'Vile de Închiriat',
+      propertiesForSale: 'Proprietăți de Vânzare',
       boats: 'Bărci',
       cars: 'Mașini',
       security: 'Securitate',
@@ -67,6 +68,7 @@ function Sidebar({ open, setOpen }) {
       collaborators: 'Collaborators',
       services: 'Services',
       rentalVillas: 'Rental Villas',
+      propertiesForSale: 'Properties For Sale',
       boats: 'Boats',
       cars: 'Cars',
       security: 'Security',
@@ -378,12 +380,12 @@ function Sidebar({ open, setOpen }) {
                 {t.rentalVillas}
               </Link>
               <Link 
-      to="/services/properties-for-sale" 
-      style={subNavItemStyle(location.pathname === '/services/properties-for-sale' || location.pathname.includes('/services/properties-for-sale/'))}
-      onClick={handleLinkClick}
-    >
-      {t.propertiesForSale || 'Properties For Sale'}
-    </Link>
+                to="/services/properties-for-sale" 
+                style={subNavItemStyle(location.pathname === '/services/properties-for-sale' || location.pathname.includes('/services/properties-for-sale/'))}
+                onClick={handleLinkClick}
+              >
+                {t.propertiesForSale}
+              </Link>
               <Link 
                 to="/services/boats" 
                 style={subNavItemStyle(location.pathname === '/services/boats')}
