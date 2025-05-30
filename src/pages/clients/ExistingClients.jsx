@@ -3150,375 +3150,684 @@ const getUserName = async (userId) => {
               
               {/* Create Offer Modal */}
               {showCreateOffer && selectedClient && (
-                <div className="h-full flex flex-col">
-                  <div className="flex justify-between items-center p-4 border-b border-gray-200 bg-gray-50">
-                    <h2 className="text-xl font-semibold text-gray-800">
-                      {t.createNewOffer} - {selectedClient.name}
-                    </h2>
-                    {isMobile && (
-                      <button 
-                        onClick={handleBackToDetails}
-                        className="bg-gray-100 text-gray-600 border-none rounded-md py-2 px-3 text-xs mr-4 cursor-pointer"
-                      >
-                        {t.backToDetails}
-                      </button>
-                    )}
-                    {!isMobile && (
-                      <button 
-                        onClick={() => setShowCreateOffer(false)}
-                        className="bg-transparent border-none text-gray-500 text-xl cursor-pointer"
-                      >
-                        ✕
-                      </button>
-                    )}
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className={`bg-white rounded-lg shadow-xl w-full h-full ${isMobile ? 'm-0' : 'max-w-7xl max-h-full m-4'} flex flex-col`}>
+      
+      {/* Header */}
+      <div className={`flex justify-between items-center ${isMobile ? 'p-4' : 'p-6'} border-b border-gray-200 bg-gray-50 flex-shrink-0`}>
+        <div>
+          <h2 className={`${isMobile ? 'text-lg' : 'text-2xl'} font-semibold text-gray-800`}>
+            {t.createNewOffer}
+          </h2>
+          <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 mt-1`}>
+            {t.offerFor} {selectedClient.name}
+          </p>
+        </div>
+        <button 
+          onClick={() => setShowCreateOffer(false)}
+          className={`bg-gray-100 hover:bg-gray-200 text-gray-600 border-none rounded-full ${isMobile ? 'w-8 h-8' : 'w-10 h-10'} flex items-center justify-center ${isMobile ? 'text-lg' : 'text-xl'} cursor-pointer`}
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Main Content */}
+      <div className={`flex-1 flex ${isMobile ? 'flex-col' : 'flex-row'} overflow-hidden`}>
+        
+        {/* Categories - Mobile: Horizontal scroll, Desktop: Left Sidebar */}
+        {isMobile ? (
+          <div className="bg-gray-50 border-b border-gray-200 flex-shrink-0">
+            <div className="p-3">
+              <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+                Service Categories
+              </h3>
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {serviceCategories.map(category => (
+                  <button
+                    key={category.id}
+                    onClick={() => setSelectedCategory(category.id)}
+                    className={`flex-shrink-0 flex flex-col items-center gap-1 p-3 rounded-lg border transition-colors min-w-20 ${
+                      selectedCategory === category.id 
+                        ? 'bg-indigo-100 border-indigo-300 text-indigo-700' 
+                        : 'bg-white border-gray-200 text-gray-700'
+                    }`}
+                  >
+                    <span className="text-xl">{category.icon}</span>
+                    <span className="text-xs text-center font-medium">{category.name}</span>
+                    <span className="text-xs text-gray-500">
+                      {availableServices[category.id]?.length || 0}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="w-72 bg-gray-50 border-r border-gray-200 flex flex-col">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                Service Categories
+              </h3>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto">
+              {serviceCategories.map(category => (
+                <button
+                  key={category.id}
+                  onClick={() => setSelectedCategory(category.id)}
+                  className={`w-full flex items-center gap-3 p-4 text-left border-b border-gray-200 transition-colors ${
+                    selectedCategory === category.id 
+                      ? 'bg-indigo-50 border-l-4 border-l-indigo-600 text-indigo-700' 
+                      : 'hover:bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  <span className="text-2xl">{category.icon}</span>
+                  <div>
+                    <div className="font-medium">{category.name}</div>
+                    <div className="text-xs text-gray-500">
+                      {availableServices[category.id]?.length || 0} services
+                    </div>
                   </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Center - Services Grid */}
+        <div className="flex-1 flex flex-col min-w-0">
+          
+          {/* Services Header */}
+          <div className={`${isMobile ? 'p-4' : 'p-6'} border-b border-gray-200 bg-white flex-shrink-0`}>
+            <div className={`flex ${isMobile ? 'flex-col gap-3' : 'flex-row'} justify-between items-${isMobile ? 'start' : 'center'}`}>
+              <div>
+                <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold text-gray-800`}>
+                  {serviceCategories.find(c => c.id === selectedCategory)?.name}
+                </h3>
+                <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 mt-1`}>
+                  {(() => {
+                    const services = availableServices[selectedCategory] || [];
+                    const filtered = services.filter(service => {
+                      const price = parseFloat(service.dailyPrice || service.price || service.rate || 0);
+                      return price >= appliedMinPrice && price <= appliedMaxPrice;
+                    });
+                    return filtered.length;
+                  })()} services available
+                </p>
+              </div>
+              
+              {/* Price Filter */}
+              {['villas', 'boats', 'cars'].includes(selectedCategory) && (
+                <div className="relative">
+                  <button 
+                    onClick={() => setShowPriceFilter(!showPriceFilter)}
+                    className={`flex items-center gap-2 ${isMobile ? 'px-3 py-2' : 'px-4 py-2'} bg-white border border-gray-300 rounded-lg ${isMobile ? 'text-xs' : 'text-sm'} hover:bg-gray-50`}
+                  >
+                    <span>💰</span>
+                    <span>{t.filterByPrice}</span>
+                    <span>{showPriceFilter ? '▲' : '▼'}</span>
+                  </button>
                   
-                  <div className="flex-1 overflow-hidden flex flex-col">
-                    <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} flex-1 overflow-hidden`}>
-                      {/* Left side - Service categories and listings */}
-                      <div className={`${isMobile ? 'w-full border-b border-gray-200' : 'w-3/5 border-r border-gray-200'} p-4 flex flex-col`}>
-                        {/* Service Categories (Grid Layout) */}
-                        <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-3'} gap-2 mb-4`}>
-                          {serviceCategories.map(category => (
-                            <button
-                              key={category.id}
-                              onClick={() => setSelectedCategory(category.id)}
-                              className={`flex flex-col items-center justify-center p-3 rounded-md border ${selectedCategory === category.id ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white border-gray-200'}`}
-                            >
-                              <span className="text-2xl mb-2">{category.icon}</span>
-                              <span className="text-xs text-center">{category.name}</span>
-                            </button>
-                          ))}
+                  {showPriceFilter && (
+                    <div className={`absolute ${isMobile ? 'top-full left-0 right-0' : 'top-full right-0'} mt-2 p-4 bg-white border border-gray-200 rounded-lg shadow-lg z-10 ${isMobile ? 'w-full' : 'w-80'}`}>
+                      <div className="flex gap-4 mb-4">
+                        <div className="flex-1">
+                          <label className="block text-xs font-medium text-gray-500 mb-2">{t.minPrice}</label>
+                          <input
+                            type="number"
+                            value={minPrice}
+                            onChange={(e) => setMinPrice(e.target.value)}
+                            className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
+                            placeholder="0"
+                            min="0"
+                          />
                         </div>
+                        <div className="flex-1">
+                          <label className="block text-xs font-medium text-gray-500 mb-2">{t.maxPrice}</label>
+                          <input
+                            type="number"
+                            value={maxPrice}
+                            onChange={(e) => setMaxPrice(e.target.value)}
+                            className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
+                            placeholder="∞"
+                            min="0"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <button 
+                          onClick={() => {
+                            setMinPrice('');
+                            setMaxPrice('');
+                            setAppliedMinPrice(0);
+                            setAppliedMaxPrice(Infinity);
+                            setShowPriceFilter(false);
+                          }}
+                          className="py-2 px-3 bg-gray-100 text-gray-600 border-none rounded-md text-xs font-medium cursor-pointer"
+                        >
+                          {t.reset}
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setAppliedMinPrice(minPrice === '' ? 0 : parseFloat(minPrice));
+                            setAppliedMaxPrice(maxPrice === '' ? Infinity : parseFloat(maxPrice));
+                            setShowPriceFilter(false);
+                          }}
+                          className="py-2 px-3 bg-indigo-600 text-white border-none rounded-md text-xs font-medium cursor-pointer"
+                        >
+                          {t.apply}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Services Grid - WIDE LANDSCAPE CARDS */}
+          <div className={`flex-1 overflow-y-auto ${isMobile ? 'p-4' : 'p-8'}`}>
+            {loadingServices ? (
+              <div className="flex flex-col items-center justify-center h-full">
+                <div className="inline-block w-8 h-8 border-2 border-gray-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+                <p className="text-gray-500">{t.loadingServices}</p>
+              </div>
+            ) : (() => {
+              const services = availableServices[selectedCategory] || [];
+              const filteredServices = services.filter(service => {
+                const price = parseFloat(service.dailyPrice || service.price || service.rate || 0);
+                return price >= appliedMinPrice && price <= appliedMaxPrice;
+              });
+              
+              return filteredServices.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full">
+                  <div className="text-6xl text-gray-300 mb-4">📦</div>
+                  <p className="text-gray-500 text-lg">{t.noServicesFound}</p>
+                </div>
+              ) : (
+                <div className="grid gap-6 grid-cols-1">
+                  {filteredServices.map(service => (
+                    <div key={service.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.01] w-full max-w-5xl mx-auto">
+                      
+                      {/* HORIZONTAL LAYOUT - Image + Content Side by Side */}
+                      <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'}`}>
                         
-                        {/* Price filter (conditionally shown) */}
-                        {['villas', 'boats', 'cars'].includes(selectedCategory) && (
-                          <div className="relative mb-4">
-                            <button 
-                              onClick={() => setShowPriceFilter(!showPriceFilter)}
-                              className="flex justify-between items-center w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-md text-sm"
-                            >
-                              <span>{t.filterByPrice}</span>
-                              <span>{showPriceFilter ? '▲' : '▼'}</span>
-                            </button>
-                            
-                            {showPriceFilter && (
-                              <div className="absolute top-full left-0 right-0 mt-1 p-4 bg-white border border-gray-200 rounded-md shadow-lg z-10">
-                                <div className="flex gap-4 mb-4">
-                                  <div className="flex-1">
-                                    <label className="block text-xs font-medium text-gray-500 mb-2">{t.minPrice}</label>
-                                    <input
-                                      type="number"
-                                      value={minPrice}
-                                      onChange={(e) => setMinPrice(e.target.value)}
-                                      className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
-                                      placeholder="0"
-                                      min="0"
-                                    />
-                                  </div>
-                                  <div className="flex-1">
-                                    <label className="block text-xs font-medium text-gray-500 mb-2">{t.maxPrice}</label>
-                                    <input
-                                      type="number"
-                                      value={maxPrice}
-                                      onChange={(e) => setMaxPrice(e.target.value)}
-                                      className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
-                                      placeholder="∞"
-                                      min="0"
-                                    />
-                                  </div>
-                                </div>
-                                <div className="flex justify-end gap-2">
-                                  <button 
-                                    onClick={handleResetPriceFilter}
-                                    className="py-2 px-3 bg-gray-100 text-gray-600 border-none rounded-md text-xs font-medium cursor-pointer"
-                                  >
-                                    {t.reset}
-                                  </button>
-                                  <button 
-                                    onClick={handleApplyPriceFilter}
-                                    className="py-2 px-3 bg-indigo-600 text-white border-none rounded-md text-xs font-medium cursor-pointer"
-                                  >
-                                    {t.apply}
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        
-                        {/* Services Grid */}
-                        <div className="border-t border-gray-200 pt-4 flex-1 flex flex-col">
-                          <h3 className="text-sm font-medium text-gray-500 mb-4">
-                            {serviceCategories.find(c => c.id === selectedCategory)?.name}
-                          </h3>
-                          
-                          {loadingServices ? (
-                            <div className="flex flex-col items-center justify-center p-8 text-center">
-                              <div className="inline-block w-6 h-6 border-2 border-gray-200 border-t-indigo-600 rounded-full animate-spin mb-2"></div>
-                              <p className="text-sm text-gray-500">{t.loadingServices}</p>
-                            </div>
+                        {/* Service Image - WIDER BUT SHORTER */}
+                        <div className={`${isMobile ? 'h-48' : 'w-2/5 h-64'} bg-gray-100 relative overflow-hidden flex-shrink-0`}>
+                          {((service.imageUrl || (service.photos && service.photos.length > 0)) && !imageErrors[service.id]) ? (
+                            <img 
+                              src={service.imageUrl || (service.photos && service.photos[0])} 
+                              alt={typeof service.name === 'object' ? getLocalizedText(service.name, language) : service.name}
+                              className="w-full h-full object-cover"
+                              onError={() => setImageErrors(prev => ({...prev, [service.id]: true}))}
+                            />
                           ) : (
-                            <div className={`overflow-y-auto overflow-x-hidden p-0.5`} 
-                            style={isMobile ? {} : { height: '450px', paddingBottom: '150px' }}> {/* Extra large padding to ensure full scrolling */}
-                          <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-6`}>
-                            {filteredServices.map(service => renderServiceCard(service))}
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
+                              <div className="text-center">
+                                <div className="text-6xl mb-2 opacity-60">
+                                  {service.category === 'villas' ? '🏠' :
+                                   service.category === 'boats' ? '🛥️' :
+                                   service.category === 'cars' ? '🚗' :
+                                   service.category === 'security' ? '🔒' :
+                                   service.category === 'nannies' ? '👶' :
+                                   service.category === 'chefs' ? '🍽️' :
+                                   service.category === 'excursions' ? '🏔️' : '✨'}
+                                </div>
+                                <p className="text-gray-500 font-medium text-sm">No image available</p>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Floating Category Badge */}
+                          <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-medium text-gray-700 shadow-lg">
+                            {serviceCategories.find(c => c.id === selectedCategory)?.name}
+                          </div>
+                        </div>
+                        
+                        {/* Service Details - RIGHT SIDE OF IMAGE */}
+                        <div className={`${isMobile ? 'p-6' : 'flex-1 p-8'} flex flex-col justify-between`}>
+                          
+                          {/* Top Section - Title and Details */}
+                          <div>
+                            <h4 className="text-3xl font-bold text-gray-900 mb-4 leading-tight">
+                              {typeof service.name === 'object'
+                                ? getLocalizedText(service.name, language)
+                                : service.name}
+                            </h4>
                             
-                            {filteredServices.length === 0 && (
-                              <div className="col-span-full text-center py-8 text-gray-500">
-                                {t.noServicesFound}
+                            {/* Service-specific details - HORIZONTAL LAYOUT */}
+                            {service.category === 'villas' && (
+                              <div className="space-y-2 text-gray-600 mb-6">
+                                {service.address && (
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-lg">📍</span>
+                                    <span className="text-base">
+                                      {typeof service.address === 'object'
+                                        ? getLocalizedText(service.address, language)
+                                        : service.address}
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="flex gap-8">
+                                  {service.bedrooms && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-lg">🛏️</span>
+                                      <span className="text-base font-medium">{service.bedrooms} bedrooms</span>
+                                    </div>
+                                  )}
+                                  {service.capacity && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-lg">👥</span>
+                                      <span className="text-base font-medium">{service.capacity} guests</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {service.category === 'cars' && (
+                              <div className="space-y-2 text-gray-600 mb-6">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-lg">🚗</span>
+                                  <span className="text-base font-medium">{service.make} {service.model}</span>
+                                </div>
+                                {service.year && (
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-lg">📅</span>
+                                    <span className="text-base">{service.year}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            
+                            {service.category === 'boats' && (
+                              <div className="space-y-2 text-gray-600 mb-6">
+                                <div className="flex gap-8">
+                                  {service.model && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-lg">🛥️</span>
+                                      <span className="text-base font-medium">{service.model}</span>
+                                    </div>
+                                  )}
+                                  {service.length && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-lg">📏</span>
+                                      <span className="text-base font-medium">{service.length}m</span>
+                                    </div>
+                                  )}
+                                </div>
+                                {service.capacity && (
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-lg">👥</span>
+                                    <span className="text-base">{service.capacity} guests</span>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
                           
-                          {/* This spacer ensures you can scroll past the bottom of the last card */}
-                          {!isMobile && filteredServices.length > 0 && (
-                            <div style={{ height: '120px' }}></div>
-                          )}
+                          {/* Bottom Section - Price, Discount, Button in Horizontal Layout */}
+                          <div className={`flex ${isMobile ? 'flex-col gap-4' : 'flex-row gap-6'} items-end`}>
+                            
+                            {/* Price Section - COMPACT */}
+                            <div className="flex-shrink-0">
+                              <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-100">
+                                <div className="text-center">
+                                  <div className="text-3xl font-bold text-indigo-600">
+                                    €{service.dailyPrice || service.price || service.rate || 0}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    /{service.unit || 'day'}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* DISCOUNT SECTION - COMPACT HORIZONTAL */}
+                            <div className="flex-1">
+                              <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl">
+                                <div className="flex items-center justify-between mb-3">
+                                  <h5 className="text-base font-bold text-gray-800 flex items-center gap-2">
+                                    <span className="text-lg">💰</span>
+                                    {t.discount}
+                                  </h5>
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => {
+                                        const newServices = {...availableServices};
+                                        const categoryServices = newServices[selectedCategory];
+                                        const serviceIndex = categoryServices.findIndex(s => s.id === service.id);
+                                        if (serviceIndex !== -1) {
+                                          categoryServices[serviceIndex] = {
+                                            ...categoryServices[serviceIndex],
+                                            discountType: 'percentage',
+                                            discountValue: categoryServices[serviceIndex].discountValue || 0
+                                          };
+                                          setAvailableServices(newServices);
+                                        }
+                                      }}
+                                      className={`px-3 py-1 text-sm rounded-lg font-semibold ${
+                                        service.discountType === 'percentage' 
+                                          ? 'bg-indigo-600 text-white' 
+                                          : 'bg-white text-gray-600 border border-gray-300'
+                                      }`}
+                                    >
+                                      %
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        const newServices = {...availableServices};
+                                        const categoryServices = newServices[selectedCategory];
+                                        const serviceIndex = categoryServices.findIndex(s => s.id === service.id);
+                                        if (serviceIndex !== -1) {
+                                          categoryServices[serviceIndex] = {
+                                            ...categoryServices[serviceIndex],
+                                            discountType: 'fixed',
+                                            discountValue: categoryServices[serviceIndex].discountValue || 0
+                                          };
+                                          setAvailableServices(newServices);
+                                        }
+                                      }}
+                                      className={`px-3 py-1 text-sm rounded-lg font-semibold ${
+                                        service.discountType === 'fixed' 
+                                          ? 'bg-indigo-600 text-white' 
+                                          : 'bg-white text-gray-600 border border-gray-300'
+                                      }`}
+                                    >
+                                      €
+                                    </button>
+                                  </div>
+                                </div>
+                                
+                                <div className="flex gap-3 items-center">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={service.discountValue || 0}
+                                    onChange={(e) => {
+                                      const newServices = {...availableServices};
+                                      const categoryServices = newServices[selectedCategory];
+                                      const serviceIndex = categoryServices.findIndex(s => s.id === service.id);
+                                      if (serviceIndex !== -1) {
+                                        categoryServices[serviceIndex] = {
+                                          ...categoryServices[serviceIndex],
+                                          discountValue: parseFloat(e.target.value) || 0
+                                        };
+                                        setAvailableServices(newServices);
+                                      }
+                                    }}
+                                    className="flex-1 p-2 text-base border border-gray-300 rounded-lg"
+                                    placeholder="0"
+                                  />
+                                  <span className="text-sm text-gray-700 font-semibold">
+                                    {service.discountType === 'percentage' ? '%' : '€'}
+                                  </span>
+                                </div>
+                                
+                                {/* Show discounted price - INLINE */}
+                                {service.discountValue > 0 && (
+                                  <div className="mt-3 flex items-center justify-between text-sm">
+                                    <span className="text-gray-500 line-through">
+                                      €{service.dailyPrice || service.price || service.rate || 0}
+                                    </span>
+                                    <span className="text-xl font-bold text-green-600">
+                                      €{service.discountType === 'percentage' 
+                                        ? ((service.dailyPrice || service.price || service.rate || 0) * (1 - service.discountValue/100)).toFixed(2)
+                                        : Math.max((service.dailyPrice || service.price || service.rate || 0) - service.discountValue, 0).toFixed(2)
+                                      }
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Add to Offer Button - COMPACT */}
+                            <div className="flex-shrink-0">
+                              <button 
+                                onClick={() => {
+                                  const originalPrice = service.dailyPrice || service.price || service.rate || 0;
+                                  const discountedPrice = service.discountValue > 0 
+                                    ? (service.discountType === 'percentage' 
+                                        ? originalPrice * (1 - service.discountValue/100)
+                                        : Math.max(originalPrice - service.discountValue, 0))
+                                    : originalPrice;
+                                  
+                                  const existingItem = offerItems.find(item => item.id === service.id);
+                                  
+                                  if (existingItem) {
+                                    setOfferItems(prev => prev.map(item => 
+                                      item.id === service.id 
+                                        ? { ...item, quantity: item.quantity + 1 } 
+                                        : item
+                                    ));
+                                  } else {
+                                    setOfferItems(prev => [...prev, { 
+                                      ...service,
+                                      price: discountedPrice,
+                                      originalPrice: originalPrice,
+                                      discountType: service.discountType || null,
+                                      discountValue: service.discountValue || 0,
+                                      hasDiscount: service.discountValue > 0,
+                                      quantity: 1,
+                                      isSelected: false
+                                    }]);
+                                  }
+                                }}
+                                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-lg font-bold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center gap-2 whitespace-nowrap"
+                              >
+                                <span className="text-xl">🛒</span>
+                                Add to Offer
+                                {service.discountValue > 0 && (
+                                  <span className="text-sm">
+                                    (€{service.discountType === 'percentage' 
+                                      ? ((service.dailyPrice || service.price || service.rate || 0) * (1 - service.discountValue/100)).toFixed(2)
+                                      : Math.max((service.dailyPrice || service.price || service.rate || 0) - service.discountValue, 0).toFixed(2)
+                                    })
+                                  </span>
+                                )}
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                          )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+
+        {/* Right Sidebar - Current Offer (Desktop only) */}
+        {!isMobile && (
+          <div className="w-80 bg-gray-50 border-l border-gray-200 flex flex-col">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                {t.currentOfferItems}
+              </h3>
+              <p className="text-xs text-gray-500 mt-1">
+                {offerItems.length} {offerItems.length === 1 ? 'item' : 'items'}
+              </p>
+            </div>
+            
+            {/* Offer Items List */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {offerItems.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-4xl text-gray-300 mb-2">🛒</div>
+                  <p className="text-sm text-gray-500">{t.noItemsAdded}</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {offerItems.map(item => (
+                    <div key={item.id} className="bg-white p-3 rounded-lg border border-gray-200">
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-medium text-sm text-gray-900 flex-1 mr-2">
+                          {typeof item.name === 'object'
+                            ? getLocalizedText(item.name, language)
+                            : item.name}
+                        </h4>
+                        <button 
+                          onClick={() => setOfferItems(prev => prev.filter(i => i.id !== item.id))}
+                          className="text-red-500 hover:text-red-700 text-sm"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      
+                      {/* Show discount info if applied */}
+                      {item.hasDiscount && (
+                        <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Original:</span>
+                            <span className="line-through text-gray-500">€{item.originalPrice}</span>
+                          </div>
+                          <div className="flex justify-between font-medium">
+                            <span className="text-green-700">
+                              Discount ({item.discountType === 'percentage' ? `${item.discountValue}%` : `€${item.discountValue}`}):
+                            </span>
+                            <span className="text-green-700">€{item.price.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Quantity Controls */}
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => {
+                              if (item.quantity > 1) {
+                                setOfferItems(prev => prev.map(i => 
+                                  i.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+                                ));
+                              }
+                            }}
+                            className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded text-xs"
+                          >
+                            −
+                          </button>
+                          <span className="mx-2 text-sm font-medium">{item.quantity}</span>
+                          <button
+                            onClick={() => {
+                              setOfferItems(prev => prev.map(i => 
+                                i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+                              ));
+                            }}
+                            className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded text-xs"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <div className="text-sm font-medium text-gray-900">
+                          €{(item.price * item.quantity).toFixed(2)}
                         </div>
                       </div>
                       
-                      {/* Right side - Current offer items */}
-                      <div className={`${isMobile ? 'w-full' : 'w-2/5'} p-4 flex flex-col ${isMobile ? '' : 'border-l border-gray-200 -ml-px'}`}>
-                        <h3 className="text-base font-semibold text-gray-800 mb-4">{t.currentOfferItems}</h3>
-                        
-                        {offerItems.length === 0 ? (
-                          <div className="p-8 text-center text-gray-500 text-sm border border-dashed border-gray-300 rounded-lg">
-                            {t.noItemsAdded}
-                          </div>
-                        ) : (
-                          <div className="flex flex-col gap-4 overflow-auto flex-1 max-h-[calc(100vh-18rem)]">
-                            {/* Offer items table */}
-                            <div className="border border-gray-200 rounded-md overflow-auto">
-                              <table className="w-full border-collapse">
-                                <thead>
-                                  <tr>
-                                    <th className="text-left p-3 text-xs font-medium text-gray-500 bg-gray-50 border-b border-gray-200">{t.service}</th>
-                                    <th className="text-center p-3 text-xs font-medium text-gray-500 bg-gray-50 border-b border-gray-200">{t.quantity}</th>
-                                    <th className="text-right p-3 text-xs font-medium text-gray-500 bg-gray-50 border-b border-gray-200">{t.total}</th>
-                                    <th className="p-3 text-xs font-medium text-gray-500 bg-gray-50 border-b border-gray-200"></th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                {offerItems.map(item => (
-                                  <tr key={item.id} className="border-b border-gray-200">
-                                    <td className="p-3 text-sm text-gray-900 align-top">
-                                      <div className="flex items-center gap-2">
-                                        <input 
-                                          type="checkbox" 
-                                          checked={selectedItems.includes(item.id)}
-                                          onChange={() => {
-                                            if (selectedItems.includes(item.id)) {
-                                              setSelectedItems(prev => prev.filter(id => id !== item.id));
-                                            } else {
-                                              setSelectedItems(prev => [...prev, item.id]);
-                                            }
-                                          }}
-                                          className="cursor-pointer"
-                                        />
-                                        <div>
-                                          <div className="font-medium mb-1">
-                                            {typeof item.name === 'object'
-                                              ? getLocalizedText(item.name, language)
-                                              : item.name}
-                                          </div>
-                                          <div className="text-xs text-gray-500">
-                                            €{item.price}/{item.unit}
-                                          </div>
-                                        </div>
-                                      </div>
-                                      {item.discountValue > 0 && (
-                                        <div className="mt-2 text-xs text-red-500">
-                                          {t.discount}: {item.discountType === 'percentage' 
-                                            ? `${item.discountValue}%` 
-                                            : `€${item.discountValue}`}
-                                        </div>
-                                      )}
-                                    </td>
-                                    <td className="p-3 text-center">
-                                      <div className="inline-flex items-center">
-                                        <button
-                                          onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                                          className="w-6 h-6 flex items-center justify-center bg-gray-100 border border-gray-300 rounded-l-md text-sm text-gray-600"
-                                        >
-                                          -
-                                        </button>
-                                        <span className="min-w-6 text-center mx-2 text-sm">{item.quantity}</span>
-                                        <button
-                                          onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                                          className="w-6 h-6 flex items-center justify-center bg-gray-100 border border-gray-300 rounded-r-md text-sm text-gray-600"
-                                        >
-                                          +
-                                        </button>
-                                      </div>
-                                    </td>
-                                    <td className="p-3 text-right">
-                                      {item.discountValue > 0 ? (
-                                        <>
-                                          <span className="line-through text-gray-400 text-xs mr-1">
-                                            €{(item.price * item.quantity).toFixed(2)}
-                                          </span>
-                                          <span className="text-sm">
-                                            €{calculateItemPrice(item).toFixed(2)}
-                                          </span>
-                                        </>
-                                      ) : (
-                                        <span className="text-sm">€{(item.price * item.quantity).toFixed(2)}</span>
-                                      )}
-                                    </td>
-                                    <td className="p-3 text-right">
-                                      <button 
-                                        onClick={() => handleRemoveFromOffer(item.id)}
-                                        className="bg-transparent border-none text-red-500 text-lg cursor-pointer"
-                                      >
-                                        🗑️
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ))}
-                                </tbody>
-                                <tfoot>
-                                  <tr>
-                                    <td colSpan="2" className="p-3 text-right text-sm font-medium text-gray-600">{t.subtotal}:</td>
-                                    <td className="p-3 text-right text-sm font-medium text-gray-900">€{calculateSubtotal().toFixed(2)}</td>
-                                    <td></td>
-                                  </tr>
-                                  {discountValue > 0 && (
-                                    <tr>
-                                      <td colSpan="2" className="p-3 text-right text-xs text-gray-500">{t.discount}:</td>
-                                      <td className="p-3 text-right text-xs text-red-500">
-                                        -{discountType === 'percentage' ? `${discountValue}%` : `€${discountValue}`} 
-                                        (€{calculateDiscountAmount(calculateSubtotal()).toFixed(2)})
-                                      </td>
-                                      <td></td>
-                                    </tr>
-                                  )}
-                                  <tr>
-                                    <td colSpan="2" className="p-3 text-right text-sm font-semibold text-gray-900">{t.total}:</td>
-                                    <td className="p-3 text-right text-sm font-semibold text-gray-900">€{calculateTotal().toFixed(2)}</td>
-                                    <td></td>
-                                  </tr>
-                                </tfoot>
-                              </table>
-                            </div>
-                            
-                            {/* Discount Section */}
-                            <div className="border border-gray-200 rounded-md overflow-auto mb-4">
-                              <div className="p-3 bg-gray-50 border-b border-gray-200">
-                                <h4 className="text-sm font-medium text-gray-600 m-0">{t.discount}</h4>
-                              </div>
-                              <div className="p-3">
-                                <div className="mb-3">
-                                  <p className="text-sm text-gray-500 mb-2">
-                                    {selectedItems.length === 0 
-                                      ? 'Please select items above to apply discount' 
-                                      : `Apply discount to ${selectedItems.length} selected item(s)`}
-                                  </p>
-                                </div>
-                                
-                                <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'} gap-4`}>
-                                  <div className={`${isMobile ? 'w-full' : 'w-1/2'}`}>
-                                    <label className="block text-xs font-medium text-gray-600 mb-2">{t.discountType}</label>
-                                    <div className="flex flex-col gap-2">
-                                      <label className="flex items-center text-sm text-gray-600">
-                                        <input 
-                                          type="radio" 
-                                          checked={discountType === 'percentage'} 
-                                          onChange={() => setDiscountType('percentage')}
-                                          className="mr-2"
-                                          disabled={selectedItems.length === 0}
-                                        />
-                                        <span>{t.percentage}</span>
-                                      </label>
-                                      <label className="flex items-center text-sm text-gray-600">
-                                        <input 
-                                          type="radio" 
-                                          checked={discountType === 'fixed'} 
-                                          onChange={() => setDiscountType('fixed')}
-                                          className="mr-2"
-                                          disabled={selectedItems.length === 0}
-                                        />
-                                        <span>{t.fixedAmount}</span>
-                                      </label>
-                                    </div>
-                                  </div>
-                                  <div className={`${isMobile ? 'w-full' : 'w-1/2'}`}>
-                                    <label className="block text-xs font-medium text-gray-600 mb-2">{t.discountAmount}</label>
-                                    <div className="relative">
-                                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                                        {discountType === 'percentage' ? '%' : '€'}
-                                      </span>
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        value={discountValue}
-                                        onChange={(e) => {
-                                          const value = e.target.value;
-                                          if (value === '' || value === '-') {
-                                            setDiscountValue('');
-                                          } else {
-                                            const parsed = parseFloat(value);
-                                            if (!isNaN(parsed)) {
-                                              setDiscountValue(parsed);
-                                            }
-                                          }
-                                        }}
-                                        className="w-full p-2.5 pl-6 border border-gray-300 rounded-md text-sm"
-                                        disabled={selectedItems.length === 0}
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                                
-                                <div className="flex justify-end mt-4">
-                                  <button
-                                    onClick={handleApplyDiscount}
-                                    className={`py-2 px-3 bg-indigo-600 text-white border-none rounded-md text-xs font-medium cursor-pointer ${selectedItems.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                    disabled={selectedItems.length === 0}
-                                  >
-                                    {t.applyDiscount}
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {/* Notes Section */}
-                            <div className="mb-4">
-                              <label className="block text-sm font-medium text-gray-600 mb-2">{t.additionalNotes}</label>
-                              <textarea
-                                value={offerNotes}
-                                onChange={(e) => setOfferNotes(e.target.value)}
-                                placeholder={t.addNotesPlaceholder}
-                                className="w-full p-3 border border-gray-300 rounded-md text-sm resize-vertical min-h-20"
-                              ></textarea>
-                            </div>
-                          </div>
-                        )}
+                      {/* Price breakdown */}
+                      <div className="text-xs text-gray-500">
+                        €{item.price.toFixed(2)} × {item.quantity} = €{(item.price * item.quantity).toFixed(2)}
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="flex justify-end gap-3 p-4 border-t border-gray-200 bg-gray-50">
-                    {!isMobile && (
-                      <button 
-                        onClick={() => setShowCreateOffer(false)} 
-                        className="py-2.5 px-4 bg-gray-100 text-gray-600 border-none rounded-md text-sm font-medium cursor-pointer"
-                      >
-                        {t.cancel}
-                      </button>
-                    )}
-                    <button 
-                      onClick={handleSaveOffer}
-                      disabled={offerItems.length === 0}
-                      className={`py-2.5 px-4 bg-indigo-600 text-white border-none rounded-md text-sm font-medium cursor-pointer ${offerItems.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      {currentEditingOffer ? t.updateOffer : t.saveOffer}
-                    </button>
-                  </div>
+                  ))}
                 </div>
               )}
+            </div>
+            
+            {/* Offer Summary */}
+            {offerItems.length > 0 && (
+              <div className="border-t border-gray-200 p-4">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>{t.subtotal}:</span>
+                    <span>€{offerItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)}</span>
+                  </div>
+                  {discountValue > 0 && (
+                    <div className="flex justify-between text-red-500">
+                      <span>{t.discount}:</span>
+                      <span>-€{(() => {
+                        const subtotal = offerItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+                        return discountType === 'percentage' 
+                          ? (subtotal * (discountValue / 100)).toFixed(2)
+                          : discountValue.toFixed(2);
+                      })()}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-semibold text-lg border-t pt-2">
+                    <span>{t.total}:</span>
+                    <span>€{(() => {
+                      const subtotal = offerItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+                      const globalDiscountAmount = discountValue > 0 
+                        ? (discountType === 'percentage' ? subtotal * (discountValue / 100) : discountValue)
+                        : 0;
+                      return Math.max(subtotal - globalDiscountAmount, 0).toFixed(2);
+                    })()}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className={`flex ${isMobile ? 'flex-col gap-3' : 'flex-row'} justify-between items-center ${isMobile ? 'p-4' : 'p-6'} border-t border-gray-200 bg-gray-50`}>
+        
+        {/* Mobile: Show offer summary */}
+        {isMobile && offerItems.length > 0 && (
+          <div className="w-full bg-white rounded-lg p-3 border border-gray-200">
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-600">
+                {offerItems.length} {offerItems.length === 1 ? 'item' : 'items'}
+              </span>
+              <span className="font-semibold text-lg text-indigo-600">
+                €{(() => {
+                  const subtotal = offerItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+                  const globalDiscountAmount = discountValue > 0 
+                    ? (discountType === 'percentage' ? subtotal * (discountValue / 100) : discountValue)
+                    : 0;
+                  return Math.max(subtotal - globalDiscountAmount, 0).toFixed(2);
+                })()}
+              </span>
+            </div>
+          </div>
+        )}
+        
+        <div className={`flex items-center gap-4 ${isMobile ? 'w-full' : ''}`}>
+          <button 
+            onClick={() => setShowCreateOffer(false)}
+            className={`${isMobile ? 'flex-1' : ''} px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors`}
+          >
+            {t.cancel}
+          </button>
+          
+          {!isMobile && (
+            <div className="text-sm text-gray-600">
+              {offerItems.length} {offerItems.length === 1 ? 'item' : 'items'} • €{(() => {
+                const subtotal = offerItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+                const globalDiscountAmount = discountValue > 0 
+                  ? (discountType === 'percentage' ? subtotal * (discountValue / 100) : discountValue)
+                  : 0;
+                return Math.max(subtotal - globalDiscountAmount, 0).toFixed(2);
+              })()}
+            </div>
+          )}
+          
+          <button 
+            onClick={handleSaveOffer}
+            disabled={offerItems.length === 0}
+            className={`${isMobile ? 'flex-1' : ''} px-8 py-3 bg-indigo-600 text-white rounded-lg font-medium ${
+              offerItems.length === 0 
+                ? 'opacity-50 cursor-not-allowed' 
+                : 'hover:bg-indigo-700'
+            } transition-colors`}
+          >
+            {currentEditingOffer ? t.updateOffer : t.saveOffer}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
               
               {/* Create Reservation Modal */}
               {showCreateReservation && selectedClient && (

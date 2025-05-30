@@ -2212,50 +2212,52 @@ const UpcomingBookings = () => {
   const [notificationMessage, setNotificationMessage] = useState('');
   const [notificationType, setNotificationType] = useState('success');
   
-  // Enhanced mobile touch handling for bottom sheet
-  useEffect(() => {
-    if (showBottomSheet && bottomSheetRef.current) {
-      const element = bottomSheetRef.current;
-      
+
+useEffect(() => {
+  if (showBottomSheet && bottomSheetRef.current) {
+    const modal = bottomSheetRef.current;
+    const header = modal.querySelector('.bottom-sheet-header');
+    
+    if (header) {
       const handleTouchStart = (e) => {
         const startY = e.touches[0].clientY;
-        let startTop = element.getBoundingClientRect().top;
         
         const handleTouchMove = (e) => {
           const currentY = e.touches[0].clientY;
           const deltaY = currentY - startY;
           
           if (deltaY > 0) {
-            element.style.transform = `translateY(${deltaY}px)`;
-            element.style.transition = 'none';
+            modal.style.transform = `translateY(${deltaY}px)`;
+            modal.style.transition = 'none';
           }
         };
         
         const handleTouchEnd = (e) => {
-          element.style.transition = 'transform 0.3s ease-out';
+          modal.style.transition = 'transform 0.3s ease-out';
           const endY = e.changedTouches[0].clientY;
           const deltaY = endY - startY;
           
           if (deltaY > 100) {
             closeBottomSheet();
           } else {
-            element.style.transform = 'translateY(0)';
+            modal.style.transform = 'translateY(0)';
           }
         };
         
-        element.addEventListener('touchmove', handleTouchMove);
-        element.addEventListener('touchend', handleTouchEnd);
+        document.addEventListener('touchmove', handleTouchMove);
+        document.addEventListener('touchend', handleTouchEnd);
         
         return () => {
-          element.removeEventListener('touchmove', handleTouchMove);
-          element.removeEventListener('touchend', handleTouchEnd);
+          document.removeEventListener('touchmove', handleTouchMove);
+          document.removeEventListener('touchend', handleTouchEnd);
         };
       };
       
-      element.addEventListener('touchstart', handleTouchStart);
-      return () => element.removeEventListener('touchstart', handleTouchStart);
+      header.addEventListener('touchstart', handleTouchStart);
+      return () => header.removeEventListener('touchstart', handleTouchStart);
     }
-  }, [showBottomSheet]);
+  }
+}, [showBottomSheet]);
   
   // Helper functions for status text
   const getStatusText = (status) => {
@@ -3734,36 +3736,36 @@ const UpcomingBookings = () => {
       
       {/* Bottom Sheet with Enhanced Content */}
       {showBottomSheet && (
-       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end md:items-center md:justify-center">
-  <div 
-  className="bg-white rounded-t-2xl md:rounded-xl w-full md:max-w-lg h-[90vh] md:h-auto md:max-h-[90vh] overflow-hidden animate-slide-up"
-  ref={bottomSheetRef}
->
-            {/* Bottom Sheet Header */}
-            <div className="p-4 border-b sticky top-0 bg-white z-10">
-              <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-3 md:hidden"></div>
-              <div className="flex justify-between items-center">
-              <h3 className="font-bold text-lg">
-                {bottomSheetContent === 'client-details' ? t.clientDetails :
-                bottomSheetContent === 'quick-payment' ? t.addPayment :
-                bottomSheetContent === 'edit-payment' ? t.editPayment :
-                bottomSheetContent === 'add-service' ? t.addService :
-                bottomSheetContent === 'edit-service' ? t.serviceDetails :
-                bottomSheetContent === 'add-shopping' ? t.addShoppingExpense : ''}
-              </h3>
-                <button 
-                  className="text-gray-500 hover:text-gray-700"
-                  onClick={closeBottomSheet}
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                  </svg>
-                </button>
-              </div>
-            </div>
+  <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end md:items-center md:justify-center">
+    <div 
+      className="bg-white rounded-t-2xl md:rounded-xl w-full md:max-w-lg h-[90vh] md:h-auto md:max-h-[90vh] overflow-hidden animate-slide-up flex flex-col"
+      ref={bottomSheetRef}
+    >
+      {/* Bottom Sheet Header */}
+      <div className="flex-shrink-0 p-4 border-b bg-white z-10 bottom-sheet-header">
+        <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-3 md:hidden"></div>
+        <div className="flex justify-between items-center">
+          <h3 className="font-bold text-lg">
+            {bottomSheetContent === 'client-details' ? t.clientDetails :
+            bottomSheetContent === 'quick-payment' ? t.addPayment :
+            bottomSheetContent === 'edit-payment' ? t.editPayment :
+            bottomSheetContent === 'add-service' ? t.addService :
+            bottomSheetContent === 'edit-service' ? t.serviceDetails :
+            bottomSheetContent === 'add-shopping' ? t.addShoppingExpense : ''}
+          </h3>
+          <button 
+            className="text-gray-500 hover:text-gray-700"
+            onClick={closeBottomSheet}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
             
             {/* Bottom Sheet Content */}
-            <div>
+            <div className="flex-1 overflow-y-auto" style={{WebkitOverflowScrolling: 'touch'}}>
               {/* CLIENT DETAILS VIEW */}
               {bottomSheetContent === 'client-details' && selectedItem && (
                 <div className="p-4 text-gray-700">
@@ -3774,7 +3776,7 @@ const UpcomingBookings = () => {
                         {getClientInitials(selectedItem.clientName)}
                       </div>
                       <div className="ml-3 min-w-0 flex-1 truncate">
-  <h3 className="font-medium leading-tight truncate">{safeRender(client.clientName)}</h3>
+                        <h3 className="font-medium leading-tight truncate">{safeRender(selectedItem.clientName)}</h3>
                         <p className="text-sm text-gray-600">{t.clientId} {selectedItem.clientId.substring(0, 8)}</p>
                       </div>
                     </div>
