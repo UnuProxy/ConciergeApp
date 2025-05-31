@@ -1,4 +1,4 @@
-// Cars component with inline styles
+// Cars component with inline styles and enhanced filtering
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
@@ -6,7 +6,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { db, storage } from '../../firebase/config';
 import { getCurrentLanguage } from "../../utils/languageHelper";
 
-// Enhanced styles with mobile responsiveness
+// Enhanced styles with mobile responsiveness and new filter styles
 const styles = {
   container: {
     width: '100%',
@@ -48,6 +48,111 @@ const styles = {
     marginBottom: '16px',
     width: '100%'
   },
+  // NEW: Filter and search styles
+  // Replace this entire section in your styles object:
+// NEW: Filter and search styles
+filterContainer: {
+  background: '#fff',
+  borderRadius: '6px',
+  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+  padding: '8px',
+  marginBottom: '12px',
+  
+  margin: '0 auto 12px auto' // Center it
+},
+filterContainer: {
+  background: '#fff',
+  borderRadius: '6px',
+  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+  padding: '8px',
+  marginBottom: '12px',
+  
+  margin: '0 auto 12px auto' // Center it
+},
+filterToggle: {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  padding: '3px 0',
+  cursor: 'pointer',
+  borderBottom: '1px solid #e5e7eb'
+},
+filterToggleText: {
+  fontSize: '11px',
+  fontWeight: '500',
+  color: '#374151'
+},
+filterContent: {
+  padding: '6px 0'
+},
+filterGrid: {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(6, 1fr)', // Fixed 6 columns max
+  gap: '6px',
+  marginBottom: '6px',
+  
+},
+filterGridMobile: {
+  display: 'grid',
+  gridTemplateColumns: '1fr',
+  gap: '8px',
+  marginBottom: '12px'
+},
+filterGroup: {
+  marginBottom: '6px'
+},
+filterLabel: {
+  display: 'block',
+  fontSize: '10px',
+  fontWeight: '500',
+  color: '#374151',
+  marginBottom: '2px'
+},
+filterSelect: {
+  width: '100%',
+  padding: '2px 6px',
+  borderRadius: '3px',
+  border: '1px solid #d1d5db',
+  fontSize: '11px',
+  backgroundColor: '#fff',
+  minHeight: '24px'
+},
+filterInput: {
+  width: '100%',
+  padding: '2px 6px',
+  borderRadius: '3px',
+  border: '1px solid #d1d5db',
+  fontSize: '11px',
+  minHeight: '24px'
+},
+filterCheckboxGroup: {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '8px'
+},
+filterCheckbox: {
+  display: 'flex',
+  alignItems: 'center',
+  fontSize: '10px',
+  color: '#374151'
+},
+clearFiltersButton: {
+  backgroundColor: '#f3f4f6',
+  color: '#374151',
+  fontWeight: '500',
+  padding: '3px 6px',
+  borderRadius: '3px',
+  border: '1px solid #d1d5db',
+  cursor: 'pointer',
+  fontSize: '10px'
+},
+resultsCount: {
+  fontSize: '10px',
+  color: '#6b7280',
+  marginTop: '3px',
+  fontStyle: 'italic'
+},
+  // Existing styles continue...
   formSection: {
     marginBottom: '16px'
   },
@@ -354,9 +459,25 @@ function Cars() {
   const [isUploading, setIsUploading] = useState(false);
   const [photoFiles, setPhotoFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
-  const [activeTab, setActiveTab] = useState('basic'); // For form navigation
-  const [imageErrors, setImageErrors] = useState({}); // Track image loading errors
+  const [activeTab, setActiveTab] = useState('basic');
+  const [imageErrors, setImageErrors] = useState({});
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 768);
+  
+  // NEW: Filter and search state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    make: '',
+    fuel: '',
+    transmission: '',
+    yearMin: '',
+    yearMax: '',
+    seatsMin: '',
+    seatsMax: '',
+    priceMin: '',
+    priceMax: '',
+    features: []
+  });
   
   // Track window size for responsiveness
   useEffect(() => {
@@ -375,7 +496,7 @@ function Cars() {
   // Check if we're on mobile
   const isMobile = windowWidth <= 768;
 
-  // Form data with comprehensive car details
+  // Form data with comprehensive car details (existing code continues...)
   const [formData, setFormData] = useState({
     // Basic Information
     name_en: '',
@@ -462,6 +583,132 @@ function Cars() {
     return fallback;
   };
 
+  // NEW: Filter and search functionality
+  const getUniqueCarMakes = () => {
+    const makes = cars.map(car => car.make).filter(Boolean);
+    return [...new Set(makes)].sort();
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      make: '',
+      fuel: '',
+      transmission: '',
+      yearMin: '',
+      yearMax: '',
+      seatsMin: '',
+      seatsMax: '',
+      priceMin: '',
+      priceMax: '',
+      features: []
+    });
+    setSearchTerm('');
+  };
+
+  const handleFilterChange = (filterKey, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterKey]: value
+    }));
+  };
+
+  const handleFeatureFilterChange = (feature, checked) => {
+    setFilters(prev => ({
+      ...prev,
+      features: checked 
+        ? [...prev.features, feature]
+        : prev.features.filter(f => f !== feature)
+    }));
+  };
+
+  const getFilteredCars = () => {
+    let filtered = cars;
+
+    // Search filter
+    if (searchTerm.trim()) {
+      const search = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter(car => {
+        const name = getLocalizedContent(car.name, language, '').toLowerCase();
+        const make = (car.make || '').toLowerCase();
+        const model = (car.model || '').toLowerCase();
+        const description = getLocalizedContent(car.description, language, '').toLowerCase();
+        
+        return name.includes(search) || 
+               make.includes(search) || 
+               model.includes(search) || 
+               description.includes(search);
+      });
+    }
+
+    // Make filter
+    if (filters.make) {
+      filtered = filtered.filter(car => car.make === filters.make);
+    }
+
+    // Fuel filter
+    if (filters.fuel) {
+      filtered = filtered.filter(car => car.fuel === filters.fuel);
+    }
+
+    // Transmission filter
+    if (filters.transmission) {
+      filtered = filtered.filter(car => car.transmission === filters.transmission);
+    }
+
+    // Year range filter
+    if (filters.yearMin) {
+      filtered = filtered.filter(car => {
+        const year = parseInt(car.year);
+        return !isNaN(year) && year >= parseInt(filters.yearMin);
+      });
+    }
+    if (filters.yearMax) {
+      filtered = filtered.filter(car => {
+        const year = parseInt(car.year);
+        return !isNaN(year) && year <= parseInt(filters.yearMax);
+      });
+    }
+
+    // Seats range filter
+    if (filters.seatsMin) {
+      filtered = filtered.filter(car => {
+        const seats = parseInt(car.seats);
+        return !isNaN(seats) && seats >= parseInt(filters.seatsMin);
+      });
+    }
+    if (filters.seatsMax) {
+      filtered = filtered.filter(car => {
+        const seats = parseInt(car.seats);
+        return !isNaN(seats) && seats <= parseInt(filters.seatsMax);
+      });
+    }
+
+    // Price range filter (using daily price)
+    if (filters.priceMin) {
+      filtered = filtered.filter(car => {
+        const price = parseFloat(car.pricing?.daily || 0);
+        return price >= parseFloat(filters.priceMin);
+      });
+    }
+    if (filters.priceMax) {
+      filtered = filtered.filter(car => {
+        const price = parseFloat(car.pricing?.daily || 0);
+        return price <= parseFloat(filters.priceMax);
+      });
+    }
+
+    // Features filter
+    if (filters.features.length > 0) {
+      filtered = filtered.filter(car => {
+        return filters.features.every(feature => car.features?.[feature] === true);
+      });
+    }
+
+    return filtered;
+  };
+
+  const filteredCars = getFilteredCars();
+
   // Enhanced authentication useEffect that properly sets up auth state listener
   useEffect(() => {
     const auth = getAuth();
@@ -516,7 +763,12 @@ function Cars() {
       console.error("Error fetching cars:", error);
     }
   };
-  
+
+  // ALL OTHER EXISTING FUNCTIONS CONTINUE HERE...
+  // (handleInputChange, toggleFeature, resetForm, handlePhotoChange, uploadPhotos, 
+  //  prepareFormDataForSave, handleAddCar, handleUpdateCar, handleDeleteCar, 
+  //  handleDeletePhoto, startEditingCar, navigation functions, etc.)
+
   // Enhanced input handler that can handle deeply nested objects
   const handleInputChange = (e, section = null, subSection = null) => {
     if (!e || !e.target) return;
@@ -1123,6 +1375,33 @@ function Cars() {
         features: "Features",
         contact: "Contact"
       },
+      // NEW: Filter translations
+      search: {
+        placeholder: "Search cars by name, make, model...",
+        filters: "Filters",
+        showFilters: "Show Filters",
+        hideFilters: "Hide Filters",
+        clearFilters: "Clear All Filters",
+        resultsCount: "cars found"
+      },
+      filters: {
+        make: "Make/Brand",
+        fuel: "Fuel Type",
+        transmission: "Transmission",
+        year: "Year",
+        yearMin: "Min Year",
+        yearMax: "Max Year",
+        seats: "Number of Seats",
+        seatsMin: "Min Seats",
+        seatsMax: "Max Seats",
+        price: "Daily Price (€)",
+        priceMin: "Min Price",
+        priceMax: "Max Price",
+        features: "Features",
+        anyMake: "Any Make",
+        anyFuel: "Any Fuel",
+        anyTransmission: "Any Transmission"
+      },
       photos: "Photos (Max: 24)",
       noPhotos: "No image",
       cancel: "Cancel",
@@ -1225,6 +1504,33 @@ function Cars() {
         features: "Dotări",
         contact: "Contact"
       },
+      // NEW: Filter translations
+      search: {
+        placeholder: "Caută mașini după nume, marcă, model...",
+        filters: "Filtre",
+        showFilters: "Arată Filtrele",
+        hideFilters: "Ascunde Filtrele",
+        clearFilters: "Șterge Toate Filtrele",
+        resultsCount: "mașini găsite"
+      },
+      filters: {
+        make: "Marcă",
+        fuel: "Tip Combustibil",
+        transmission: "Transmisie",
+        year: "An",
+        yearMin: "An Minim",
+        yearMax: "An Maxim",
+        seats: "Număr Locuri",
+        seatsMin: "Locuri Minime",
+        seatsMax: "Locuri Maxime",
+        price: "Preț Zilnic (€)",
+        priceMin: "Preț Minim",
+        priceMax: "Preț Maxim",
+        features: "Dotări",
+        anyMake: "Orice Marcă",
+        anyFuel: "Orice Combustibil",
+        anyTransmission: "Orice Transmisie"
+      },
       photos: "Fotografii (Max: 24)",
       noPhotos: "Fără imagine",
       cancel: "Anulează",
@@ -1284,6 +1590,222 @@ function Cars() {
         <div className="text-center">
           <div className="text-4xl mb-2">🚗</div>
           <div>{getLocalizedContent(car.name, language, t.noPhotos)}</div>
+        </div>
+      </div>
+    );
+  };
+
+  // NEW: Render the filter and search section
+  const renderFiltersSection = () => {
+    const filterGridStyle = isMobile ? styles.filterGridMobile : styles.filterGrid;
+    const uniqueMakes = getUniqueCarMakes();
+
+    return (
+      <div style={styles.filterContainer}>
+        {/* Search Bar */}
+        <input
+          type="text"
+          placeholder={t.search.placeholder}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={styles.searchBar}
+        />
+
+        {/* Filter Toggle */}
+        <div 
+  style={styles.filterToggle}
+  onClick={() => setShowFilters(!showFilters)}
+>
+  <span style={styles.filterToggleText}>
+    {showFilters ? t.search.hideFilters : t.search.showFilters}
+  </span>
+  <span style={{fontSize: '10px'}}>
+    {showFilters ? '▲' : '▼'}
+  </span>
+</div>
+
+        {/* Filter Content */}
+        {showFilters && (
+          <div style={styles.filterContent}>
+            {/* Basic Filters Row */}
+            <div style={filterGridStyle}>
+              {/* Make Filter */}
+              <div style={styles.filterGroup}>
+                <label style={styles.filterLabel}>{t.filters.make}</label>
+                <select
+                  value={filters.make}
+                  onChange={(e) => handleFilterChange('make', e.target.value)}
+                  style={styles.filterSelect}
+                >
+                  <option value="">{t.filters.anyMake}</option>
+                  {uniqueMakes.map(make => (
+                    <option key={make} value={make}>{make}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Fuel Filter */}
+              <div style={styles.filterGroup}>
+                <label style={styles.filterLabel}>{t.filters.fuel}</label>
+                <select
+                  value={filters.fuel}
+                  onChange={(e) => handleFilterChange('fuel', e.target.value)}
+                  style={styles.filterSelect}
+                >
+                  <option value="">{t.filters.anyFuel}</option>
+                  <option value="petrol">{t.fuelTypes.petrol}</option>
+                  <option value="diesel">{t.fuelTypes.diesel}</option>
+                  <option value="hybrid">{t.fuelTypes.hybrid}</option>
+                  <option value="electric">{t.fuelTypes.electric}</option>
+                </select>
+              </div>
+
+              {/* Transmission Filter */}
+              <div style={styles.filterGroup}>
+                <label style={styles.filterLabel}>{t.filters.transmission}</label>
+                <select
+                  value={filters.transmission}
+                  onChange={(e) => handleFilterChange('transmission', e.target.value)}
+                  style={styles.filterSelect}
+                >
+                  <option value="">{t.filters.anyTransmission}</option>
+                  <option value="automatic">{t.transmissionTypes.automatic}</option>
+                  <option value="manual">{t.transmissionTypes.manual}</option>
+                </select>
+              </div>
+
+              {/* Year Range */}
+              <div style={styles.filterGroup}>
+                <label style={styles.filterLabel}>{t.filters.yearMin}</label>
+                <input
+                  type="number"
+                  placeholder="1900"
+                  value={filters.yearMin}
+                  onChange={(e) => handleFilterChange('yearMin', e.target.value)}
+                  style={styles.filterInput}
+                  min="1900"
+                  max={new Date().getFullYear() + 1}
+                />
+              </div>
+
+              <div style={styles.filterGroup}>
+                <label style={styles.filterLabel}>{t.filters.yearMax}</label>
+                <input
+                  type="number"
+                  placeholder={new Date().getFullYear().toString()}
+                  value={filters.yearMax}
+                  onChange={(e) => handleFilterChange('yearMax', e.target.value)}
+                  style={styles.filterInput}
+                  min="1900"
+                  max={new Date().getFullYear() + 1}
+                />
+              </div>
+
+              {/* Seats Range */}
+              <div style={styles.filterGroup}>
+                <label style={styles.filterLabel}>{t.filters.seatsMin}</label>
+                <input
+                  type="number"
+                  placeholder="1"
+                  value={filters.seatsMin}
+                  onChange={(e) => handleFilterChange('seatsMin', e.target.value)}
+                  style={styles.filterInput}
+                  min="1"
+                  max="20"
+                />
+              </div>
+
+              <div style={styles.filterGroup}>
+                <label style={styles.filterLabel}>{t.filters.seatsMax}</label>
+                <input
+                  type="number"
+                  placeholder="20"
+                  value={filters.seatsMax}
+                  onChange={(e) => handleFilterChange('seatsMax', e.target.value)}
+                  style={styles.filterInput}
+                  min="1"
+                  max="20"
+                />
+              </div>
+
+              {/* Price Range */}
+              <div style={styles.filterGroup}>
+                <label style={styles.filterLabel}>{t.filters.priceMin}</label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={filters.priceMin}
+                  onChange={(e) => handleFilterChange('priceMin', e.target.value)}
+                  style={styles.filterInput}
+                  min="0"
+                />
+              </div>
+
+              <div style={styles.filterGroup}>
+                <label style={styles.filterLabel}>{t.filters.priceMax}</label>
+                <input
+                  type="number"
+                  placeholder="1000"
+                  value={filters.priceMax}
+                  onChange={(e) => handleFilterChange('priceMax', e.target.value)}
+                  style={styles.filterInput}
+                  min="0"
+                />
+              </div>
+            </div>
+
+            {/* Features Filter - Compact horizontal layout */}
+            <div style={styles.filterGroup}>
+              <label style={styles.filterLabel}>{t.filters.features}</label>
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: isMobile ? '6px' : '12px',
+                marginTop: '4px'
+              }}>
+                {[
+                  { key: 'airConditioning', label: t.features.airConditioning },
+                  { key: 'bluetooth', label: t.features.bluetooth },
+                  { key: 'navigation', label: t.features.navigation },
+                  { key: 'leatherSeats', label: t.features.leatherSeats },
+                  { key: 'sunroof', label: t.features.sunroof },
+                  { key: 'cruiseControl', label: t.features.cruiseControl }
+                ].map(feature => (
+                  <div key={feature.key} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    fontSize: '11px',
+                    color: '#374151',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    <input
+                      type="checkbox"
+                      id={`filter-${feature.key}`}
+                      checked={filters.features.includes(feature.key)}
+                      onChange={(e) => handleFeatureFilterChange(feature.key, e.target.checked)}
+                      style={{marginRight: '4px', width: '14px', height: '14px'}}
+                    />
+                    <label htmlFor={`filter-${feature.key}`}>{feature.label}</label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Clear Filters Button */}
+            <div style={{display: 'flex', justifyContent: 'flex-end', marginTop: '6px'}}>
+              <button
+                onClick={clearFilters}
+                style={styles.clearFiltersButton}
+              >
+                {t.search.clearFilters}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Results Count */}
+        <div style={styles.resultsCount}>
+          {filteredCars.length} {t.search.resultsCount}
         </div>
       </div>
     );
@@ -2175,17 +2697,22 @@ function Cars() {
               {t.carList.addNew}
             </button>
           </div>
+
+          {/* NEW: Filters and Search Section */}
+          {renderFiltersSection()}
           
-          {cars.length === 0 ? (
+          {filteredCars.length === 0 ? (
             <div style={{textAlign: 'center', padding: '40px 0', background: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'}}>
-              <p style={{color: '#6b7280'}}>{t.carList.noCars}</p>
+              <p style={{color: '#6b7280'}}>
+                {cars.length === 0 ? t.carList.noCars : `No cars match your current filters.`}
+              </p>
             </div>
           ) : (
             <div style={{
               ...styles.carListContainer,
               gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))'
             }}>
-              {cars.map((car) => (
+              {filteredCars.map((car) => (
                 <div key={car.id} style={styles.carCard}>
                   {/* Car image or placeholder with error handling */}
                   <div style={styles.carImageContainer}>
@@ -2202,6 +2729,11 @@ function Cars() {
                         {car.make} {car.model} {car.year && `(${car.year})`}
                       </p>
                       <p>{car.seats && `${car.seats} ${language === 'en' ? 'seats' : 'locuri'}`} • {car.transmission && t.transmissionTypes[car.transmission]}</p>
+                      {car.pricing?.daily && (
+                        <p style={{fontWeight: '600', color: '#1f2937', marginTop: '8px'}}>
+                          €{car.pricing.daily}/{language === 'en' ? 'day' : 'zi'}
+                        </p>
+                      )}
                     </div>
                     <div style={styles.buttonRow}>
                       <button
