@@ -32,6 +32,10 @@ import PropertiesForSale from './pages/services/properties/PropertiesForSale';
 import AddProperty from './pages/services/properties/AddProperty';
 import PropertyDetail from './pages/services/properties/PropertyDetail';
 
+// NEW: Import splash screen components
+import SplashScreen from './components/SplashScreen'
+import './styles/splashAnimations.css'
+
 // Layout wrapper for all protected routes
 function ProtectedLayout({ children, sidebarOpen, setSidebarOpen }) {
   return (
@@ -50,6 +54,10 @@ function ProtectedLayout({ children, sidebarOpen, setSidebarOpen }) {
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768)
   
+  // NEW: Splash screen state
+  const [showSplash, setShowSplash] = useState(true)
+  const [isAppReady, setIsAppReady] = useState(false)
+
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth >= 768) setSidebarOpen(true)
@@ -57,7 +65,45 @@ function App() {
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
+
+  // NEW: Handle splash screen completion
+  const handleSplashComplete = () => {
+    setShowSplash(false)
+    // Small delay for smooth transition
+    setTimeout(() => {
+      setIsAppReady(true)
+    }, 300)
+  }
+
+  // NEW: Show splash screen first
+  if (showSplash) {
+    return <SplashScreen onComplete={handleSplashComplete} />
+  }
+
+  // NEW: Show loading state briefly during transition
+  if (!isAppReady) {
+    return (
+      <div style={{
+        width: '100vw',
+        height: '100vh',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 75%, #475569 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          width: '40px',
+          height: '40px',
+          border: '3px solid rgba(255, 215, 0, 0.3)',
+          borderTop: '3px solid #ffd700',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite'
+        }}></div>
+      </div>
+    )
+  }
   
+  // EXISTING: Your main app with all routes
   return (
     <AuthProvider>
       {/* Add CompanyProvider here - needs to come after AuthProvider */}

@@ -508,6 +508,7 @@ function ExistingClients() {
   const [showCreateReservation, setShowCreateReservation] = useState(false);
   const [showEditClient, setShowEditClient] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [selectedBoatMonths, setSelectedBoatMonths] = useState({});
   
   // Offer states
   const [selectedCategory, setSelectedCategory] = useState('villas');
@@ -792,106 +793,265 @@ useEffect(() => {
             
             // Process the data based on collection type
             if (category.id === 'villas') {
-              services[category.id] = snapshot.docs.map(doc => {
-                const data = doc.data();
-                
-                // Debugging logs
-                console.log(`Processing villa: ${data.name?.en || data.name || 'Unknown'}`);
-                console.log('Raw data structure:', JSON.stringify(data, null, 2));
-                
-                if (data.photos) {
-                  console.log('Photos array:', data.photos);
-                  console.log('Photos array type:', Array.isArray(data.photos) ? 'Array' : typeof data.photos);
-                  console.log('Photos array length:', data.photos.length);
-                  
-                  // Check first photo if it exists
-                  if (data.photos.length > 0) {
-                    console.log('First photo structure:', data.photos[0]);
-                    console.log('First photo URL:', data.photos[0]?.url);
-                  }
-                }
-                
-                // Extract image URL using our helper function
-                const imageUrl = extractImageUrl(data);
-                console.log('Extracted image URL:', imageUrl);
-                
-                const priceConfig = data.priceConfigurations && data.priceConfigurations.length > 0 
-                                  ? data.priceConfigurations[0] 
-                                  : null;
-                
-                return {
-                  id: doc.id,
-                  ...data,
-                  price: priceConfig ? parseFloat(priceConfig.price) || 0 : (data.price ? parseFloat(data.price) : 0),
-                  dailyPrice: priceConfig ? parseFloat(priceConfig.price) || 0 : (data.dailyPrice ? parseFloat(data.dailyPrice) : 0),
-                  unit: priceConfig ? priceConfig.type || 'day' : 'day',
-                  category: category.id,
-                  companyId: companyInfo.id,
-                  imageUrl: imageUrl
-                };
-              });
-            } else if (category.id === 'boats') {
-              services[category.id] = snapshot.docs.map(doc => {
-                const data = doc.data();
-                
-                // Also use the image extraction function for boats
-                const imageUrl = extractImageUrl(data);
-                
-                // Check for multiple possible price fields
-                const priceValue = data.rate !== undefined ? data.rate : 
-                                 (data.price !== undefined ? data.price : 
-                                 (data.hourlyRate !== undefined ? data.hourlyRate : 0));
-                                 
-                return {
-                  id: doc.id,
-                  ...data,
-                  price: parseFloat(priceValue) || 0,
-                  hourlyRate: parseFloat(data.hourlyRate || priceValue) || 0,
-                  unit: 'hour',
-                  category: category.id,
-                  companyId: companyInfo.id,
-                  imageUrl: imageUrl
-                };
-              });
-            } else if (category.id === 'cars') {
-              services[category.id] = snapshot.docs.map(doc => {
-                const data = doc.data();
-                
-                // Use the image extraction function for cars too
-                const imageUrl = extractImageUrl(data);
-                
-                // For cars, price might be in pricing.daily or other formats
-                let priceValue = 0;
-                
-                // Check for pricing structure first
-                if (data.pricing && data.pricing.daily) {
-                  priceValue = data.pricing.daily;
-                } 
-                // Then check for direct price fields
-                else if (data.rate !== undefined) {
-                  priceValue = data.rate;
-                } else if (data.price !== undefined) {
-                  priceValue = data.price;
-                } else if (data.dailyRate !== undefined) {
-                  priceValue = data.dailyRate;
-                }
-                
-                return {
-                  id: doc.id,
-                  ...data,
-                  price: parseFloat(priceValue) || 0,
-                  dailyRate: parseFloat(priceValue) || 0,
-                  unit: 'day',
-                  category: category.id,
-                  companyId: companyInfo.id,
-                  imageUrl: imageUrl,
-                  // Include additional car info for display
-                  make: data.make || '',
-                  model: data.model || '',
-                  year: data.year || ''
-                };
-              });
-            } else if (category.id === 'security') {
+  services[category.id] = snapshot.docs.map(doc => {
+    const data = doc.data();
+    
+    console.log(`Processing villa: ${data.name?.en || data.name || 'Unknown'}`);
+    console.log('Raw villa data structure:', JSON.stringify(data, null, 2));
+    
+    const imageUrl = extractImageUrl(data);
+    
+    // ENHANCED VILLA PRICING - Handle seasonal pricing
+    let priceValue = 0;
+    let unit = 'day';
+    let selectedPriceSource = 'none';
+    
+    // Priority 1: Daily price from pricing.daily
+    if (data.pricing?.daily && parseFloat(data.pricing.daily) > 0) {
+      priceValue = parseFloat(data.pricing.daily);
+      unit = 'day';
+      selectedPriceSource = 'pricing.daily';
+    }
+    // Priority 2: Check price configurations (your current structure)
+    else if (data.priceConfigurations && data.priceConfigurations.length > 0) {
+      const priceConfig = data.priceConfigurations[0];
+      priceValue = parseFloat(priceConfig.price) || 0;
+      unit = priceConfig.type || 'day';
+      selectedPriceSource = 'priceConfigurations';
+    }
+    // Priority 3: Direct price field
+    else if (data.price && parseFloat(data.price) > 0) {
+      priceValue = parseFloat(data.price);
+      unit = 'day';
+      selectedPriceSource = 'price';
+    }
+    // Priority 4: Daily price field
+    else if (data.dailyPrice && parseFloat(data.dailyPrice) > 0) {
+      priceValue = parseFloat(data.dailyPrice);
+      unit = 'day';
+      selectedPriceSource = 'dailyPrice';
+    }
+    
+    console.log(`Villa pricing for ${data.name?.en || 'Unknown'}:`, {
+      selectedPrice: priceValue,
+      selectedUnit: unit,
+      selectedPriceSource: selectedPriceSource,
+      hasPricingStructure: !!data.pricing,
+      hasPriceConfigurations: !!data.priceConfigurations
+    });
+    
+    return {
+      id: doc.id,
+      ...data,
+      price: priceValue,
+      dailyPrice: priceValue,
+      unit: unit,
+      category: category.id,
+      companyId: companyInfo.id,
+      imageUrl: imageUrl,
+      priceSource: selectedPriceSource,
+      // Store original pricing structures for month selector
+      originalPricing: data.pricing,
+      originalPriceConfigurations: data.priceConfigurations
+    };
+  });
+} else if (category.id === 'boats') {
+  services[category.id] = snapshot.docs.map(doc => {
+    const data = doc.data();
+    
+    // Use the image extraction function for boats
+    const imageUrl = extractImageUrl(data);
+    
+    // HANDLE YOUR ACTUAL FIRESTORE PRICING STRUCTURE
+    let priceValue = 0;
+    let unit = 'day';
+    let selectedPriceSource = 'none';
+    
+    // Get current month to determine seasonal pricing
+    const currentMonth = new Date().getMonth() + 1; // 1-12
+    
+    // Map month numbers to month names in your structure
+    const monthNames = {
+      1: 'january',
+      2: 'february', 
+      3: 'march',
+      4: 'april',
+      5: 'may',
+      6: 'june',
+      7: 'july',
+      8: 'august',
+      9: 'september',
+      10: 'october',
+      11: 'november',
+      12: 'december'
+    };
+    
+    // Priority 1: Daily price from pricing.daily
+    if (data.pricing?.daily && parseFloat(data.pricing.daily) > 0) {
+      priceValue = parseFloat(data.pricing.daily);
+      unit = 'day';
+      selectedPriceSource = 'pricing.daily';
+    }
+    
+    // Priority 2: Current month seasonal price
+    else if (data.pricing?.monthly) {
+      const currentMonthName = monthNames[currentMonth];
+      const currentMonthPrice = data.pricing.monthly[currentMonthName];
+      
+      if (currentMonthPrice && parseFloat(currentMonthPrice) > 0) {
+        priceValue = parseFloat(currentMonthPrice);
+        unit = 'day';
+        selectedPriceSource = `pricing.monthly.${currentMonthName}`;
+      }
+      
+      // If no current month price, try to find any available seasonal price
+      else {
+        const availableMonths = Object.keys(data.pricing.monthly);
+        for (const month of availableMonths) {
+          const monthPrice = data.pricing.monthly[month];
+          if (monthPrice && parseFloat(monthPrice) > 0) {
+            priceValue = parseFloat(monthPrice);
+            unit = 'day';
+            selectedPriceSource = `pricing.monthly.${month}`;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Priority 3: Fallback to standard price fields
+    if (priceValue === 0) {
+      if (data.price && parseFloat(data.price) > 0) {
+        priceValue = parseFloat(data.price);
+        unit = data.unit || 'day';
+        selectedPriceSource = 'price';
+      }
+      else if (data.dailyPrice && parseFloat(data.dailyPrice) > 0) {
+        priceValue = parseFloat(data.dailyPrice);
+        unit = 'day';
+        selectedPriceSource = 'dailyPrice';
+      }
+      else if (data.rate && parseFloat(data.rate) > 0) {
+        priceValue = parseFloat(data.rate);
+        unit = data.rateUnit || 'day';
+        selectedPriceSource = 'rate';
+      }
+      // Only use hourly as last resort
+      else if (data.hourlyRate && parseFloat(data.hourlyRate) > 0) {
+        priceValue = parseFloat(data.hourlyRate);
+        unit = 'hour';
+        selectedPriceSource = 'hourlyRate';
+      }
+    }
+    
+    // DEBUG: Log the pricing data found
+    console.log(`Boat pricing for ${data.name?.en || data.name || 'Unknown'}:`, {
+      rawPricingData: data.pricing,
+      currentMonth: currentMonth,
+      currentMonthName: monthNames[currentMonth],
+      currentMonthPrice: data.pricing?.monthly?.[monthNames[currentMonth]],
+      selectedPrice: priceValue,
+      selectedUnit: unit,
+      selectedPriceSource: selectedPriceSource,
+      availableMonthlyPrices: data.pricing?.monthly ? Object.keys(data.pricing.monthly).filter(month => 
+        data.pricing.monthly[month] && parseFloat(data.pricing.monthly[month]) > 0
+      ) : []
+    });
+    
+    return {
+      id: doc.id,
+      ...data,
+      price: priceValue,
+      dailyPrice: priceValue,
+      hourlyRate: parseFloat(data.hourlyRate || 0) || 0,
+      unit: unit,
+      category: category.id,
+      companyId: companyInfo.id,
+      imageUrl: imageUrl,
+      priceSource: selectedPriceSource,
+      // Store the original pricing structure for reference
+      originalPricing: data.pricing,
+      // Extract seasonal pricing in a flat structure for easy access
+      seasonalPricing: data.pricing?.monthly ? {
+        may: parseFloat(data.pricing.monthly.may || 0),
+        june: parseFloat(data.pricing.monthly.june || 0),
+        july: parseFloat(data.pricing.monthly.july || 0),
+        august: parseFloat(data.pricing.monthly.august || 0),
+        september: parseFloat(data.pricing.monthly.september || 0),
+        october: parseFloat(data.pricing.monthly.october || 0)
+      } : {}
+    };
+  });
+} else if (category.id === 'cars') {
+  services[category.id] = snapshot.docs.map(doc => {
+    const data = doc.data();
+    
+    const imageUrl = extractImageUrl(data);
+    
+    // ENHANCED CAR PRICING - Handle seasonal pricing
+    let priceValue = 0;
+    let unit = 'day';
+    let selectedPriceSource = 'none';
+    
+    // Priority 1: Daily price from pricing.daily
+    if (data.pricing?.daily && parseFloat(data.pricing.daily) > 0) {
+      priceValue = parseFloat(data.pricing.daily);
+      unit = 'day';
+      selectedPriceSource = 'pricing.daily';
+    }
+    // Priority 2: Check pricing structure daily
+    else if (data.pricing?.dailyRate && parseFloat(data.pricing.dailyRate) > 0) {
+      priceValue = parseFloat(data.pricing.dailyRate);
+      unit = 'day';
+      selectedPriceSource = 'pricing.dailyRate';
+    }
+    // Priority 3: Check for pricing.daily nested
+    else if (data.pricing && data.pricing.daily && parseFloat(data.pricing.daily) > 0) {
+      priceValue = parseFloat(data.pricing.daily);
+      unit = 'day';
+      selectedPriceSource = 'pricing.daily';
+    }
+    // Priority 4: Direct rate field
+    else if (data.rate && parseFloat(data.rate) > 0) {
+      priceValue = parseFloat(data.rate);
+      unit = 'day';
+      selectedPriceSource = 'rate';
+    }
+    // Priority 5: Direct price field
+    else if (data.price && parseFloat(data.price) > 0) {
+      priceValue = parseFloat(data.price);
+      unit = data.unit || 'day';
+      selectedPriceSource = 'price';
+    }
+    // Priority 6: Daily rate field
+    else if (data.dailyRate && parseFloat(data.dailyRate) > 0) {
+      priceValue = parseFloat(data.dailyRate);
+      unit = 'day';
+      selectedPriceSource = 'dailyRate';
+    }
+    
+    console.log(`Car pricing for ${data.make} ${data.model}:`, {
+      selectedPrice: priceValue,
+      selectedUnit: unit,
+      selectedPriceSource: selectedPriceSource,
+      hasPricingStructure: !!data.pricing
+    });
+    
+    return {
+      id: doc.id,
+      ...data,
+      price: priceValue,
+      dailyRate: priceValue,
+      unit: unit,
+      category: category.id,
+      companyId: companyInfo.id,
+      imageUrl: imageUrl,
+      priceSource: selectedPriceSource,
+      // Store original pricing for month selector
+      originalPricing: data.pricing
+    };
+  });
+} else if (category.id === 'security') {
               services[category.id] = snapshot.docs.map(doc => {
                 const data = doc.data();
                 
@@ -2428,8 +2588,8 @@ const getUserName = async (userId) => {
       case 'villas':
         return (
           <div key={service.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm h-full flex flex-col">
-            {renderImage(service, "h-48")}
-            <div className="p-4 flex-1 flex flex-col">
+            {renderImage(service, "h-32")}
+            <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-3'} gap-4`}>
               <h3 className="text-base font-semibold text-gray-900 mb-3">
                 {typeof service.name === 'object'
                   ? getLocalizedText(service.name, language)
@@ -3149,644 +3309,1003 @@ const getUserName = async (userId) => {
               )}
               
               {/* Create Offer Modal */}
-              {showCreateOffer && selectedClient && (
+{showCreateOffer && selectedClient && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div className={`bg-white rounded-lg shadow-xl w-full h-full ${isMobile ? 'm-0' : 'max-w-7xl max-h-full m-4'} flex flex-col`}>
+    <div className={`bg-white rounded-lg shadow-xl ${isMobile ? 'w-full h-full m-0' : 'w-full max-w-5xl h-5/6 m-4'} flex flex-col`}>
       
       {/* Header */}
       <div className={`flex justify-between items-center ${isMobile ? 'p-4' : 'p-6'} border-b border-gray-200 bg-gray-50 flex-shrink-0`}>
         <div>
-          <h2 className={`${isMobile ? 'text-lg' : 'text-2xl'} font-semibold text-gray-800`}>
-            {t.createNewOffer}
+          <h2 className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold text-gray-800`}>
+            {currentEditingOffer ? t.editOffer : t.createNewOffer}
           </h2>
           <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 mt-1`}>
             {t.offerFor} {selectedClient.name}
           </p>
         </div>
-        <button 
-          onClick={() => setShowCreateOffer(false)}
-          className={`bg-gray-100 hover:bg-gray-200 text-gray-600 border-none rounded-full ${isMobile ? 'w-8 h-8' : 'w-10 h-10'} flex items-center justify-center ${isMobile ? 'text-lg' : 'text-xl'} cursor-pointer`}
-        >
-          ✕
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Mobile Cart Toggle Button */}
+          {isMobile && offerItems.length > 0 && (
+            <button
+              onClick={() => setCurrentView(currentView === 'cart' ? 'offer' : 'cart')}
+              className="bg-indigo-600 text-white rounded-full w-10 h-10 flex items-center justify-center relative"
+            >
+              🛒
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                {offerItems.length}
+              </span>
+            </button>
+          )}
+          <button 
+            onClick={() => setShowCreateOffer(false)}
+            className={`bg-gray-100 hover:bg-gray-200 text-gray-600 border-none rounded-full ${isMobile ? 'w-8 h-8' : 'w-10 h-10'} flex items-center justify-center ${isMobile ? 'text-lg' : 'text-xl'} cursor-pointer`}
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
-      {/* Main Content */}
-      <div className={`flex-1 flex ${isMobile ? 'flex-col' : 'flex-row'} overflow-hidden`}>
+      {/* Mobile Cart View */}
+      {isMobile && currentView === 'cart' && (
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="p-4 border-b border-gray-200 bg-gray-50">
+            <div className="flex justify-between items-center">
+              <h3 className="text-base font-semibold text-gray-800">Cart Items</h3>
+              <button
+                onClick={() => setCurrentView('offer')}
+                className="text-indigo-600 text-sm font-medium"
+              >
+                Continue with Offer
+              </button>
+            </div>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4">
+            {offerItems.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="text-4xl text-gray-300 mb-2">🛒</div>
+                <p className="text-sm text-gray-500">No items in cart</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {offerItems.map(item => (
+                  <div key={item.id} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <div className="flex justify-between items-start mb-3">
+                      <h4 className="font-medium text-sm text-gray-900 flex-1 mr-2">
+                        {typeof item.name === 'object'
+                          ? getLocalizedText(item.name, language)
+                          : item.name}
+                      </h4>
+                      <button 
+                        onClick={() => setOfferItems(prev => prev.filter(i => i.id !== item.id))}
+                        className="text-red-500 hover:text-red-700 text-lg"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    
+                    {/* Quantity Controls */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            if (item.quantity > 1) {
+                              setOfferItems(prev => prev.map(i => 
+                                i.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+                              ));
+                            }
+                          }}
+                          className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded text-lg font-bold"
+                        >
+                          −
+                        </button>
+                        <span className="mx-3 text-lg font-medium min-w-8 text-center">{item.quantity}</span>
+                        <button
+                          onClick={() => {
+                            setOfferItems(prev => prev.map(i => 
+                              i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+                            ));
+                          }}
+                          className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded text-lg font-bold"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-bold text-gray-900">
+                          €{(item.price * item.quantity).toFixed(2)}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          €{item.price.toFixed(2)} each
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Custom Discount Section - MOBILE */}
+                    
+
+{/* Fixed Custom Discount Section - Mobile Version */}
+<div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+  <div className="flex items-center justify-between mb-2">
+    <span className="text-sm font-medium text-gray-700">Custom Discount:</span>
+    <div className="flex gap-1">
+      <button
+        onClick={() => {
+          setOfferItems(prev => prev.map(i => 
+            i.id === item.id ? { 
+              ...i, 
+              discountType: 'percentage',
+              discountValue: i.discountValue || 0,
+              hasCustomDiscount: true
+            } : i
+          ));
+        }}
+        className={`px-3 py-1 text-sm rounded ${
+          item.discountType === 'percentage' 
+            ? 'bg-indigo-600 text-white' 
+            : 'bg-white border border-gray-300'
+        }`}
+      >
+        %
+      </button>
+      <button
+        onClick={() => {
+          setOfferItems(prev => prev.map(i => 
+            i.id === item.id ? { 
+              ...i, 
+              discountType: 'fixed',
+              discountValue: i.discountValue || 0,
+              hasCustomDiscount: true
+            } : i
+          ));
+        }}
+        className={`px-3 py-1 text-sm rounded ${
+          item.discountType === 'fixed' 
+            ? 'bg-indigo-600 text-white' 
+            : 'bg-white border border-gray-300'
+        }`}
+      >
+        €
+      </button>
+    </div>
+  </div>
+  
+  <div className="flex gap-2 items-center">
+    {/* FIXED INPUT FIELD - Mobile Friendly */}
+    <input
+      type="text"
+      inputMode="decimal"
+      pattern="[0-9]*\.?[0-9]*"
+      value={item.discountValue || ''}
+      placeholder="0"
+      onFocus={(e) => {
+        // Clear the field when focused if it's 0
+        if (e.target.value === '0' || e.target.value === 0) {
+          e.target.value = '';
+          // Also update the state
+          setOfferItems(prev => prev.map(i => 
+            i.id === item.id ? { ...i, discountValue: 0 } : i
+          ));
+        }
+        // Select all text for easy replacement
+        e.target.select();
+      }}
+      onChange={(e) => {
+        let value = e.target.value;
         
-        {/* Categories - Mobile: Horizontal scroll, Desktop: Left Sidebar */}
-        {isMobile ? (
-          <div className="bg-gray-50 border-b border-gray-200 flex-shrink-0">
-            <div className="p-3">
-              <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
-                Service Categories
-              </h3>
-              <div className="flex gap-2 overflow-x-auto pb-2">
+        // Allow empty string
+        if (value === '') {
+          setOfferItems(prev => prev.map(i => 
+            i.id === item.id ? { 
+              ...i, 
+              discountValue: 0,
+              hasCustomDiscount: false,
+              price: i.originalPrice
+            } : i
+          ));
+          return;
+        }
+        
+        // Only allow numbers and decimal point
+        value = value.replace(/[^0-9.]/g, '');
+        
+        // Prevent multiple decimal points
+        const parts = value.split('.');
+        if (parts.length > 2) {
+          value = parts[0] + '.' + parts.slice(1).join('');
+        }
+        
+        const discountValue = parseFloat(value) || 0;
+        
+        setOfferItems(prev => prev.map(i => 
+          i.id === item.id ? { 
+            ...i, 
+            discountValue: discountValue,
+            hasCustomDiscount: discountValue > 0,
+            // Recalculate price with discount
+            price: item.discountType === 'percentage' 
+              ? item.originalPrice * (1 - discountValue/100)
+              : Math.max(item.originalPrice - discountValue, 0)
+          } : i
+        ));
+      }}
+      onBlur={(e) => {
+        // If field is empty on blur, set to 0
+        if (e.target.value === '') {
+          setOfferItems(prev => prev.map(i => 
+            i.id === item.id ? { 
+              ...i, 
+              discountValue: 0,
+              hasCustomDiscount: false,
+              price: i.originalPrice
+            } : i
+          ));
+        }
+      }}
+      className="flex-1 p-3 text-lg border border-gray-300 rounded text-center bg-white"
+      style={{
+        WebkitAppearance: 'none',
+        MozAppearance: 'textfield'
+      }}
+    />
+    <span className="text-sm text-gray-700 font-medium min-w-6">
+      {item.discountType === 'percentage' ? '%' : '€'}
+    </span>
+  </div>
+  
+  {/* Quick Discount Buttons */}
+  <div className="mt-2 flex gap-2">
+    <button
+      onClick={() => {
+        const quickDiscount = item.discountType === 'percentage' ? 10 : 100;
+        setOfferItems(prev => prev.map(i => 
+          i.id === item.id ? { 
+            ...i, 
+            discountValue: quickDiscount,
+            hasCustomDiscount: true,
+            price: item.discountType === 'percentage' 
+              ? item.originalPrice * (1 - quickDiscount/100)
+              : Math.max(item.originalPrice - quickDiscount, 0)
+          } : i
+        ));
+      }}
+      className="flex-1 py-2 bg-blue-100 text-blue-800 rounded text-sm font-medium"
+    >
+      {item.discountType === 'percentage' ? '10%' : '€100'}
+    </button>
+    <button
+      onClick={() => {
+        const quickDiscount = item.discountType === 'percentage' ? 20 : 200;
+        setOfferItems(prev => prev.map(i => 
+          i.id === item.id ? { 
+            ...i, 
+            discountValue: quickDiscount,
+            hasCustomDiscount: true,
+            price: item.discountType === 'percentage' 
+              ? item.originalPrice * (1 - quickDiscount/100)
+              : Math.max(item.originalPrice - quickDiscount, 0)
+          } : i
+        ));
+      }}
+      className="flex-1 py-2 bg-blue-100 text-blue-800 rounded text-sm font-medium"
+    >
+      {item.discountType === 'percentage' ? '20%' : '€200'}
+    </button>
+    <button
+      onClick={() => {
+        setOfferItems(prev => prev.map(i => 
+          i.id === item.id ? { 
+            ...i, 
+            discountValue: 0,
+            hasCustomDiscount: false,
+            price: i.originalPrice
+          } : i
+        ));
+      }}
+      className="flex-1 py-2 bg-gray-100 text-gray-600 rounded text-sm font-medium"
+    >
+      Clear
+    </button>
+  </div>
+  
+  {/* Show discounted price */}
+  {item.hasCustomDiscount && item.discountValue > 0 && (
+    <div className="mt-2 flex items-center justify-between text-sm">
+      <span className="text-gray-500 line-through">
+        Original: €{item.originalPrice}
+      </span>
+      <span className="font-bold text-green-600">
+        After discount: €{item.price.toFixed(2)}
+      </span>
+    </div>
+  )}
+</div>
+
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          {/* Cart Total */}
+          {offerItems.length > 0 && (
+            <div className="border-t border-gray-200 p-4 bg-gray-50">
+              <div className="space-y-2">
+                <div className="flex justify-between text-lg font-bold">
+                  <span>Total:</span>
+                  <span className="text-indigo-600">
+                    €{offerItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Main Content - Services View */}
+      {(!isMobile || currentView === 'offer') && (
+        <div className={`flex-1 flex ${isMobile ? 'flex-col' : 'flex-row'} overflow-hidden min-h-0`}>
+          
+          {/* Categories - Mobile: Horizontal scroll, Desktop: Left Sidebar */}
+          {isMobile ? (
+            <div className="bg-gray-50 border-b border-gray-200 flex-shrink-0">
+              <div className="p-3">
+                <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+                  Service Categories
+                </h3>
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {serviceCategories.map(category => (
+                    <button
+                      key={category.id}
+                      onClick={() => setSelectedCategory(category.id)}
+                      className={`flex-shrink-0 flex flex-col items-center gap-1 p-2 rounded-lg border transition-colors min-w-16 ${
+                        selectedCategory === category.id 
+                          ? 'bg-indigo-100 border-indigo-300 text-indigo-700' 
+                          : 'bg-white border-gray-200 text-gray-700'
+                      }`}
+                    >
+                      <span className="text-lg">{category.icon}</span>
+                      <span className="text-xs text-center font-medium leading-tight">{category.name}</span>
+                      <span className="text-xs text-gray-500">
+                        {availableServices[category.id]?.length || 0}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col flex-shrink-0">
+              <div className="p-4 border-b border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                  Service Categories
+                </h3>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto">
                 {serviceCategories.map(category => (
                   <button
                     key={category.id}
                     onClick={() => setSelectedCategory(category.id)}
-                    className={`flex-shrink-0 flex flex-col items-center gap-1 p-3 rounded-lg border transition-colors min-w-20 ${
+                    className={`w-full flex items-center gap-3 p-4 text-left border-b border-gray-200 transition-colors ${
                       selectedCategory === category.id 
-                        ? 'bg-indigo-100 border-indigo-300 text-indigo-700' 
-                        : 'bg-white border-gray-200 text-gray-700'
+                        ? 'bg-indigo-50 border-l-4 border-l-indigo-600 text-indigo-700' 
+                        : 'hover:bg-gray-100 text-gray-700'
                     }`}
                   >
                     <span className="text-xl">{category.icon}</span>
-                    <span className="text-xs text-center font-medium">{category.name}</span>
-                    <span className="text-xs text-gray-500">
-                      {availableServices[category.id]?.length || 0}
-                    </span>
+                    <div>
+                      <div className="font-medium text-sm">{category.name}</div>
+                      <div className="text-xs text-gray-500">
+                        {availableServices[category.id]?.length || 0} services
+                      </div>
+                    </div>
                   </button>
                 ))}
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="w-72 bg-gray-50 border-r border-gray-200 flex flex-col">
-            <div className="p-4 border-b border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                Service Categories
-              </h3>
-            </div>
+          )}
+
+          {/* Center - Services Grid */}
+          <div className="flex-1 flex flex-col min-w-0">
             
-            <div className="flex-1 overflow-y-auto">
-              {serviceCategories.map(category => (
-                <button
-                  key={category.id}
-                  onClick={() => setSelectedCategory(category.id)}
-                  className={`w-full flex items-center gap-3 p-4 text-left border-b border-gray-200 transition-colors ${
-                    selectedCategory === category.id 
-                      ? 'bg-indigo-50 border-l-4 border-l-indigo-600 text-indigo-700' 
-                      : 'hover:bg-gray-100 text-gray-700'
-                  }`}
-                >
-                  <span className="text-2xl">{category.icon}</span>
-                  <div>
-                    <div className="font-medium">{category.name}</div>
-                    <div className="text-xs text-gray-500">
-                      {availableServices[category.id]?.length || 0} services
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Center - Services Grid */}
-        <div className="flex-1 flex flex-col min-w-0">
-          
-          {/* Services Header */}
-          <div className={`${isMobile ? 'p-4' : 'p-6'} border-b border-gray-200 bg-white flex-shrink-0`}>
-            <div className={`flex ${isMobile ? 'flex-col gap-3' : 'flex-row'} justify-between items-${isMobile ? 'start' : 'center'}`}>
-              <div>
-                <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-semibold text-gray-800`}>
-                  {serviceCategories.find(c => c.id === selectedCategory)?.name}
-                </h3>
-                <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 mt-1`}>
-                  {(() => {
-                    const services = availableServices[selectedCategory] || [];
-                    const filtered = services.filter(service => {
-                      const price = parseFloat(service.dailyPrice || service.price || service.rate || 0);
-                      return price >= appliedMinPrice && price <= appliedMaxPrice;
-                    });
-                    return filtered.length;
-                  })()} services available
-                </p>
-              </div>
-              
-              {/* Price Filter */}
-              {['villas', 'boats', 'cars'].includes(selectedCategory) && (
-                <div className="relative">
-                  <button 
-                    onClick={() => setShowPriceFilter(!showPriceFilter)}
-                    className={`flex items-center gap-2 ${isMobile ? 'px-3 py-2' : 'px-4 py-2'} bg-white border border-gray-300 rounded-lg ${isMobile ? 'text-xs' : 'text-sm'} hover:bg-gray-50`}
-                  >
-                    <span>💰</span>
-                    <span>{t.filterByPrice}</span>
-                    <span>{showPriceFilter ? '▲' : '▼'}</span>
-                  </button>
-                  
-                  {showPriceFilter && (
-                    <div className={`absolute ${isMobile ? 'top-full left-0 right-0' : 'top-full right-0'} mt-2 p-4 bg-white border border-gray-200 rounded-lg shadow-lg z-10 ${isMobile ? 'w-full' : 'w-80'}`}>
-                      <div className="flex gap-4 mb-4">
-                        <div className="flex-1">
-                          <label className="block text-xs font-medium text-gray-500 mb-2">{t.minPrice}</label>
-                          <input
-                            type="number"
-                            value={minPrice}
-                            onChange={(e) => setMinPrice(e.target.value)}
-                            className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
-                            placeholder="0"
-                            min="0"
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <label className="block text-xs font-medium text-gray-500 mb-2">{t.maxPrice}</label>
-                          <input
-                            type="number"
-                            value={maxPrice}
-                            onChange={(e) => setMaxPrice(e.target.value)}
-                            className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
-                            placeholder="∞"
-                            min="0"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex justify-end gap-2">
-                        <button 
-                          onClick={() => {
-                            setMinPrice('');
-                            setMaxPrice('');
-                            setAppliedMinPrice(0);
-                            setAppliedMaxPrice(Infinity);
-                            setShowPriceFilter(false);
-                          }}
-                          className="py-2 px-3 bg-gray-100 text-gray-600 border-none rounded-md text-xs font-medium cursor-pointer"
-                        >
-                          {t.reset}
-                        </button>
-                        <button 
-                          onClick={() => {
-                            setAppliedMinPrice(minPrice === '' ? 0 : parseFloat(minPrice));
-                            setAppliedMaxPrice(maxPrice === '' ? Infinity : parseFloat(maxPrice));
-                            setShowPriceFilter(false);
-                          }}
-                          className="py-2 px-3 bg-indigo-600 text-white border-none rounded-md text-xs font-medium cursor-pointer"
-                        >
-                          {t.apply}
-                        </button>
-                      </div>
-                    </div>
-                  )}
+            {/* Services Header */}
+            <div className={`${isMobile ? 'p-3' : 'p-4'} border-b border-gray-200 bg-white flex-shrink-0`}>
+              <div className={`flex ${isMobile ? 'flex-col gap-2' : 'flex-row'} justify-between items-${isMobile ? 'start' : 'center'}`}>
+                <div>
+                  <h3 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold text-gray-800`}>
+                    {serviceCategories.find(c => c.id === selectedCategory)?.name}
+                  </h3>
+                  <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600`}>
+                    {(() => {
+                      const services = availableServices[selectedCategory] || [];
+                      const filtered = services.filter(service => {
+                        const price = parseFloat(service.dailyPrice || service.price || service.rate || 0);
+                        return price >= appliedMinPrice && price <= appliedMaxPrice;
+                      });
+                      return filtered.length;
+                    })()} services available
+                  </p>
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* Services Grid - WIDE LANDSCAPE CARDS */}
-          <div className={`flex-1 overflow-y-auto ${isMobile ? 'p-4' : 'p-8'}`}>
-            {loadingServices ? (
-              <div className="flex flex-col items-center justify-center h-full">
-                <div className="inline-block w-8 h-8 border-2 border-gray-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
-                <p className="text-gray-500">{t.loadingServices}</p>
-              </div>
-            ) : (() => {
-              const services = availableServices[selectedCategory] || [];
-              const filteredServices = services.filter(service => {
-                const price = parseFloat(service.dailyPrice || service.price || service.rate || 0);
-                return price >= appliedMinPrice && price <= appliedMaxPrice;
-              });
-              
-              return filteredServices.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full">
-                  <div className="text-6xl text-gray-300 mb-4">📦</div>
-                  <p className="text-gray-500 text-lg">{t.noServicesFound}</p>
-                </div>
-              ) : (
-                <div className="grid gap-6 grid-cols-1">
-                  {filteredServices.map(service => (
-                    <div key={service.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.01] w-full max-w-5xl mx-auto">
-                      
-                      {/* HORIZONTAL LAYOUT - Image + Content Side by Side */}
-                      <div className={`flex ${isMobile ? 'flex-col' : 'flex-row'}`}>
-                        
-                        {/* Service Image - WIDER BUT SHORTER */}
-                        <div className={`${isMobile ? 'h-48' : 'w-2/5 h-64'} bg-gray-100 relative overflow-hidden flex-shrink-0`}>
-                          {((service.imageUrl || (service.photos && service.photos.length > 0)) && !imageErrors[service.id]) ? (
-                            <img 
-                              src={service.imageUrl || (service.photos && service.photos[0])} 
-                              alt={typeof service.name === 'object' ? getLocalizedText(service.name, language) : service.name}
-                              className="w-full h-full object-cover"
-                              onError={() => setImageErrors(prev => ({...prev, [service.id]: true}))}
+                
+                {/* Price Filter */}
+                {['villas', 'boats', 'cars'].includes(selectedCategory) && (
+                  <div className="relative">
+                    <button 
+                      onClick={() => setShowPriceFilter(!showPriceFilter)}
+                      className={`flex items-center gap-2 ${isMobile ? 'px-3 py-2 text-xs' : 'px-4 py-2 text-sm'} bg-white border border-gray-300 rounded-lg hover:bg-gray-50`}
+                    >
+                      <span>💰</span>
+                      <span>{t.filterByPrice}</span>
+                      <span>{showPriceFilter ? '▲' : '▼'}</span>
+                    </button>
+                    
+                    {showPriceFilter && (
+                      <div className={`absolute ${isMobile ? 'top-full left-0 right-0' : 'top-full right-0'} mt-2 p-4 bg-white border border-gray-200 rounded-lg shadow-lg z-10 ${isMobile ? 'w-full' : 'w-72'}`}>
+                        <div className="flex gap-4 mb-4">
+                          <div className="flex-1">
+                            <label className="block text-xs font-medium text-gray-500 mb-2">{t.minPrice}</label>
+                            <input
+                              type="number"
+                              value={minPrice}
+                              onChange={(e) => setMinPrice(e.target.value)}
+                              className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                              placeholder="0"
+                              min="0"
                             />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
-                              <div className="text-center">
-                                <div className="text-6xl mb-2 opacity-60">
-                                  {service.category === 'villas' ? '🏠' :
-                                   service.category === 'boats' ? '🛥️' :
-                                   service.category === 'cars' ? '🚗' :
-                                   service.category === 'security' ? '🔒' :
-                                   service.category === 'nannies' ? '👶' :
-                                   service.category === 'chefs' ? '🍽️' :
-                                   service.category === 'excursions' ? '🏔️' : '✨'}
-                                </div>
-                                <p className="text-gray-500 font-medium text-sm">No image available</p>
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Floating Category Badge */}
-                          <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-medium text-gray-700 shadow-lg">
-                            {serviceCategories.find(c => c.id === selectedCategory)?.name}
+                          </div>
+                          <div className="flex-1">
+                            <label className="block text-xs font-medium text-gray-500 mb-2">{t.maxPrice}</label>
+                            <input
+                              type="number"
+                              value={maxPrice}
+                              onChange={(e) => setMaxPrice(e.target.value)}
+                              className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                              placeholder="∞"
+                              min="0"
+                            />
                           </div>
                         </div>
-                        
-                        {/* Service Details - RIGHT SIDE OF IMAGE */}
-                        <div className={`${isMobile ? 'p-6' : 'flex-1 p-8'} flex flex-col justify-between`}>
+                        <div className="flex justify-end gap-2">
+                          <button 
+                            onClick={handleResetPriceFilter}
+                            className="py-2 px-3 bg-gray-100 text-gray-600 border-none rounded-md text-xs font-medium cursor-pointer"
+                          >
+                            {t.reset}
+                          </button>
+                          <button 
+                            onClick={handleApplyPriceFilter}
+                            className="py-2 px-3 bg-indigo-600 text-white border-none rounded-md text-xs font-medium cursor-pointer"
+                          >
+                            {t.apply}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Services Grid - FIXED WITH PROPER SCROLLING */}
+            <div className={`flex-1 overflow-y-auto ${isMobile ? 'p-3' : 'p-4'}`} style={{minHeight: 0}}>
+              {loadingServices ? (
+                <div className="flex flex-col items-center justify-center h-full min-h-48">
+                  <div className="inline-block w-8 h-8 border-2 border-gray-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+                  <p className="text-gray-500">{t.loadingServices}</p>
+                </div>
+              ) : (() => {
+                const services = availableServices[selectedCategory] || [];
+                const filteredServices = services.filter(service => {
+                  const price = parseFloat(service.dailyPrice || service.price || service.rate || 0);
+                  return price >= appliedMinPrice && price <= appliedMaxPrice;
+                });
+                
+                return filteredServices.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full min-h-48">
+                    <div className="text-6xl text-gray-300 mb-4">📦</div>
+                    <p className="text-gray-500 text-lg">{t.noServicesFound}</p>
+                  </div>
+                ) : (
+                  <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
+                    {filteredServices.map(service => {
+                      // Enhanced Service Card Component
+                      return (
+                        <div key={service.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300">
                           
-                          {/* Top Section - Title and Details */}
-                          <div>
-                            <h4 className="text-3xl font-bold text-gray-900 mb-4 leading-tight">
+                          {/* Service Image */}
+                          <div className={`${isMobile ? 'h-32' : 'h-40'} bg-gray-100 relative overflow-hidden`}>
+                            {((service.imageUrl || (service.photos && service.photos.length > 0)) && !imageErrors[service.id]) ? (
+                              <img 
+                                src={service.imageUrl || (service.photos && service.photos[0])} 
+                                alt={typeof service.name === 'object' ? getLocalizedText(service.name, language) : service.name}
+                                className="w-full h-full object-cover"
+                                onError={() => setImageErrors(prev => ({...prev, [service.id]: true}))}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-100 to-purple-100">
+                                <div className="text-center">
+                                  <div className="text-3xl mb-2 opacity-60">
+                                    {service.category === 'villas' ? '🏠' :
+                                     service.category === 'boats' ? '🛥️' :
+                                     service.category === 'cars' ? '🚗' :
+                                     service.category === 'security' ? '🔒' :
+                                     service.category === 'nannies' ? '👶' :
+                                     service.category === 'chefs' ? '🍽️' :
+                                     service.category === 'excursions' ? '🏔️' : '✨'}
+                                  </div>
+                                  <p className="text-gray-500 font-medium text-xs">No image</p>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Category Badge */}
+                            <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-medium text-gray-700">
+                              {serviceCategories.find(c => c.id === selectedCategory)?.name}
+                            </div>
+                          </div>
+                          
+                          {/* Service Details */}
+                          <div className="p-4">
+                            
+                            {/* Service Name */}
+                            <h4 className={`${isMobile ? 'text-sm' : 'text-base'} font-bold text-gray-900 mb-2 line-clamp-2`}>
                               {typeof service.name === 'object'
                                 ? getLocalizedText(service.name, language)
                                 : service.name}
                             </h4>
                             
-                            {/* Service-specific details - HORIZONTAL LAYOUT */}
-                            {service.category === 'villas' && (
-                              <div className="space-y-2 text-gray-600 mb-6">
-                                {service.address && (
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-lg">📍</span>
-                                    <span className="text-base">
-                                      {typeof service.address === 'object'
-                                        ? getLocalizedText(service.address, language)
-                                        : service.address}
-                                    </span>
-                                  </div>
-                                )}
-                                <div className="flex gap-8">
-                                  {service.bedrooms && (
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-lg">🛏️</span>
-                                      <span className="text-base font-medium">{service.bedrooms} bedrooms</span>
-                                    </div>
-                                  )}
-                                  {service.capacity && (
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-lg">👥</span>
-                                      <span className="text-base font-medium">{service.capacity} guests</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                            
-                            {service.category === 'cars' && (
-                              <div className="space-y-2 text-gray-600 mb-6">
-                                <div className="flex items-center gap-3">
-                                  <span className="text-lg">🚗</span>
-                                  <span className="text-base font-medium">{service.make} {service.model}</span>
-                                </div>
-                                {service.year && (
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-lg">📅</span>
-                                    <span className="text-base">{service.year}</span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            
-                            {service.category === 'boats' && (
-                              <div className="space-y-2 text-gray-600 mb-6">
-                                <div className="flex gap-8">
-                                  {service.model && (
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-lg">🛥️</span>
-                                      <span className="text-base font-medium">{service.model}</span>
-                                    </div>
-                                  )}
-                                  {service.length && (
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-lg">📏</span>
-                                      <span className="text-base font-medium">{service.length}m</span>
-                                    </div>
-                                  )}
-                                </div>
-                                {service.capacity && (
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-lg">👥</span>
-                                    <span className="text-base">{service.capacity} guests</span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          
-                          {/* Bottom Section - Price, Discount, Button in Horizontal Layout */}
-                          <div className={`flex ${isMobile ? 'flex-col gap-4' : 'flex-row gap-6'} items-end`}>
-                            
-                            {/* Price Section - COMPACT */}
-                            <div className="flex-shrink-0">
-                              <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-100">
-                                <div className="text-center">
-                                  <div className="text-3xl font-bold text-indigo-600">
-                                    €{service.dailyPrice || service.price || service.rate || 0}
-                                  </div>
-                                  <div className="text-sm text-gray-500">
-                                    /{service.unit || 'day'}
-                                  </div>
-                                </div>
-                              </div>
+                            {/* Service-specific details */}
+                            <div className="space-y-1 mb-3 text-xs text-gray-600">
+                              {service.category === 'villas' && (
+  <>
+    {service.address && (
+      <div className="flex items-center gap-1">
+        <span>📍</span>
+        <span className="truncate">
+          {typeof service.address === 'object'
+            ? getLocalizedText(service.address, language)
+            : service.address}
+        </span>
+      </div>
+    )}
+    <div className="flex gap-4">
+      {service.bedrooms && (
+        <span>🛏️ {service.bedrooms} bed</span>
+      )}
+      {service.capacity && (
+        <span>👥 {service.capacity} guests</span>
+      )}
+    </div>
+    
+    {/* ADD MONTH SELECTOR FOR VILLAS */}
+    {service.originalPricing?.monthly && (
+      <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
+        <label className="block text-xs font-medium text-green-800 mb-1">
+          📅 Select Month:
+        </label>
+        <select
+          value={selectedBoatMonths[service.id] || 'daily'}
+          onChange={(e) => {
+            setSelectedBoatMonths(prev => ({
+              ...prev,
+              [service.id]: e.target.value
+            }));
+          }}
+          className="w-full p-1 text-xs border border-green-300 rounded bg-white"
+        >
+          <option value="daily">Daily Rate (€{service.originalPricing?.daily || service.price || 0})</option>
+          {Object.entries(service.originalPricing.monthly)
+            .filter(([month, price]) => price && parseFloat(price) > 0)
+            .map(([month, price]) => (
+              <option key={month} value={month}>
+                {month.charAt(0).toUpperCase() + month.slice(1)} (€{price})
+              </option>
+            ))
+          }
+        </select>
+      </div>
+    )}
+  </>
+)}
+                              
+                              {service.category === 'cars' && (
+  <div className="space-y-1">
+    <div>🚗 {service.make} {service.model}</div>
+    {service.year && <div>📅 {service.year}</div>}
+    
+    {/* ADD MONTH SELECTOR FOR CARS */}
+    {service.originalPricing?.monthly && (
+      <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
+        <label className="block text-xs font-medium text-orange-800 mb-1">
+          📅 Select Month:
+        </label>
+        <select
+          value={selectedBoatMonths[service.id] || 'daily'}
+          onChange={(e) => {
+            setSelectedBoatMonths(prev => ({
+              ...prev,
+              [service.id]: e.target.value
+            }));
+          }}
+          className="w-full p-1 text-xs border border-orange-300 rounded bg-white"
+        >
+          <option value="daily">Daily Rate (€{service.originalPricing?.daily || service.price || 0})</option>
+          {Object.entries(service.originalPricing.monthly)
+            .filter(([month, price]) => price && parseFloat(price) > 0)
+            .map(([month, price]) => (
+              <option key={month} value={month}>
+                {month.charAt(0).toUpperCase() + month.slice(1)} (€{price})
+              </option>
+            ))
+          }
+        </select>
+      </div>
+    )}
+  </div>
+)}
+                              
+                              {service.category === 'boats' && (
+  <div className="space-y-1">
+    {service.model && <div>🛥️ {service.model}</div>}
+    <div className="flex gap-4">
+      {service.length && <span>📏 {service.length}m</span>}
+      {service.capacity && <span>👥 {service.capacity} guests</span>}
+    </div>
+    
+    {/* ADD MONTH SELECTOR HERE */}
+    {service.originalPricing?.monthly && (
+      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+        <label className="block text-xs font-medium text-blue-800 mb-1">
+          📅 Select Month:
+        </label>
+        <select
+          value={selectedBoatMonths[service.id] || 'daily'}
+          onChange={(e) => {
+            setSelectedBoatMonths(prev => ({
+              ...prev,
+              [service.id]: e.target.value
+            }));
+          }}
+          className="w-full p-1 text-xs border border-blue-300 rounded bg-white"
+        >
+          <option value="daily">Daily Rate (€{service.originalPricing?.daily || 0})</option>
+          {Object.entries(service.originalPricing.monthly)
+            .filter(([month, price]) => price && parseFloat(price) > 0)
+            .map(([month, price]) => (
+              <option key={month} value={month}>
+                {month.charAt(0).toUpperCase() + month.slice(1)} (€{price})
+              </option>
+            ))
+          }
+        </select>
+      </div>
+    )}
+  </div>
+)}
                             </div>
                             
-                            {/* DISCOUNT SECTION - COMPACT HORIZONTAL */}
-                            <div className="flex-1">
-                              <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl">
-                                <div className="flex items-center justify-between mb-3">
-                                  <h5 className="text-base font-bold text-gray-800 flex items-center gap-2">
-                                    <span className="text-lg">💰</span>
-                                    {t.discount}
-                                  </h5>
-                                  <div className="flex gap-2">
-                                    <button
-                                      onClick={() => {
-                                        const newServices = {...availableServices};
-                                        const categoryServices = newServices[selectedCategory];
-                                        const serviceIndex = categoryServices.findIndex(s => s.id === service.id);
-                                        if (serviceIndex !== -1) {
-                                          categoryServices[serviceIndex] = {
-                                            ...categoryServices[serviceIndex],
-                                            discountType: 'percentage',
-                                            discountValue: categoryServices[serviceIndex].discountValue || 0
-                                          };
-                                          setAvailableServices(newServices);
-                                        }
-                                      }}
-                                      className={`px-3 py-1 text-sm rounded-lg font-semibold ${
-                                        service.discountType === 'percentage' 
-                                          ? 'bg-indigo-600 text-white' 
-                                          : 'bg-white text-gray-600 border border-gray-300'
-                                      }`}
-                                    >
-                                      %
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        const newServices = {...availableServices};
-                                        const categoryServices = newServices[selectedCategory];
-                                        const serviceIndex = categoryServices.findIndex(s => s.id === service.id);
-                                        if (serviceIndex !== -1) {
-                                          categoryServices[serviceIndex] = {
-                                            ...categoryServices[serviceIndex],
-                                            discountType: 'fixed',
-                                            discountValue: categoryServices[serviceIndex].discountValue || 0
-                                          };
-                                          setAvailableServices(newServices);
-                                        }
-                                      }}
-                                      className={`px-3 py-1 text-sm rounded-lg font-semibold ${
-                                        service.discountType === 'fixed' 
-                                          ? 'bg-indigo-600 text-white' 
-                                          : 'bg-white text-gray-600 border border-gray-300'
-                                      }`}
-                                    >
-                                      €
-                                    </button>
-                                  </div>
-                                </div>
-                                
-                                <div className="flex gap-3 items-center">
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    value={service.discountValue || 0}
-                                    onChange={(e) => {
-                                      const newServices = {...availableServices};
-                                      const categoryServices = newServices[selectedCategory];
-                                      const serviceIndex = categoryServices.findIndex(s => s.id === service.id);
-                                      if (serviceIndex !== -1) {
-                                        categoryServices[serviceIndex] = {
-                                          ...categoryServices[serviceIndex],
-                                          discountValue: parseFloat(e.target.value) || 0
-                                        };
-                                        setAvailableServices(newServices);
-                                      }
-                                    }}
-                                    className="flex-1 p-2 text-base border border-gray-300 rounded-lg"
-                                    placeholder="0"
-                                  />
-                                  <span className="text-sm text-gray-700 font-semibold">
-                                    {service.discountType === 'percentage' ? '%' : '€'}
-                                  </span>
-                                </div>
-                                
-                                {/* Show discounted price - INLINE */}
-                                {service.discountValue > 0 && (
-                                  <div className="mt-3 flex items-center justify-between text-sm">
-                                    <span className="text-gray-500 line-through">
-                                      €{service.dailyPrice || service.price || service.rate || 0}
-                                    </span>
-                                    <span className="text-xl font-bold text-green-600">
-                                      €{service.discountType === 'percentage' 
-                                        ? ((service.dailyPrice || service.price || service.rate || 0) * (1 - service.discountValue/100)).toFixed(2)
-                                        : Math.max((service.dailyPrice || service.price || service.rate || 0) - service.discountValue, 0).toFixed(2)
-                                      }
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            
-                            {/* Add to Offer Button - COMPACT */}
-                            <div className="flex-shrink-0">
-                              <button 
-                                onClick={() => {
-                                  const originalPrice = service.dailyPrice || service.price || service.rate || 0;
-                                  const discountedPrice = service.discountValue > 0 
-                                    ? (service.discountType === 'percentage' 
-                                        ? originalPrice * (1 - service.discountValue/100)
-                                        : Math.max(originalPrice - service.discountValue, 0))
-                                    : originalPrice;
-                                  
-                                  const existingItem = offerItems.find(item => item.id === service.id);
-                                  
-                                  if (existingItem) {
-                                    setOfferItems(prev => prev.map(item => 
-                                      item.id === service.id 
-                                        ? { ...item, quantity: item.quantity + 1 } 
-                                        : item
-                                    ));
-                                  } else {
-                                    setOfferItems(prev => [...prev, { 
-                                      ...service,
-                                      price: discountedPrice,
-                                      originalPrice: originalPrice,
-                                      discountType: service.discountType || null,
-                                      discountValue: service.discountValue || 0,
-                                      hasDiscount: service.discountValue > 0,
-                                      quantity: 1,
-                                      isSelected: false
-                                    }]);
-                                  }
-                                }}
-                                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-lg font-bold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center gap-2 whitespace-nowrap"
-                              >
-                                <span className="text-xl">🛒</span>
-                                Add to Offer
-                                {service.discountValue > 0 && (
-                                  <span className="text-sm">
-                                    (€{service.discountType === 'percentage' 
-                                      ? ((service.dailyPrice || service.price || service.rate || 0) * (1 - service.discountValue/100)).toFixed(2)
-                                      : Math.max((service.dailyPrice || service.price || service.rate || 0) - service.discountValue, 0).toFixed(2)
-                                    })
-                                  </span>
-                                )}
-                              </button>
-                            </div>
+                            {/* Price and Actions Row */}
+                            <div className="flex items-center justify-between">
+  <div>
+    <div className="text-lg font-bold text-indigo-600">
+      €{(() => {
+        const selectedMonth = selectedBoatMonths[service.id] || 'daily';
+        
+        // DEBUG: Log what we're working with
+        console.log(`Price calculation for ${service.name?.en || service.name}:`, {
+          serviceId: service.id,
+          selectedMonth: selectedMonth,
+          dailyPrice: service.originalPricing?.daily,
+          monthlyData: service.originalPricing?.monthly,
+          selectedMonthPrice: service.originalPricing?.monthly?.[selectedMonth]
+        });
+        
+        // If a specific month is selected (not 'daily')
+        if (selectedMonth !== 'daily' && service.originalPricing?.monthly?.[selectedMonth]) {
+          const monthPrice = parseFloat(service.originalPricing.monthly[selectedMonth]);
+          console.log(`Using ${selectedMonth} price: ${monthPrice}`);
+          return monthPrice;
+        }
+        
+        // Otherwise use daily price
+        const dailyPrice = parseFloat(service.originalPricing?.daily || service.price || 0);
+        console.log(`Using daily price: ${dailyPrice}`);
+        return dailyPrice;
+      })()}
+    </div>
+    <div className="text-xs text-gray-500">
+      /day {selectedBoatMonths[service.id] && selectedBoatMonths[service.id] !== 'daily' 
+        ? `(${selectedBoatMonths[service.id]})` 
+        : ''}
+    </div>
+  </div>
+  
+  <button 
+    onClick={() => {
+      const selectedMonth = selectedBoatMonths[service.id] || 'daily';
+      let finalPrice = 0;
+      
+      // CORRECTED PRICE CALCULATION
+      if (selectedMonth !== 'daily' && service.originalPricing?.monthly?.[selectedMonth]) {
+        finalPrice = parseFloat(service.originalPricing.monthly[selectedMonth]);
+      } else {
+        finalPrice = parseFloat(service.originalPricing?.daily || service.price || 0);
+      }
+      
+      console.log(`Adding to cart: ${service.name?.en}, Month: ${selectedMonth}, Price: €${finalPrice}`);
+      
+      const existingItem = offerItems.find(item => item.id === service.id);
+      
+      if (existingItem) {
+        setOfferItems(prev => prev.map(item => 
+          item.id === service.id 
+            ? { 
+                ...item, 
+                quantity: item.quantity + 1,
+                price: finalPrice,
+                originalPrice: finalPrice,
+                selectedMonth: selectedMonth
+              } 
+            : item
+        ));
+      } else {
+        // CLEAN ITEM OBJECT - Remove undefined fields
+        const newItem = { 
+          id: service.id,
+          name: service.name,
+          category: service.category,
+          price: finalPrice,
+          originalPrice: finalPrice,
+          unit: service.unit || 'day',
+          quantity: 1,
+          discountType: 'percentage',
+          discountValue: 0,
+          hasCustomDiscount: false,
+          selectedMonth: selectedMonth,
+          // Only include defined fields
+          ...(service.imageUrl && { imageUrl: service.imageUrl }),
+          ...(service.model && { model: service.model }),
+          ...(service.length && { length: service.length }),
+          ...(service.capacity && { capacity: service.capacity })
+        };
+        
+        setOfferItems(prev => [...prev, newItem]);
+      }
+      
+      if (isMobile) {
+        setTimeout(() => setCurrentView('cart'), 300);
+      }
+    }}
+    className={`bg-indigo-600 hover:bg-indigo-700 text-white ${isMobile ? 'text-xs py-2 px-3' : 'text-sm py-2 px-4'} rounded-lg transition-colors font-medium`}
+  >
+    {t.addToOffer}
+  </button>
+</div>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-
-        {/* Right Sidebar - Current Offer (Desktop only) */}
-        {!isMobile && (
-          <div className="w-80 bg-gray-50 border-l border-gray-200 flex flex-col">
-            <div className="p-4 border-b border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                {t.currentOfferItems}
-              </h3>
-              <p className="text-xs text-gray-500 mt-1">
-                {offerItems.length} {offerItems.length === 1 ? 'item' : 'items'}
-              </p>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
-            
-            {/* Offer Items List */}
-            <div className="flex-1 overflow-y-auto p-4">
-              {offerItems.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="text-4xl text-gray-300 mb-2">🛒</div>
-                  <p className="text-sm text-gray-500">{t.noItemsAdded}</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {offerItems.map(item => (
-                    <div key={item.id} className="bg-white p-3 rounded-lg border border-gray-200">
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-medium text-sm text-gray-900 flex-1 mr-2">
-                          {typeof item.name === 'object'
-                            ? getLocalizedText(item.name, language)
-                            : item.name}
-                        </h4>
-                        <button 
-                          onClick={() => setOfferItems(prev => prev.filter(i => i.id !== item.id))}
-                          className="text-red-500 hover:text-red-700 text-sm"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                      
-                      {/* Show discount info if applied */}
-                      {item.hasDiscount && (
-                        <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Original:</span>
-                            <span className="line-through text-gray-500">€{item.originalPrice}</span>
-                          </div>
-                          <div className="flex justify-between font-medium">
-                            <span className="text-green-700">
-                              Discount ({item.discountType === 'percentage' ? `${item.discountValue}%` : `€${item.discountValue}`}):
-                            </span>
-                            <span className="text-green-700">€{item.price.toFixed(2)}</span>
-                          </div>
+          </div>
+
+          {/* Right Sidebar - Current Offer (Desktop only) */}
+          {!isMobile && (
+            <div className="w-72 bg-gray-50 border-l border-gray-200 flex flex-col flex-shrink-0">
+              <div className="p-4 border-b border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                  {t.currentOfferItems}
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  {offerItems.length} {offerItems.length === 1 ? 'item' : 'items'}
+                </p>
+              </div>
+              
+              {/* Offer Items List */}
+              <div className="flex-1 overflow-y-auto p-4" style={{minHeight: 0}}>
+                {offerItems.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="text-4xl text-gray-300 mb-2">🛒</div>
+                    <p className="text-sm text-gray-500">{t.noItemsAdded}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {offerItems.map(item => (
+                      <div key={item.id} className="bg-white p-3 rounded-lg border border-gray-200">
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-medium text-sm text-gray-900 flex-1 mr-2 line-clamp-2">
+                            {typeof item.name === 'object'
+                              ? getLocalizedText(item.name, language)
+                              : item.name}
+                          </h4>
+                          <button 
+                            onClick={() => setOfferItems(prev => prev.filter(i => i.id !== item.id))}
+                            className="text-red-500 hover:text-red-700 text-sm flex-shrink-0"
+                          >
+                            ✕
+                          </button>
                         </div>
-                      )}
-                      
-                      {/* Quantity Controls */}
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => {
-                              if (item.quantity > 1) {
+                        
+                        {/* Quantity Controls */}
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                if (item.quantity > 1) {
+                                  setOfferItems(prev => prev.map(i => 
+                                    i.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+                                  ));
+                                }
+                              }}
+                              className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded text-xs"
+                            >
+                              −
+                            </button>
+                            <span className="mx-2 text-sm font-medium">{item.quantity}</span>
+                            <button
+                              onClick={() => {
                                 setOfferItems(prev => prev.map(i => 
-                                  i.id === item.id ? { ...i, quantity: i.quantity - 1 } : i
+                                  i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
                                 ));
-                              }
-                            }}
-                            className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded text-xs"
-                          >
-                            −
-                          </button>
-                          <span className="mx-2 text-sm font-medium">{item.quantity}</span>
-                          <button
-                            onClick={() => {
-                              setOfferItems(prev => prev.map(i => 
-                                i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
-                              ));
-                            }}
-                            className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded text-xs"
-                          >
-                            +
-                          </button>
+                              }}
+                              className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded text-xs"
+                            >
+                              +
+                            </button>
+                          </div>
+                          <div className="text-sm font-medium text-gray-900">
+                            €{(item.price * item.quantity).toFixed(2)}
+                          </div>
                         </div>
-                        <div className="text-sm font-medium text-gray-900">
-                          €{(item.price * item.quantity).toFixed(2)}
+
+                        {/* Custom Discount Section - DESKTOP VERSION */}
+                        <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+  <div className="flex items-center justify-between mb-2">
+    <span className="text-xs font-medium text-gray-700">Discount:</span>
+    <div className="flex gap-1">
+      <button
+        onClick={() => {
+          setOfferItems(prev => prev.map(i => 
+            i.id === item.id ? { 
+              ...i, 
+              discountType: 'percentage',
+              discountValue: i.discountValue || 0,
+              hasCustomDiscount: true
+            } : i
+          ));
+        }}
+        className={`px-2 py-1 text-xs rounded ${
+          item.discountType === 'percentage' 
+            ? 'bg-indigo-600 text-white' 
+            : 'bg-white border border-gray-300'
+        }`}
+      >
+        %
+      </button>
+      <button
+        onClick={() => {
+          setOfferItems(prev => prev.map(i => 
+            i.id === item.id ? { 
+              ...i, 
+              discountType: 'fixed',
+              discountValue: i.discountValue || 0,
+              hasCustomDiscount: true
+            } : i
+          ));
+        }}
+        className={`px-2 py-1 text-xs rounded ${
+          item.discountType === 'fixed' 
+            ? 'bg-indigo-600 text-white' 
+            : 'bg-white border border-gray-300'
+        }`}
+      >
+        €
+      </button>
+    </div>
+  </div>
+  
+  <div className="flex gap-2 items-center">
+    <input
+      type="text"
+      inputMode="decimal"
+      pattern="[0-9]*\.?[0-9]*"
+      value={item.discountValue || ''}
+      placeholder="0"
+      onFocus={(e) => {
+        if (e.target.value === '0' || e.target.value === 0) {
+          e.target.value = '';
+        }
+        e.target.select();
+      }}
+      onChange={(e) => {
+        let value = e.target.value.replace(/[^0-9.]/g, '');
+        const parts = value.split('.');
+        if (parts.length > 2) {
+          value = parts[0] + '.' + parts.slice(1).join('');
+        }
+        
+        const discountValue = parseFloat(value) || 0;
+        setOfferItems(prev => prev.map(i => 
+          i.id === item.id ? { 
+            ...i, 
+            discountValue: discountValue,
+            hasCustomDiscount: discountValue > 0,
+            price: item.discountType === 'percentage' 
+              ? item.originalPrice * (1 - discountValue/100)
+              : Math.max(item.originalPrice - discountValue, 0)
+          } : i
+        ));
+      }}
+      className="flex-1 p-1.5 text-xs border border-gray-300 rounded text-center"
+      style={{
+        WebkitAppearance: 'none',
+        MozAppearance: 'textfield'
+      }}
+    />
+    <span className="text-xs text-gray-700 font-medium">
+      {item.discountType === 'percentage' ? '%' : '€'}
+    </span>
+  </div>
+  
+  {/* Show discounted price - Desktop */}
+  {item.hasCustomDiscount && item.discountValue > 0 && (
+    <div className="mt-2 flex items-center justify-between text-xs">
+      <span className="text-gray-500 line-through">
+        Original: €{item.originalPrice}
+      </span>
+      <span className="font-bold text-green-600">
+        After: €{item.price.toFixed(2)}
+      </span>
+    </div>
+  )}
+</div>
+                        
+                        {/* Price breakdown */}
+                        <div className="text-xs text-gray-500 mt-2">
+                          €{item.price.toFixed(2)} × {item.quantity} = €{(item.price * item.quantity).toFixed(2)}
                         </div>
                       </div>
-                      
-                      {/* Price breakdown */}
-                      <div className="text-xs text-gray-500">
-                        €{item.price.toFixed(2)} × {item.quantity} = €{(item.price * item.quantity).toFixed(2)}
-                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              {/* Offer Summary */}
+              {offerItems.length > 0 && (
+                <div className="border-t border-gray-200 p-4">
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>{t.subtotal}:</span>
+                      <span>€{offerItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)}</span>
                     </div>
-                  ))}
+                    <div className="flex justify-between font-semibold text-lg border-t pt-2">
+                      <span>{t.total}:</span>
+                      <span>€{offerItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)}</span>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
-            
-            {/* Offer Summary */}
-            {offerItems.length > 0 && (
-              <div className="border-t border-gray-200 p-4">
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>{t.subtotal}:</span>
-                    <span>€{offerItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)}</span>
-                  </div>
-                  {discountValue > 0 && (
-                    <div className="flex justify-between text-red-500">
-                      <span>{t.discount}:</span>
-                      <span>-€{(() => {
-                        const subtotal = offerItems.reduce((total, item) => total + (item.price * item.quantity), 0);
-                        return discountType === 'percentage' 
-                          ? (subtotal * (discountValue / 100)).toFixed(2)
-                          : discountValue.toFixed(2);
-                      })()}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between font-semibold text-lg border-t pt-2">
-                    <span>{t.total}:</span>
-                    <span>€{(() => {
-                      const subtotal = offerItems.reduce((total, item) => total + (item.price * item.quantity), 0);
-                      const globalDiscountAmount = discountValue > 0 
-                        ? (discountType === 'percentage' ? subtotal * (discountValue / 100) : discountValue)
-                        : 0;
-                      return Math.max(subtotal - globalDiscountAmount, 0).toFixed(2);
-                    })()}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Footer */}
-      <div className={`flex ${isMobile ? 'flex-col gap-3' : 'flex-row'} justify-between items-center ${isMobile ? 'p-4' : 'p-6'} border-t border-gray-200 bg-gray-50`}>
+      <div className={`flex ${isMobile ? 'flex-col gap-3' : 'flex-row'} justify-between items-center ${isMobile ? 'p-4' : 'p-6'} border-t border-gray-200 bg-gray-50 flex-shrink-0`}>
         
         {/* Mobile: Show offer summary */}
-        {isMobile && offerItems.length > 0 && (
+        {isMobile && offerItems.length > 0 && currentView === 'offer' && (
           <div className="w-full bg-white rounded-lg p-3 border border-gray-200">
             <div className="flex justify-between items-center text-sm">
               <span className="text-gray-600">
-                {offerItems.length} {offerItems.length === 1 ? 'item' : 'items'}
+                {offerItems.length} {offerItems.length === 1 ? 'item' : 'items'} in cart
               </span>
               <span className="font-semibold text-lg text-indigo-600">
-                €{(() => {
-                  const subtotal = offerItems.reduce((total, item) => total + (item.price * item.quantity), 0);
-                  const globalDiscountAmount = discountValue > 0 
-                    ? (discountType === 'percentage' ? subtotal * (discountValue / 100) : discountValue)
-                    : 0;
-                  return Math.max(subtotal - globalDiscountAmount, 0).toFixed(2);
-                })()}
+                €{offerItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)}
               </span>
             </div>
           </div>
@@ -3802,13 +4321,7 @@ const getUserName = async (userId) => {
           
           {!isMobile && (
             <div className="text-sm text-gray-600">
-              {offerItems.length} {offerItems.length === 1 ? 'item' : 'items'} • €{(() => {
-                const subtotal = offerItems.reduce((total, item) => total + (item.price * item.quantity), 0);
-                const globalDiscountAmount = discountValue > 0 
-                  ? (discountType === 'percentage' ? subtotal * (discountValue / 100) : discountValue)
-                  : 0;
-                return Math.max(subtotal - globalDiscountAmount, 0).toFixed(2);
-              })()}
+              {offerItems.length} {offerItems.length === 1 ? 'item' : 'items'} • €{offerItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)}
             </div>
           )}
           

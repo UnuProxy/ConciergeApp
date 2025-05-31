@@ -225,6 +225,7 @@ const styles = {
     marginBottom: '0.75rem',
     marginTop: '1rem'
   },
+  // IMPROVED BOAT CARDS - More compact and responsive
   boatListContainer: {
     display: 'grid',
     gridTemplateColumns: '1fr',
@@ -234,17 +235,29 @@ const styles = {
     },
     '@media (min-width: 768px)': {
       gridTemplateColumns: 'repeat(3, 1fr)',
+    },
+    '@media (min-width: 1024px)': {
+      gridTemplateColumns: 'repeat(4, 1fr)',
+    },
+    '@media (min-width: 1280px)': {
+      gridTemplateColumns: 'repeat(5, 1fr)',
     }
   },
   boatCard: {
     backgroundColor: '#fff',
     borderRadius: '8px',
     overflow: 'hidden',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+    maxWidth: '320px',
+    margin: '0 auto',
+    transition: 'box-shadow 0.2s'
   },
   boatImageContainer: {
-    height: '12rem',
-    backgroundColor: '#f3f4f6'
+    height: '10rem',
+    backgroundColor: '#f3f4f6',
+    '@media (min-width: 768px)': {
+      height: '11rem',
+    }
   },
   boatImage: {
     width: '100%',
@@ -252,27 +265,47 @@ const styles = {
     objectFit: 'cover'
   },
   boatCardContent: {
-    padding: '1rem'
+    padding: '0.75rem',
+    '@media (min-width: 768px)': {
+      padding: '1rem',
+    }
   },
   boatCardTitle: {
-    fontSize: '1.125rem',
+    fontSize: '1rem',
     fontWeight: '600',
     marginBottom: '0.5rem',
-    color: '#1f2937'
+    color: '#1f2937',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    '@media (min-width: 768px)': {
+      fontSize: '1.125rem',
+    }
   },
   boatCardDetails: {
-    fontSize: '0.875rem',
+    fontSize: '0.8rem',
     color: '#6b7280',
-    marginBottom: '1rem'
+    marginBottom: '0.75rem',
+    '@media (min-width: 768px)': {
+      fontSize: '0.875rem',
+    }
   },
   buttonRow: {
     display: 'flex',
     flexDirection: 'column',
     gap: '0.5rem',
-    marginTop: '1rem',
+    marginTop: '0.75rem',
     '@media (min-width: 640px)': {
       flexDirection: 'row',
       justifyContent: 'space-between',
+    }
+  },
+  compactButton: {
+    fontSize: '0.75rem',
+    padding: '0.5rem 0.75rem',
+    '@media (min-width: 768px)': {
+      fontSize: '0.875rem',
+      padding: '0.625rem 1rem',
     }
   },
   currencyInput: {
@@ -375,6 +408,81 @@ const styles = {
     borderRadius: '50%',
     animation: 'spin 1s linear infinite'
   },
+  // Search and filter styles
+  searchContainer: {
+    marginBottom: '1rem'
+  },
+  searchInput: {
+    width: '100%',
+    maxWidth: '400px',
+    padding: '0.75rem 1rem 0.75rem 2.5rem',
+    border: '2px solid #e5e7eb',
+    borderRadius: '0.5rem',
+    fontSize: '1rem',
+    outline: 'none',
+    transition: 'border-color 0.2s'
+  },
+  searchInputWrapper: {
+    position: 'relative',
+    maxWidth: '400px'
+  },
+  searchIcon: {
+    position: 'absolute',
+    left: '0.75rem',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: '#9ca3af',
+    pointerEvents: 'none'
+  },
+  filterButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    padding: '0.75rem 1rem',
+    border: '1px solid #d1d5db',
+    borderRadius: '0.5rem',
+    backgroundColor: 'white',
+    color: '#6b7280',
+    fontWeight: '500',
+    fontSize: '0.875rem',
+    cursor: 'pointer',
+    transition: 'all 0.2s'
+  },
+  filterButtonActive: {
+    backgroundColor: '#f3f4f6',
+    color: '#374151',
+    borderColor: '#d1d5db'
+  },
+  controlsRow: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1rem',
+    marginBottom: '1rem',
+    '@media (min-width: 768px)': {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+    }
+  },
+  resultsInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    backgroundColor: '#f9fafb',
+    padding: '0.5rem 1rem',
+    borderRadius: '0.5rem',
+    border: '1px solid #e5e7eb'
+  },
+  clearButton: {
+    backgroundColor: '#ef4444',
+    color: 'white',
+    padding: '0.375rem 0.75rem',
+    borderRadius: '0.375rem',
+    fontSize: '0.75rem',
+    fontWeight: '500',
+    border: 'none',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s'
+  },
   // Add keyframes animation for spinner
   '@keyframes spin': {
     '0%': { transform: 'rotate(0deg)' },
@@ -462,6 +570,13 @@ function Boats() {
   const [photoFiles, setPhotoFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
   const [activeTab, setActiveTab] = useState('basic'); // For form navigation
+  
+  // Search and filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [lengthFilter, setLengthFilter] = useState({ min: '', max: '' });
+  const [capacityFilter, setCapacityFilter] = useState({ min: '', max: '' });
+  const [priceFilter, setPriceFilter] = useState({ min: '', max: '' });
   
   // Inject responsive styles on component mount
   useEffect(() => {
@@ -585,6 +700,63 @@ function Boats() {
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem('appLanguage') || 'en';
   });
+  
+  // Enhanced filtering logic for boats
+  const getFilteredBoats = () => {
+    return boats.filter(boat => {
+      // Search term filter (name and cruising area)
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        const nameMatch = getLocalizedContent(boat.name, language, '').toLowerCase().includes(searchLower);
+        const areaMatch = getLocalizedContent(boat.cruisingArea, language, '').toLowerCase().includes(searchLower);
+        
+        if (!nameMatch && !areaMatch) {
+          return false;
+        }
+      }
+
+      // Length filter
+      if (lengthFilter.min || lengthFilter.max) {
+        const boatLength = parseFloat(boat.length) || 0;
+        
+        if (lengthFilter.min && boatLength < parseFloat(lengthFilter.min)) {
+          return false;
+        }
+        
+        if (lengthFilter.max && boatLength > parseFloat(lengthFilter.max)) {
+          return false;
+        }
+      }
+
+      // Capacity filter
+      if (capacityFilter.min || capacityFilter.max) {
+        const boatCapacity = parseInt(boat.capacity) || 0;
+        
+        if (capacityFilter.min && boatCapacity < parseInt(capacityFilter.min)) {
+          return false;
+        }
+        
+        if (capacityFilter.max && boatCapacity > parseInt(capacityFilter.max)) {
+          return false;
+        }
+      }
+
+      // Price filter (daily price)
+      if (priceFilter.min || priceFilter.max) {
+        const boatPrice = parseFloat(boat.pricing?.daily) || 0;
+        
+        if (priceFilter.min && boatPrice < parseFloat(priceFilter.min)) {
+          return false;
+        }
+        
+        if (priceFilter.max && boatPrice > parseFloat(priceFilter.max)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  };
   
   // Helper function to safely get localized content
   const getLocalizedContent = (obj, lang, fallback = '') => {
@@ -1324,7 +1496,23 @@ function Boats() {
         noBoats: "No boats available. Add your first boat to get started!"
       },
       switchLanguage: "Switch to Romanian",
-      selectTab: "Select section"
+      selectTab: "Select section",
+      // Search and filter translations
+      search: "Search boats...",
+      filters: "Filters",
+      showFilters: "Show Filters",
+      hideFilters: "Hide Filters",
+      lengthRange: "Length Range (m)",
+      minLength: "Min Length",
+      maxLength: "Max Length",
+      capacityRange: "Capacity Range",
+      minCapacity: "Min Capacity",
+      maxCapacity: "Max Capacity",
+      priceRange: "Price Range (€/day)",
+      minPrice: "Min Price",
+      maxPrice: "Max Price",
+      clearFilters: "Clear Filters",
+      resultsFound: "boats found"
     },
     ro: {
       addBoat: "Adaugă Barcă",
@@ -1441,7 +1629,23 @@ function Boats() {
         noBoats: "Nu există bărci disponibile. Adaugă prima barcă pentru a începe!"
       },
       switchLanguage: "Schimbă în Engleză",
-      selectTab: "Selectează secțiunea"
+      selectTab: "Selectează secțiunea",
+      // Search and filter translations
+      search: "Caută bărci...",
+      filters: "Filtre",
+      showFilters: "Arată Filtrele",
+      hideFilters: "Ascunde Filtrele",
+      lengthRange: "Interval Lungime (m)",
+      minLength: "Lungime Min",
+      maxLength: "Lungime Max",
+      capacityRange: "Interval Capacitate",
+      minCapacity: "Capacitate Min",
+      maxCapacity: "Capacitate Max",
+      priceRange: "Interval Preț (€/zi)",
+      minPrice: "Preț Min",
+      maxPrice: "Preț Max",
+      clearFilters: "Șterge Filtrele",
+      resultsFound: "bărci găsite"
     }
   };
   
@@ -2595,18 +2799,19 @@ function Boats() {
         </div>
       )}
       
-      {/* Boat List */}
+      {/* Boat List with Search and Filters */}
       {!isAddingBoat && !isEditingBoat && (
         <div>
+          {/* Header with Add Button */}
           <div style={{
-          display: 'flex',
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '0.5rem',
-          marginBottom: '1.25rem',
-          flexWrap: 'wrap'
-        }}>
+            display: 'flex',
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '0.5rem',
+            marginBottom: '1rem',
+            flexWrap: 'wrap'
+          }}>
             <h2 className="subtitle">{t.boatList.subtitle}</h2>
             <button
               type="button"
@@ -2619,14 +2824,420 @@ function Boats() {
               {t.boatList.addNew}
             </button>
           </div>
+
+          {/* Search and Filter Controls */}
+          <div className="controlsRow">
+            {/* Search Bar */}
+            <div className="searchInputWrapper">
+              <input
+                type="text"
+                placeholder={t.search}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="searchInput"
+              />
+              <div className="searchIcon">
+                🔍
+              </div>
+            </div>
+
+            {/* Filter Controls */}
+            <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '0.75rem'
+    }}>
+      {/* Minimal Filter Toggle Button */}
+      <button
+        onClick={() => setShowFilters(!showFilters)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.5rem',
+          padding: '0.75rem 1rem',
+          backgroundColor: showFilters ? '#f3f4f6' : 'white',
+          color: showFilters ? '#374151' : '#6b7280',
+          border: '1px solid #d1d5db',
+          borderRadius: '0.5rem',
+          cursor: 'pointer',
+          fontWeight: '500',
+          transition: 'all 0.2s',
+          fontSize: '0.875rem',
+          width: '100%',
+          maxWidth: '200px'
+        }}
+        onMouseOver={(e) => {
+          e.target.style.backgroundColor = showFilters ? '#e5e7eb' : '#f9fafb';
+        }}
+        onMouseOut={(e) => {
+          e.target.style.backgroundColor = showFilters ? '#f3f4f6' : 'white';
+        }}
+      >
+        <svg style={{ width: '1rem', height: '1rem' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
+        </svg>
+        {showFilters ? t.hideFilters : t.showFilters}
+      </button>
+
+      {/* Results Count and Clear Button */}
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        backgroundColor: '#f9fafb',
+        padding: '0.5rem 1rem',
+        borderRadius: '0.5rem',
+        border: '1px solid #e5e7eb',
+        width: '100%'
+      }}>
+        <span style={{ 
+          color: '#374151', 
+          fontSize: '0.875rem',
+          fontWeight: '500'
+        }}>
+          {getFilteredBoats().length} {t.resultsFound}
+        </span>
+        
+        {(searchTerm || lengthFilter.min || lengthFilter.max || capacityFilter.min || capacityFilter.max || priceFilter.min || priceFilter.max) && (
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setLengthFilter({ min: '', max: '' });
+              setCapacityFilter({ min: '', max: '' });
+              setPriceFilter({ min: '', max: '' });
+            }}
+            style={{
+              backgroundColor: '#ef4444',
+              color: 'white',
+              padding: '0.375rem 0.75rem',
+              borderRadius: '0.375rem',
+              fontSize: '0.75rem',
+              fontWeight: '500',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.backgroundColor = '#dc2626'}
+            onMouseOut={(e) => e.target.style.backgroundColor = '#ef4444'}
+          >
+            ✕ {t.clearFilters}
+          </button>
+        )}
+      </div>
+    </div>
+  </div>
+
+  {/* Enhanced Filter Panel */}
+  {showFilters && (
+    <div style={{
+      backgroundColor: 'white',
+      border: '2px solid #e5e7eb',
+      borderRadius: '0.75rem',
+      padding: '1rem',
+      marginBottom: '1rem',
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+    }}>
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        marginBottom: '1.5rem',
+        paddingBottom: '0.75rem',
+        borderBottom: '1px solid #e5e7eb'
+      }}>
+        <svg style={{ width: '1rem', height: '1rem', marginRight: '0.5rem', color: '#6b7280' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
+        </svg>
+        <h3 style={{ 
+          fontSize: '1.1rem', 
+          fontWeight: '600', 
+          margin: 0,
+          color: '#374151'
+        }}>
+          {t.filters}
+        </h3>
+      </div>
+      
+      {/* Responsive Grid - Single column on mobile, multiple on desktop */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+        gap: '1rem'
+      }}>
+        {/* Length Range Filter */}
+        <div style={{
+          backgroundColor: '#f9fafb',
+          padding: '1rem',
+          borderRadius: '0.5rem',
+          border: '1px solid #e5e7eb'
+        }}>
+          <label style={{ 
+            display: 'flex',
+            alignItems: 'center',
+            marginBottom: '0.75rem', 
+            fontSize: '0.875rem', 
+            fontWeight: '600',
+            color: '#374151'
+          }}>
+            <span style={{ marginRight: '0.5rem' }}>📏</span>
+            {t.lengthRange}
+          </label>
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            gap: '0.5rem'
+          }}>
+            <input
+              type="number"
+              placeholder={t.minLength}
+              value={lengthFilter.min}
+              onChange={(e) => setLengthFilter(prev => ({ ...prev, min: e.target.value }))}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem',
+                outline: 'none',
+                transition: 'border-color 0.2s',
+                boxSizing: 'border-box'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
+              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+            />
+            <input
+              type="number"
+              placeholder={t.maxLength}
+              value={lengthFilter.max}
+              onChange={(e) => setLengthFilter(prev => ({ ...prev, max: e.target.value }))}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem',
+                outline: 'none',
+                transition: 'border-color 0.2s',
+                boxSizing: 'border-box'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
+              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+            />
+          </div>
+        </div>
+
+        {/* Capacity Range Filter */}
+        <div style={{
+          backgroundColor: '#f9fafb',
+          padding: '1rem',
+          borderRadius: '0.5rem',
+          border: '1px solid #e5e7eb'
+        }}>
+          <label style={{ 
+            display: 'flex',
+            alignItems: 'center',
+            marginBottom: '0.75rem', 
+            fontSize: '0.875rem', 
+            fontWeight: '600',
+            color: '#374151'
+          }}>
+            <span style={{ marginRight: '0.5rem' }}>👥</span>
+            {t.capacityRange}
+          </label>
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            gap: '0.5rem'
+          }}>
+            <input
+              type="number"
+              placeholder={t.minCapacity}
+              value={capacityFilter.min}
+              onChange={(e) => setCapacityFilter(prev => ({ ...prev, min: e.target.value }))}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem',
+                outline: 'none',
+                transition: 'border-color 0.2s',
+                boxSizing: 'border-box'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
+              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+            />
+            <input
+              type="number"
+              placeholder={t.maxCapacity}
+              value={capacityFilter.max}
+              onChange={(e) => setCapacityFilter(prev => ({ ...prev, max: e.target.value }))}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem',
+                outline: 'none',
+                transition: 'border-color 0.2s',
+                boxSizing: 'border-box'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
+              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+            />
+          </div>
+        </div>
+
+        {/* Price Range Filter */}
+        <div style={{
+          backgroundColor: '#f9fafb',
+          padding: '1rem',
+          borderRadius: '0.5rem',
+          border: '1px solid #e5e7eb'
+        }}>
+          <label style={{ 
+            display: 'flex',
+            alignItems: 'center',
+            marginBottom: '0.75rem', 
+            fontSize: '0.875rem', 
+            fontWeight: '600',
+            color: '#374151'
+          }}>
+            <span style={{ marginRight: '0.5rem' }}>💰</span>
+            {t.priceRange}
+          </label>
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            gap: '0.5rem'
+          }}>
+            <input
+              type="number"
+              placeholder={t.minPrice}
+              value={priceFilter.min}
+              onChange={(e) => setPriceFilter(prev => ({ ...prev, min: e.target.value }))}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem',
+                outline: 'none',
+                transition: 'border-color 0.2s',
+                boxSizing: 'border-box'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
+              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+            />
+            <input
+              type="number"
+              placeholder={t.maxPrice}
+              value={priceFilter.max}
+              onChange={(e) => setPriceFilter(prev => ({ ...prev, max: e.target.value }))}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem',
+                outline: 'none',
+                transition: 'border-color 0.2s',
+                boxSizing: 'border-box'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
+              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Active Filters Summary */}
+      {(searchTerm || lengthFilter.min || lengthFilter.max || capacityFilter.min || capacityFilter.max || priceFilter.min || priceFilter.max) && (
+        <div style={{
+          marginTop: '1.5rem',
+          paddingTop: '1rem',
+          borderTop: '1px solid #e5e7eb'
+        }}>
+          <p style={{ 
+            fontSize: '0.75rem', 
+            color: '#6b7280', 
+            margin: '0 0 0.5rem 0',
+            fontWeight: '500'
+          }}>
+            Active Filters:
+          </p>
+          <div style={{ 
+            display: 'flex', 
+            flexWrap: 'wrap', 
+            gap: '0.5rem'
+          }}>
+            {searchTerm && (
+              <span style={{
+                backgroundColor: '#ebf8ff',
+                color: '#1e40af',
+                padding: '0.25rem 0.5rem',
+                borderRadius: '0.375rem',
+                fontSize: '0.75rem',
+                border: '1px solid #bfdbfe',
+                whiteSpace: 'nowrap'
+              }}>
+                Search: "{searchTerm.length > 15 ? searchTerm.substring(0, 15) + '...' : searchTerm}"
+              </span>
+            )}
+            {(lengthFilter.min || lengthFilter.max) && (
+              <span style={{
+                backgroundColor: '#f0fdf4',
+                color: '#15803d',
+                padding: '0.25rem 0.5rem',
+                borderRadius: '0.375rem',
+                fontSize: '0.75rem',
+                border: '1px solid #bbf7d0',
+                whiteSpace: 'nowrap'
+              }}>
+                Length: {lengthFilter.min || '0'}m - {lengthFilter.max || '∞'}m
+              </span>
+            )}
+            {(capacityFilter.min || capacityFilter.max) && (
+              <span style={{
+                backgroundColor: '#fef3c7',
+                color: '#92400e',
+                padding: '0.25rem 0.5rem',
+                borderRadius: '0.375rem',
+                fontSize: '0.75rem',
+                border: '1px solid #fde68a',
+                whiteSpace: 'nowrap'
+              }}>
+                Capacity: {capacityFilter.min || '0'} - {capacityFilter.max || '∞'}
+              </span>
+            )}
+            {(priceFilter.min || priceFilter.max) && (
+              <span style={{
+                backgroundColor: '#fecaca',
+                color: '#991b1b',
+                padding: '0.25rem 0.5rem',
+                borderRadius: '0.375rem',
+                fontSize: '0.75rem',
+                border: '1px solid #fca5a5',
+                whiteSpace: 'nowrap'
+              }}>
+                €{priceFilter.min || '0'} - €{priceFilter.max || '∞'}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  
+          )}
           
-          {boats.length === 0 ? (
+          {/* Boat Grid */}
+          {getFilteredBoats().length === 0 ? (
             <div style={{textAlign: 'center', padding: '2.5rem 1rem', background: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'}}>
-              <p style={{color: '#6b7280'}}>{t.boatList.noBoats}</p>
+              <p style={{color: '#6b7280'}}>{boats.length === 0 ? t.boatList.noBoats : `No boats match your filters.`}</p>
             </div>
           ) : (
             <div className="boatListContainer">
-              {boats.map((boat) => (
+              {getFilteredBoats().map((boat) => (
                 <div key={boat.id} className="boatCard">
                   {/* Boat image or placeholder */}
                   <div className="boatImageContainer">
@@ -2650,18 +3261,26 @@ function Boats() {
                     </h3>
                     
                     <div className="boatCardDetails">
-                      <p style={{marginBottom: '0.25rem'}}>
-                        {boat.length ? `${boat.length}m • ` : ''}
+                      <p style={{marginBottom: '0.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
+                        {boat.length ? `${boat.length}m` : ''}
+                        {boat.length && boat.capacity ? ' • ' : ''}
                         {boat.capacity ? `${boat.capacity} ${language === 'en' ? 'people' : 'persoane'}` : ''}
                       </p>
-                      <p>{getLocalizedContent(boat.cruisingArea, language)}</p>
+                      <p style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
+                        {getLocalizedContent(boat.cruisingArea, language)}
+                      </p>
+                      {boat.pricing?.daily && (
+                        <p style={{marginTop: '0.5rem', fontWeight: '600', color: '#3b82f6'}}>
+                          €{boat.pricing.daily}/{language === 'en' ? 'day' : 'zi'}
+                        </p>
+                      )}
                     </div>
                     
                     <div className="buttonRow">
                       <button
                         type="button"
                         onClick={() => startEditingBoat(boat)}
-                        className="buttonSecondary"
+                        className={cx('buttonSecondary', 'compactButton')}
                       >
                         {t.edit}
                       </button>
@@ -2673,7 +3292,7 @@ function Boats() {
                             handleDeleteBoat(boat.id);
                           }
                         }}
-                        className="buttonDanger"
+                        className={cx('buttonDanger', 'compactButton')}
                       >
                         {t.delete}
                       </button>

@@ -18,7 +18,23 @@ function Villas() {
   const [previewUrls, setPreviewUrls] = useState([]);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [currentPdfVilla, setCurrentPdfVilla] = useState(null);
-  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [priceFilter, setPriceFilter] = useState({ min: '', max: '' });
+  const [bedroomFilter, setBedroomFilter] = useState('');
+  const [bathroomFilter, setBathroomFilter] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  <style jsx>{`
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+`}</style>
   // CORS-aware image loading function
   const loadImageAsBase64 = async (url) => {
     if (!url) return null;
@@ -306,6 +322,7 @@ function Villas() {
       owner_phone: '',
       owner_notes_en: '',
       owner_notes_ro: '',
+      
     });
     setPriceConfigs([{
       id: Date.now(),
@@ -752,6 +769,46 @@ function Villas() {
       setCurrentPdfVilla(null);
     }
   };
+
+  const getFilteredVillas = () => {
+  return villas.filter(villa => {
+    // Search term filter (name and address)
+    const searchLower = searchTerm.toLowerCase();
+    const nameMatch = getLocalizedContent(villa.name, language, '').toLowerCase().includes(searchLower);
+    const addressMatch = getLocalizedContent(villa.address, language, '').toLowerCase().includes(searchLower);
+    
+    if (searchTerm && !nameMatch && !addressMatch) {
+      return false;
+    }
+    
+    // Bedroom filter
+    if (bedroomFilter && villa.bedrooms !== parseInt(bedroomFilter)) {
+      return false;
+    }
+    
+    // Bathroom filter
+    if (bathroomFilter && villa.bathrooms !== parseInt(bathroomFilter)) {
+      return false;
+    }
+    
+    // Price filter
+    if (priceFilter.min || priceFilter.max) {
+      const villaPrice = villa.priceConfigurations && villa.priceConfigurations.length > 0 
+        ? parseFloat(villa.priceConfigurations[0].price) || 0 
+        : 0;
+      
+      if (priceFilter.min && villaPrice < parseFloat(priceFilter.min)) {
+        return false;
+      }
+      
+      if (priceFilter.max && villaPrice > parseFloat(priceFilter.max)) {
+        return false;
+      }
+    }
+    
+    return true;
+  });
+};
   
   // This is the only new function we're adding - no conflicts with existing code
   const addAmenitiesPage = (doc, villa, colors, fontSizes) => {
@@ -1547,17 +1604,445 @@ const addPhotosPage = async (doc, villa, colors, fontSizes) => {
         {t.rentalVillas}
       </h1>
       
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-        <h2 style={{ fontSize: '1.2rem' }}>
-          {t.villaListings}
-        </h2>
-        <button
-          onClick={() => setIsAddingVilla(true)}
-          style={{ padding: '0.5rem 1rem', backgroundColor: '#4F46E5', color: 'white', border: 'none', borderRadius: '0.375rem' }}
-        >
-          {t.addNewVilla}
-        </button>
+   <div style={{ marginBottom: '1.5rem' }}>
+  {/* Header with Add Button */}
+  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+    <h2 style={{ fontSize: '1.2rem' }}>
+      {t.villaListings}
+    </h2>
+    <button
+      onClick={() => setIsAddingVilla(true)}
+      style={{ 
+        padding: '0.75rem 1.5rem', 
+        backgroundColor: '#4F46E5', 
+        color: 'white', 
+        border: 'none', 
+        borderRadius: '0.5rem',
+        fontWeight: '500',
+        cursor: 'pointer',
+        transition: 'background-color 0.2s'
+      }}
+      onMouseOver={(e) => e.target.style.backgroundColor = '#4338CA'}
+      onMouseOut={(e) => e.target.style.backgroundColor = '#4F46E5'}
+    >
+      {t.addNewVilla}
+    </button>
+  </div>
+
+  {/* Search and Filter Controls Row - Responsive */}
+  <div style={{ 
+    display: 'flex', 
+    gap: '1rem', 
+    alignItems: 'flex-start', 
+    marginBottom: '1rem',
+    flexDirection: window.innerWidth < 768 ? 'column' : 'row'
+  }}>
+    {/* Search Bar - Limited width on desktop */}
+    <div style={{ 
+      flex: window.innerWidth < 768 ? 'none' : '1',
+      width: window.innerWidth < 768 ? '100%' : 'auto',
+      maxWidth: window.innerWidth >= 768 ? '400px' : 'none',
+      minWidth: window.innerWidth >= 768 ? '300px' : 'auto'
+    }}>
+      <div style={{ position: 'relative' }}>
+        <input
+          type="text"
+          placeholder={t.search}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '0.75rem 1rem 0.75rem 2.5rem',
+            border: '2px solid #E5E7EB',
+            borderRadius: '0.5rem',
+            fontSize: '1rem',
+            outline: 'none',
+            transition: 'border-color 0.2s',
+            boxSizing: 'border-box'
+          }}
+          onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
+          onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
+        />
+        {/* Search Icon */}
+        <div style={{
+          position: 'absolute',
+          left: '0.75rem',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          color: '#9CA3AF',
+          pointerEvents: 'none'
+        }}>
+          🔍
+        </div>
       </div>
+    </div>
+
+    {/* Controls Row - Stack on mobile */}
+    <div style={{
+      display: 'flex',
+      gap: '0.75rem',
+      alignItems: 'center',
+      flexDirection: window.innerWidth < 768 ? 'column' : 'row',
+      width: window.innerWidth < 768 ? '100%' : 'auto'
+    }}>
+      {/* Filter Toggle Button */}
+      <button
+  onClick={() => setShowFilters(!showFilters)}
+  className={`flex items-center justify-center gap-2 px-4 py-3 rounded border font-medium transition-colors text-sm ${
+    showFilters 
+      ? 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200' 
+      : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+  }`}
+>
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
+  </svg>
+  {showFilters ? t.hideFilters : t.showFilters}
+</button>
+
+      {/* Results Count and Clear Button */}
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '0.75rem',
+        backgroundColor: '#F9FAFB',
+        padding: '0.5rem 1rem',
+        borderRadius: '0.5rem',
+        border: '1px solid #E5E7EB',
+        width: window.innerWidth < 768 ? '100%' : 'auto',
+        justifyContent: window.innerWidth < 768 ? 'space-between' : 'center'
+      }}>
+        <span style={{ 
+          color: '#374151', 
+          fontSize: '0.875rem',
+          fontWeight: '500',
+          whiteSpace: 'nowrap'
+        }}>
+          {getFilteredVillas().length} {t.resultsFound}
+        </span>
+        
+        {(searchTerm || priceFilter.min || priceFilter.max || bedroomFilter || bathroomFilter) && (
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setPriceFilter({ min: '', max: '' });
+              setBedroomFilter('');
+              setBathroomFilter('');
+            }}
+            style={{
+              padding: '0.375rem 0.75rem',
+              backgroundColor: '#EF4444',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.375rem',
+              fontSize: '0.75rem',
+              cursor: 'pointer',
+              fontWeight: '500',
+              transition: 'background-color 0.2s',
+              whiteSpace: 'nowrap'
+            }}
+            onMouseOver={(e) => e.target.style.backgroundColor = '#DC2626'}
+            onMouseOut={(e) => e.target.style.backgroundColor = '#EF4444'}
+          >
+            ✕ {t.clearFilters}
+          </button>
+        )}
+      </div>
+    </div>
+  </div>
+
+  {/* Enhanced Filter Panel - Mobile Responsive */}
+  {showFilters && (
+    <div style={{
+      backgroundColor: 'white',
+      border: '2px solid #E5E7EB',
+      borderRadius: '0.75rem',
+      padding: window.innerWidth < 768 ? '1rem' : '1.5rem',
+      marginBottom: '1rem',
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+      animation: 'slideDown 0.3s ease-out'
+    }}>
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        marginBottom: '1.5rem',
+        paddingBottom: '0.75rem',
+        borderBottom: '1px solid #E5E7EB'
+      }}>
+       <svg style={{ width: '1rem', height: '1rem', marginRight: '0.5rem', color: '#6B7280' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
+      </svg>
+        <h3 style={{ 
+          fontSize: '1.1rem', 
+          fontWeight: '600', 
+          margin: 0,
+          color: '#374151'
+        }}>
+          {t.filters}
+        </h3>
+      </div>
+      
+      {/* Responsive Grid - Single column on mobile */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: window.innerWidth < 768 
+          ? '1fr' 
+          : window.innerWidth < 1024 
+            ? 'repeat(2, 1fr)' 
+            : 'repeat(3, 1fr)',
+        gap: window.innerWidth < 768 ? '1rem' : '1.5rem'
+      }}>
+        {/* Price Range Filter - Responsive */}
+        <div style={{
+          backgroundColor: '#F9FAFB',
+          padding: window.innerWidth < 768 ? '0.75rem' : '1rem',
+          borderRadius: '0.5rem',
+          border: '1px solid #E5E7EB'
+        }}>
+          <label style={{ 
+            display: 'flex',
+            alignItems: 'center',
+            marginBottom: '0.75rem', 
+            fontSize: '0.875rem', 
+            fontWeight: '600',
+            color: '#374151'
+          }}>
+            <span style={{ marginRight: '0.5rem' }}>💰</span>
+            {t.priceRange} (€)
+          </label>
+          <div style={{ 
+            display: 'flex', 
+            gap: '0.5rem', 
+            alignItems: 'center',
+            flexDirection: window.innerWidth < 480 ? 'column' : 'row'
+          }}>
+            <input
+              type="number"
+              placeholder={t.minPrice}
+              value={priceFilter.min}
+              onChange={(e) => setPriceFilter(prev => ({ ...prev, min: e.target.value }))}
+              style={{
+                flex: 1,
+                width: window.innerWidth < 480 ? '100%' : 'auto',
+                padding: '0.75rem',
+                border: '1px solid #D1D5DB',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem',
+                outline: 'none',
+                transition: 'border-color 0.2s',
+                boxSizing: 'border-box'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
+              onBlur={(e) => e.target.style.borderColor = '#D1D5DB'}
+            />
+            <span style={{ 
+              color: '#6B7280', 
+              fontWeight: '500',
+              display: window.innerWidth < 480 ? 'none' : 'block'
+            }}>—</span>
+            <input
+              type="number"
+              placeholder={t.maxPrice}
+              value={priceFilter.max}
+              onChange={(e) => setPriceFilter(prev => ({ ...prev, max: e.target.value }))}
+              style={{
+                flex: 1,
+                width: window.innerWidth < 480 ? '100%' : 'auto',
+                padding: '0.75rem',
+                border: '1px solid #D1D5DB',
+                borderRadius: '0.375rem',
+                fontSize: '0.875rem',
+                outline: 'none',
+                transition: 'border-color 0.2s',
+                boxSizing: 'border-box'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
+              onBlur={(e) => e.target.style.borderColor = '#D1D5DB'}
+            />
+          </div>
+        </div>
+
+        {/* Bedrooms Filter */}
+        <div style={{
+          backgroundColor: '#F9FAFB',
+          padding: window.innerWidth < 768 ? '0.75rem' : '1rem',
+          borderRadius: '0.5rem',
+          border: '1px solid #E5E7EB'
+        }}>
+          <label style={{ 
+            display: 'flex',
+            alignItems: 'center',
+            marginBottom: '0.75rem', 
+            fontSize: '0.875rem', 
+            fontWeight: '600',
+            color: '#374151'
+          }}>
+            <span style={{ marginRight: '0.5rem' }}>🛏️</span>
+            {t.bedrooms}
+          </label>
+          <select
+            value={bedroomFilter}
+            onChange={(e) => setBedroomFilter(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              border: '1px solid #D1D5DB',
+              borderRadius: '0.375rem',
+              fontSize: '0.875rem',
+              backgroundColor: 'white',
+              outline: 'none',
+              transition: 'border-color 0.2s',
+              boxSizing: 'border-box'
+            }}
+            onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
+            onBlur={(e) => e.target.style.borderColor = '#D1D5DB'}
+          >
+            <option value="">{t.anyBedrooms}</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5+</option>
+          </select>
+        </div>
+
+        {/* Bathrooms Filter */}
+        <div style={{
+          backgroundColor: '#F9FAFB',
+          padding: window.innerWidth < 768 ? '0.75rem' : '1rem',
+          borderRadius: '0.5rem',
+          border: '1px solid #E5E7EB'
+        }}>
+          <label style={{ 
+            display: 'flex',
+            alignItems: 'center',
+            marginBottom: '0.75rem', 
+            fontSize: '0.875rem', 
+            fontWeight: '600',
+            color: '#374151'
+          }}>
+            <span style={{ marginRight: '0.5rem' }}>🚿</span>
+            {t.bathrooms}
+          </label>
+          <select
+            value={bathroomFilter}
+            onChange={(e) => setBathroomFilter(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              border: '1px solid #D1D5DB',
+              borderRadius: '0.375rem',
+              fontSize: '0.875rem',
+              backgroundColor: 'white',
+              outline: 'none',
+              transition: 'border-color 0.2s',
+              boxSizing: 'border-box'
+            }}
+            onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
+            onBlur={(e) => e.target.style.borderColor = '#D1D5DB'}
+          >
+            <option value="">{t.anyBathrooms}</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4+</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Active Filters Summary - Better mobile layout */}
+      {(searchTerm || priceFilter.min || priceFilter.max || bedroomFilter || bathroomFilter) && (
+        <div style={{
+          marginTop: '1.5rem',
+          paddingTop: '1rem',
+          borderTop: '1px solid #E5E7EB'
+        }}>
+          <p style={{ 
+            fontSize: '0.75rem', 
+            color: '#6B7280', 
+            margin: '0 0 0.5rem 0',
+            fontWeight: '500'
+          }}>
+            Active Filters:
+          </p>
+          <div style={{ 
+            display: 'flex', 
+            flexWrap: 'wrap', 
+            gap: '0.5rem',
+            justifyContent: window.innerWidth < 768 ? 'flex-start' : 'flex-start'
+          }}>
+            {searchTerm && (
+              <span style={{
+                backgroundColor: '#EBF8FF',
+                color: '#1E40AF',
+                padding: '0.25rem 0.5rem',
+                borderRadius: '0.375rem',
+                fontSize: '0.75rem',
+                border: '1px solid #BFDBFE',
+                whiteSpace: 'nowrap'
+              }}>
+                Search: "{searchTerm.length > 15 ? searchTerm.substring(0, 15) + '...' : searchTerm}"
+              </span>
+            )}
+            {(priceFilter.min || priceFilter.max) && (
+              <span style={{
+                backgroundColor: '#F0FDF4',
+                color: '#15803D',
+                padding: '0.25rem 0.5rem',
+                borderRadius: '0.375rem',
+                fontSize: '0.75rem',
+                border: '1px solid #BBF7D0',
+                whiteSpace: 'nowrap'
+              }}>
+                €{priceFilter.min || '0'} - €{priceFilter.max || '∞'}
+              </span>
+            )}
+            {bedroomFilter && (
+              <span style={{
+                backgroundColor: '#FEF3C7',
+                color: '#92400E',
+                padding: '0.25rem 0.5rem',
+                borderRadius: '0.375rem',
+                fontSize: '0.75rem',
+                border: '1px solid #FDE68A',
+                whiteSpace: 'nowrap'
+              }}>
+                {bedroomFilter} Bed
+              </span>
+            )}
+            {bathroomFilter && (
+              <span style={{
+                backgroundColor: '#FECACA',
+                color: '#991B1B',
+                padding: '0.25rem 0.5rem',
+                borderRadius: '0.375rem',
+                fontSize: '0.75rem',
+                border: '1px solid #FCA5A5',
+                whiteSpace: 'nowrap'
+              }}>
+                {bathroomFilter} Bath
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )}
+</div>
+
+{/* Add this CSS animation at the top of your component or in a style tag */}
+<style jsx>{`
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+`}</style>
       
       <div style={{ 
         display: 'grid', 
@@ -1565,7 +2050,7 @@ const addPhotosPage = async (doc, villa, colors, fontSizes) => {
         gap: '1rem',
         marginBottom: '2rem'
       }}>
-        {villas.map(villa => (
+        {getFilteredVillas().map(villa => (
           <div key={villa.id} style={{ border: '1px solid #e5e7eb', borderRadius: '0.5rem', overflow: 'hidden' }}>
             {/* Villa photo */}
             <div style={{ height: '200px', backgroundColor: '#f3f4f6' }}>
