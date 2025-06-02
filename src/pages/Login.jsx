@@ -31,7 +31,8 @@ const Login = () => {
       setError('');
       setLoading(true);
       
-      const { newUser } = await loginWithGoogle();
+      // Force account selection by passing forceAccountSelection: true
+      const { newUser } = await loginWithGoogle({ forceAccountSelection: true });
       
       // Since we're auto-assigning users to their company based on email,
       // we don't need the company selection screen anymore
@@ -71,7 +72,8 @@ const Login = () => {
               <path d="M12 2L15.09 8.26L22 9L17 14L18.18 21L12 17.77L5.82 21L7 14L2 9L8.91 8.26L12 2Z"/>
             </svg>
           </div>
-          <h1 style={styles.brandName}>Just Enjoy Ibiza</h1>
+          <h1 style={styles.brandName}> Luxury Concierge</h1>
+          <h1 style={styles.tagline}>Ibiza</h1>
           <p style={styles.tagline}>Concierge Excellence</p>
         </div>
 

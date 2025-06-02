@@ -12,50 +12,14 @@
   "categories": ["business", "productivity", "lifestyle"],
   "icons": [
     {
-      "src": "/icons/icon-72x72.png",
-      "sizes": "72x72",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "/icons/icon-96x96.png",
-      "sizes": "96x96",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "/icons/icon-128x128.png",
-      "sizes": "128x128",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "/icons/icon-144x144.png",
-      "sizes": "144x144",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "/icons/icon-152x152.png",
-      "sizes": "152x152",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "/icons/icon-192x192.png",
+      "src": "src/assets/Luxury_app.jpeg",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable any"
     },
     {
-      "src": "/icons/icon-384x384.png",
-      "sizes": "384x384",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "/icons/icon-512x512.png",
-      "sizes": "512x512",
+      "src": "src/assets/Luxury_app.jpeg",
+      "sizes": "512x512", 
       "type": "image/png",
       "purpose": "maskable any"
     }
@@ -65,10 +29,10 @@
       "name": "New Booking",
       "short_name": "Book",
       "description": "Create a new client booking",
-      "url": "/bookings/new",
+      "url": "/reservations",
       "icons": [
         {
-          "src": "/icons/shortcut-booking.png",
+          "src": "src/assets/Luxury_app.jpeg",
           "sizes": "96x96"
         }
       ]
@@ -80,50 +44,34 @@
       "url": "/clients",
       "icons": [
         {
-          "src": "/icons/shortcut-clients.png",
+          "src": "src/assets/Luxury_app.jpeg",
           "sizes": "96x96"
         }
       ]
     },
     {
-      "name": "Service Requests",
-      "short_name": "Requests",
-      "description": "Handle incoming service requests",
-      "url": "/requests",
+      "name": "Service Management",
+      "short_name": "Services",
+      "description": "Manage luxury services",
+      "url": "/services",
       "icons": [
         {
-          "src": "/icons/shortcut-requests.png",
+          "src": "src/assets/Luxury_app.jpeg",
           "sizes": "96x96"
         }
       ]
     },
     {
-      "name": "Analytics",
-      "short_name": "Stats",
-      "description": "View business analytics and reports",
-      "url": "/analytics",
+      "name": "Finance",
+      "short_name": "Finance",
+      "description": "View financial reports and analytics",
+      "url": "/finance",
       "icons": [
         {
-          "src": "/icons/shortcut-analytics.png",
+          "src": "src/assets/Luxury_app.jpeg",
           "sizes": "96x96"
         }
       ]
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "/screenshots/desktop-1.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Elite Concierge Dashboard"
-    },
-    {
-      "src": "/screenshots/mobile-1.png", 
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Mobile Concierge Interface"
     }
   ],
   "related_applications": [],

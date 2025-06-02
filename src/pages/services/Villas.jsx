@@ -23,73 +23,76 @@ function Villas() {
   const [bedroomFilter, setBedroomFilter] = useState('');
   const [bathroomFilter, setBathroomFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  <style jsx>{`
-  @keyframes slideDown {
-    from {
-      opacity: 0;
-      transform: translateY(-10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-`}</style>
-  // CORS-aware image loading function
+
+  // Enhanced image loading function that handles Firebase Storage URLs better
   const loadImageAsBase64 = async (url) => {
     if (!url) return null;
     
+    console.log("Loading image from:", url);
+    
     try {
-      console.log("Loading image from:", url);
+      // First, try to fetch the image as a blob
+      const response = await fetch(url, {
+        mode: 'cors',
+        credentials: 'omit'
+      });
       
-      // Create an image element
-      const img = new Image();
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
-      // Use a promise to handle the async image loading
+      const blob = await response.blob();
+      
+      // Convert blob to base64
       return new Promise((resolve, reject) => {
-        // Set up listeners before setting src
-        img.onload = function() {
-          try {
-            // Create a canvas to draw the image
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0);
-            
-            // Get the data URL and extract just the base64 part
+        const reader = new FileReader();
+        reader.onload = () => {
+          resolve(reader.result);
+        };
+        reader.onerror = () => {
+          reject(new Error('Failed to read blob as base64'));
+        };
+        reader.readAsDataURL(blob);
+      });
+      
+    } catch (fetchError) {
+      console.warn("Fetch method failed, trying canvas method:", fetchError);
+      
+      // Fallback to canvas method
+      try {
+        const img = new Image();
+        
+        return new Promise((resolve, reject) => {
+          img.onload = function() {
             try {
-              const dataURL = canvas.toDataURL('image/jpeg', 0.85);
+              const canvas = document.createElement('canvas');
+              canvas.width = img.naturalWidth;
+              canvas.height = img.naturalHeight;
+              
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0);
+              
+              const dataURL = canvas.toDataURL('image/jpeg', 0.9);
               resolve(dataURL);
             } catch (err) {
               console.error("Canvas error:", err);
               reject(err);
             }
-          } catch (err) {
-            console.error("Canvas setup error:", err);
-            reject(err);
-          }
-        };
-        
-        img.onerror = function(e) {
-          console.error("Image load error:", e);
-          reject(new Error(`Failed to load image: ${url}`));
-        };
-        
-        // Set crossOrigin BEFORE setting src
-        img.crossOrigin = 'Anonymous';
-        
-        // Add a cache-busting parameter to the URL to avoid caching issues
-        const cacheBustUrl = url.includes('?') 
-          ? `${url}&cacheBust=${new Date().getTime()}` 
-          : `${url}?cacheBust=${new Date().getTime()}`;
-        
-        img.src = cacheBustUrl;
-      });
-    } catch (error) {
-      console.error("Error in loadImageAsBase64:", error);
-      return null;
+          };
+          
+          img.onerror = function(e) {
+            console.error("Image load error:", e);
+            reject(new Error(`Failed to load image: ${url}`));
+          };
+          
+          // Set crossOrigin BEFORE setting src
+          img.crossOrigin = 'anonymous';
+          img.src = url;
+        });
+      } catch (canvasError) {
+        console.error("Canvas method also failed:", canvasError);
+        return null;
+      }
     }
   };
   
@@ -110,7 +113,6 @@ function Villas() {
     owner_phone: '',
     owner_notes_en: '',
     owner_notes_ro: '',
-    // Price will be handled separately
   });
   
   // Handle price configurations separately
@@ -322,7 +324,6 @@ function Villas() {
       owner_phone: '',
       owner_notes_en: '',
       owner_notes_ro: '',
-      
     });
     setPriceConfigs([{
       id: Date.now(),
@@ -672,330 +673,542 @@ function Villas() {
     setCurrentPdfVilla(villa);
     setIsGeneratingPDF(true);
   };
-  
-  // Handle PDF generation
-  const generateVillaPDF = async () => {
-    if (!currentPdfVilla) return;
-    
-    // Always use English for PDF generation regardless of current UI language
-    const pdfLanguage = 'en';
-    const villaName = getLocalizedContent(currentPdfVilla.name, pdfLanguage, 'Villa');
-    const villa = currentPdfVilla;
-    
-    try {
-      // Set loading state
-      setIsGeneratingPDF(true);
-      
-      // Create PDF with premium quality settings
-      const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-        compress: true
-      });
-      
-      // Set document properties for better metadata
-      doc.setProperties({
-        title: `${villaName} - Ibiza Luxury Villas`,
-        subject: `Luxury Villa Details - ${villaName}`,
-        author: 'Ibiza Luxury Villas',
-        keywords: 'luxury, villa, ibiza, rental, premium, exclusive',
-        creator: 'Ibiza Luxury Villas PDF Generator'
-      });
-      
-      // Premium style constants for sophisticated design
-      const colors = {
-        primary: [0, 45, 114],       // Deep blue
-        secondary: [190, 167, 94],   // Gold accent
-        text: [45, 41, 38],          // Rich dark for text
-        lightText: [96, 96, 96],     // Light gray for secondary text
-        background: [252, 250, 248], // Warm white background
-        borders: [230, 215, 185]     // Subtle cream for borders
-      };
-      
-      const fontSizes = {
-        header: 28,
-        subheader: 18,
-        sectionTitle: 16,
-        normal: 12,
-        small: 10
-      };
-      
-      // ---- Create cover page ----
-      // Using your existing function
-      addCoverPage(doc, villa, villaName, colors, fontSizes);
-      
-      // ---- Create interior pages ----
-      // Main information page - using your existing function
-      doc.addPage();
-      addMainInfoPage(doc, villa, colors, fontSizes);
-      
-      // Photos page (if available) - using your existing function
-      if (villa.photos && villa.photos.length > 0) {
-        doc.addPage();
-        addPhotosPage(doc, villa, colors, fontSizes);
-      }
-      
-      // Price and booking information - using your existing function
-      doc.addPage();
-      addPriceAndBookingPage(doc, villa, colors, fontSizes);
-      
-      // Add amenities page if villa has amenities
-      if (villa.amenities && villa.amenities.length > 0) {
-        doc.addPage();
-        addAmenitiesPage(doc, villa, colors, fontSizes);
-      }
-      
-      // Add page numbers to all pages except the cover
-      const pageCount = doc.internal.getNumberOfPages();
-      for (let i = 2; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setTextColor(...colors.lightText);
-        doc.setFontSize(8);
-        doc.text(`Page ${i-1} of ${pageCount-1}`, 105, 285, { align: 'center' });
-      }
-      
-      // Save the PDF with a clean filename
-      doc.save(`${villaName.replace(/\s+/g, '_')}_luxury_villa.pdf`);
-      
-      // Close the PDF modal
-      setIsGeneratingPDF(false);
-      setCurrentPdfVilla(null);
-      
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      alert("There was an error generating the PDF. Please try again.");
-      setIsGeneratingPDF(false);
-      setCurrentPdfVilla(null);
-    }
-  };
 
-  const getFilteredVillas = () => {
-  return villas.filter(villa => {
-    // Search term filter (name and address)
-    const searchLower = searchTerm.toLowerCase();
-    const nameMatch = getLocalizedContent(villa.name, language, '').toLowerCase().includes(searchLower);
-    const addressMatch = getLocalizedContent(villa.address, language, '').toLowerCase().includes(searchLower);
-    
-    if (searchTerm && !nameMatch && !addressMatch) {
-      return false;
-    }
-    
-    // Bedroom filter
-    if (bedroomFilter && villa.bedrooms !== parseInt(bedroomFilter)) {
-      return false;
-    }
-    
-    // Bathroom filter
-    if (bathroomFilter && villa.bathrooms !== parseInt(bathroomFilter)) {
-      return false;
-    }
-    
-    // Price filter
-    if (priceFilter.min || priceFilter.max) {
-      const villaPrice = villa.priceConfigurations && villa.priceConfigurations.length > 0 
-        ? parseFloat(villa.priceConfigurations[0].price) || 0 
-        : 0;
-      
-      if (priceFilter.min && villaPrice < parseFloat(priceFilter.min)) {
-        return false;
-      }
-      
-      if (priceFilter.max && villaPrice > parseFloat(priceFilter.max)) {
-        return false;
-      }
-    }
-    
-    return true;
-  });
-};
-  
-  // This is the only new function we're adding - no conflicts with existing code
-  const addAmenitiesPage = (doc, villa, colors, fontSizes) => {
-    // Add page heading
-    doc.setFillColor(...colors.primary);
-    doc.rect(0, 0, 210, 20, 'F');
-    
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(fontSizes.subheader);
-    doc.text('LUXURY AMENITIES', 105, 13, { align: 'center' });
-    
-    // Start content area
-    let currentY = 40;
-    
-    // Group amenities by category (if available)
-    const amenities = villa.amenities || [];
-    
-    // Create a two-column layout for amenities
-    const columnWidth = 85;
-    const leftColX = 20;
-    const rightColX = 115;
-    
-    // Prepare amenities list
-    const amenitiesList = Array.isArray(amenities) ? amenities : 
-                           (typeof amenities === 'string' ? amenities.split(',').map(a => a.trim()) : []);
-    
-    if (amenitiesList.length === 0) {
-      // No amenities available
-      doc.setTextColor(...colors.text);
-      doc.setFontSize(fontSizes.normal);
-      doc.text('Amenities information not available', 105, 150, { align: 'center' });
-      return;
-    }
-    
-    // Split amenities into two columns
-    const midPoint = Math.ceil(amenitiesList.length / 2);
-    const leftColAmenities = amenitiesList.slice(0, midPoint);
-    const rightColAmenities = amenitiesList.slice(midPoint);
-    
-    // Draw left column
-    doc.setTextColor(...colors.text);
-    doc.setFontSize(fontSizes.normal);
-    leftColAmenities.forEach((amenity, index) => {
-      doc.text(`• ${amenity}`, leftColX, currentY + (index * 10));
-    });
-    
-    // Draw right column
-    rightColAmenities.forEach((amenity, index) => {
-      doc.text(`• ${amenity}`, rightColX, currentY + (index * 10));
-    });
-    
-    // Add elegant footer note
-    doc.setTextColor(...colors.lightText);
-    doc.setFontSize(fontSizes.small);
-    doc.text('Additional amenities may be available upon request', 105, 270, { align: 'center' });
-  };
-  
-  // Helper function to add a luxury cover page
-  // Helper function to add a luxury cover page
-const addCoverPage = async (doc, villa, villaName, colors, fontSizes) => {
-  // Set background color
-  doc.setFillColor(colors.background[0], colors.background[1], colors.background[2]);
-  doc.rect(0, 0, 210, 297, 'F');
-  
-  // Add gold decorative line at top
-  doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
-  doc.setLineWidth(3);
-  doc.line(20, 20, 190, 20);
-  
-  // Add company logo/header
-  doc.setFontSize(fontSizes.header);
-  doc.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2]);
-  doc.setFont('helvetica', 'bold');
-  doc.text('IBIZA LUXURY VILLAS', 105, 40, { align: 'center' });
-  
-  // Gold line under header
-  doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
-  doc.setLineWidth(1);
-  doc.line(65, 45, 145, 45);
-  
-  // Main villa image (if available)
-  if (villa.photos && villa.photos.length > 0) {
-    try {
-      // Check if we have a valid URL to prevent errors
-      const coverImageUrl = villa.photos[0].url;
-      if (coverImageUrl) {
-        try {
-          // Load image as base64
-          const imgData = await loadImageAsBase64(coverImageUrl);
-          
-          // Add image to PDF with proper positioning and size
-          doc.addImage(imgData, 'JPEG', 25, 60, 160, 120);
-        } catch (err) {
-          console.error("Error loading cover image:", err);
-          
-          // Fallback to placeholder if image loading fails
-          doc.setFillColor(240, 240, 240);
-          doc.roundedRect(25, 60, 160, 120, 3, 3, 'F');
-          doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
-          doc.setLineWidth(1);
-          doc.roundedRect(25, 60, 160, 120, 3, 3, 'S');
-          
-          // Text placeholder for image
-          doc.setFontSize(12);
-          doc.setTextColor(100, 100, 100);
-          doc.text('Villa Image', 105, 120, { align: 'center' });
-        }
-      }
-    } catch (imgError) {
-      console.error("Error adding cover image:", imgError);
-    }
-  }
-  
-  // Villa name as title
-  doc.setFontSize(fontSizes.header);
-  doc.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2]);
-  doc.setFont('helvetica', 'bold');
-  
-  // Handle long villa names with multi-line support
-  const nameLines = doc.splitTextToSize(villaName, 150);
-  doc.text(nameLines, 105, 205, { align: 'center' });
-  
-  // Location/address beneath title
-  doc.setFontSize(fontSizes.subheader);
-  doc.setTextColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
-  doc.setFont('helvetica', 'italic');
-  const addressText = getLocalizedContent(villa.address, 'en', '');
-  const addressLines = doc.splitTextToSize(addressText, 150);
-  doc.text(addressLines, 105, 220, { align: 'center' });
-  
-  // Quick highlights - bedrooms, bathrooms
-  doc.setFontSize(fontSizes.normal);
-  doc.setTextColor(colors.text[0], colors.text[1], colors.text[2]);
-  doc.setFont('helvetica', 'normal');
-  
-  // Create highlight boxes at bottom of page
-  const highlightData = [
-    { label: 'Bedrooms', value: villa.bedrooms || 0 },
-    { label: 'Bathrooms', value: villa.bathrooms || 0 }
-  ];
-  
-  // Add price if available
-  if (villa.priceConfigurations && villa.priceConfigurations.length > 0) {
-    const mainPrice = villa.priceConfigurations[0];
-    const priceLabel = getLocalizedContent(mainPrice.label, 'en', '');
-    const priceValue = `€${mainPrice.price || 0}`;
-    highlightData.push({ label: priceLabel, value: priceValue });
-  }
-  
-  // Draw highlight boxes
-  const boxWidth = 50;
-  const boxSpacing = 10;
-  const totalWidth = (boxWidth * highlightData.length) + (boxSpacing * (highlightData.length - 1));
-  let startX = (210 - totalWidth) / 2;
-  
-  highlightData.forEach(highlight => {
-    // Box
+  // Enhanced cover page with luxury design
+  const addCoverPage = async (doc, villa, villaName, colors, fontSizes) => {
+    // Luxury gradient background
     doc.setFillColor(250, 250, 250);
-    doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
-    doc.setLineWidth(0.5);
-    doc.roundedRect(startX, 245, boxWidth, 35, 3, 3, 'FD');
+    doc.rect(0, 0, 210, 297, 'F');
     
-    // Value
-    doc.setFontSize(fontSizes.subheader);
+    // Add elegant header border
+    doc.setFillColor(colors.primary[0], colors.primary[1], colors.primary[2]);
+    doc.rect(0, 0, 210, 8, 'F');
+    
+    // Gold accent line
+    doc.setFillColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+    doc.rect(0, 8, 210, 2, 'F');
+    
+    // Company logo area with elegant typography
+    doc.setFontSize(32);
     doc.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2]);
     doc.setFont('helvetica', 'bold');
-    doc.text(String(highlight.value), startX + (boxWidth/2), 260, { align: 'center' });
+    doc.text('IBIZA', 105, 35, { align: 'center' });
     
-    // Label
-    doc.setFontSize(fontSizes.small);
-    doc.setTextColor(colors.lightText[0], colors.lightText[1], colors.lightText[2]);
+    doc.setFontSize(24);
+    doc.setTextColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
     doc.setFont('helvetica', 'normal');
-    doc.text(highlight.label, startX + (boxWidth/2), 270, { align: 'center' });
+    doc.text('LUXURY VILLAS', 105, 45, { align: 'center' });
     
-    startX += boxWidth + boxSpacing;
-  });
-  
-  // Footer with generation date
-  doc.setFontSize(fontSizes.small);
-  doc.setTextColor(colors.lightText[0], colors.lightText[1], colors.lightText[2]);
-  const today = new Date();
-  doc.text(`Generated: ${today.toLocaleDateString()}`, 20, 290);
-  
-  // Website or contact
-  doc.text('www.ibizaluxuryvillas.com', 190, 290, { align: 'right' });
-};
-  
+    // Decorative elements
+    doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+    doc.setLineWidth(1);
+    doc.line(70, 50, 140, 50);
+    
+    // Main villa image with luxury frame
+    if (villa.photos && villa.photos.length > 0) {
+      try {
+        console.log("Loading cover image:", villa.photos[0].url);
+        const imgData = await loadImageAsBase64(villa.photos[0].url);
+        
+        if (imgData) {
+          // Create luxury frame
+          doc.setFillColor(255, 255, 255);
+          doc.roundedRect(20, 65, 170, 130, 5, 5, 'F');
+          
+          // Shadow effect
+          doc.setFillColor(0, 0, 0, 0.1);
+          doc.roundedRect(22, 67, 170, 130, 5, 5, 'F');
+          
+          // Gold frame border
+          doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+          doc.setLineWidth(3);
+          doc.roundedRect(20, 65, 170, 130, 5, 5, 'S');
+          
+          // Add the image
+          doc.addImage(imgData, 'JPEG', 25, 70, 160, 120);
+          
+          console.log("Cover image added successfully");
+        } else {
+          throw new Error("Image data is null");
+        }
+      } catch (err) {
+        console.error("Error loading cover image:", err);
+        
+        // Luxury placeholder
+        doc.setFillColor(245, 245, 245);
+        doc.roundedRect(20, 65, 170, 130, 5, 5, 'F');
+        
+        doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+        doc.setLineWidth(3);
+        doc.roundedRect(20, 65, 170, 130, 5, 5, 'S');
+        
+        // Elegant placeholder icon
+        doc.setFontSize(48);
+        doc.setTextColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+        doc.text('🏖️', 105, 135, { align: 'center' });
+        
+        doc.setFontSize(14);
+        doc.setTextColor(colors.lightText[0], colors.lightText[1], colors.lightText[2]);
+        doc.text('Villa Photography', 105, 150, { align: 'center' });
+      }
+    }
+    
+    // Villa name with luxury styling
+    doc.setFontSize(28);
+    doc.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2]);
+    doc.setFont('helvetica', 'bold');
+    
+    // Handle long villa names
+    const nameLines = doc.splitTextToSize(villaName, 160);
+    let nameStartY = 215;
+    if (nameLines.length > 1) {
+      nameStartY = 210;
+    }
+    doc.text(nameLines, 105, nameStartY, { align: 'center' });
+    
+    // Location with elegant styling
+    const addressText = getLocalizedContent(villa.address, 'en', 'Ibiza, Spain');
+    doc.setFontSize(16);
+    doc.setTextColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+    doc.setFont('helvetica', 'italic');
+    doc.text(addressText, 105, nameStartY + 15, { align: 'center' });
+    
+    // Luxury property highlights in elegant boxes
+    const highlights = [];
+    if (villa.bedrooms) highlights.push({ icon: '🛏️', label: 'Bedrooms', value: villa.bedrooms });
+    if (villa.bathrooms) highlights.push({ icon: '🛁', label: 'Bathrooms', value: villa.bathrooms });
+    
+    // Add main price if available
+    if (villa.priceConfigurations && villa.priceConfigurations.length > 0) {
+      const mainPrice = villa.priceConfigurations[0];
+      highlights.push({ 
+        icon: '💎', 
+        label: 'Starting from', 
+        value: `€${mainPrice.price}/night` 
+      });
+    }
+    
+    if (highlights.length > 0) {
+      const boxWidth = 50;
+      const boxHeight = 40;
+      const spacing = 10;
+      const totalWidth = (boxWidth * highlights.length) + (spacing * (highlights.length - 1));
+      let startX = (210 - totalWidth) / 2;
+      
+      highlights.forEach((highlight, index) => {
+        // Luxury box with gradient effect
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(startX, 245, boxWidth, boxHeight, 3, 3, 'F');
+        
+        // Gold border
+        doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+        doc.setLineWidth(1);
+        doc.roundedRect(startX, 245, boxWidth, boxHeight, 3, 3, 'S');
+        
+        // Icon
+        doc.setFontSize(16);
+        doc.text(highlight.icon, startX + (boxWidth/2), 255, { align: 'center' });
+        
+        // Value
+        doc.setFontSize(12);
+        doc.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2]);
+        doc.setFont('helvetica', 'bold');
+        doc.text(String(highlight.value), startX + (boxWidth/2), 268, { align: 'center' });
+        
+        // Label
+        doc.setFontSize(8);
+        doc.setTextColor(colors.lightText[0], colors.lightText[1], colors.lightText[2]);
+        doc.setFont('helvetica', 'normal');
+        doc.text(highlight.label, startX + (boxWidth/2), 278, { align: 'center' });
+        
+        startX += boxWidth + spacing;
+      });
+    }
+    
+    // Elegant footer
+    doc.setFontSize(10);
+    doc.setTextColor(colors.lightText[0], colors.lightText[1], colors.lightText[2]);
+    doc.text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, 20, 290);
+    doc.text('www.ibizaluxuryvillas.com', 190, 290, { align: 'right' });
+  };
+
+  // Enhanced photos page with better layout
+  const addPhotosPage = async (doc, villa, colors, fontSizes) => {
+    addPageHeader(doc, 'Villa Gallery', colors, fontSizes);
+    
+    if (villa.photos && villa.photos.length > 0) {
+      const margin = 15;
+      const gutter = 8;
+      const availableWidth = 210 - (margin * 2);
+      
+      // For luxury layout, use different arrangements based on photo count
+      if (villa.photos.length === 1) {
+        // Single large photo
+        const photoHeight = 160;
+        const yPos = 40;
+        
+        try {
+          console.log("Loading single photo:", villa.photos[0].url);
+          const imgData = await loadImageAsBase64(villa.photos[0].url);
+          
+          if (imgData) {
+            // Luxury frame
+            doc.setFillColor(255, 255, 255);
+            doc.roundedRect(margin - 5, yPos - 5, availableWidth + 10, photoHeight + 10, 5, 5, 'F');
+            
+            doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+            doc.setLineWidth(2);
+            doc.roundedRect(margin - 5, yPos - 5, availableWidth + 10, photoHeight + 10, 5, 5, 'S');
+            
+            doc.addImage(imgData, 'JPEG', margin, yPos, availableWidth, photoHeight);
+            console.log("Single photo added successfully");
+          }
+        } catch (err) {
+          console.error("Error loading single photo:", err);
+          addPhotoPlaceholder(doc, margin, yPos, availableWidth, photoHeight, colors, '1');
+        }
+        
+      } else if (villa.photos.length <= 4) {
+        // Grid layout for 2-4 photos
+        const photosPerRow = villa.photos.length === 2 ? 2 : 2;
+        const photoWidth = (availableWidth - gutter) / photosPerRow;
+        const photoHeight = photoWidth * 0.75;
+        
+        let yPos = 40;
+        let photoIndex = 0;
+        
+        for (let row = 0; row < Math.ceil(villa.photos.length / photosPerRow); row++) {
+          for (let col = 0; col < photosPerRow && photoIndex < villa.photos.length; col++) {
+            const xPos = margin + (col * (photoWidth + gutter));
+            const currentYPos = yPos + (row * (photoHeight + gutter));
+            
+            try {
+              console.log(`Loading photo ${photoIndex + 1}:`, villa.photos[photoIndex].url);
+              const imgData = await loadImageAsBase64(villa.photos[photoIndex].url);
+              
+              if (imgData) {
+                // Luxury frame for each photo
+                doc.setFillColor(255, 255, 255);
+                doc.roundedRect(xPos - 2, currentYPos - 2, photoWidth + 4, photoHeight + 4, 3, 3, 'F');
+                
+                doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+                doc.setLineWidth(1);
+                doc.roundedRect(xPos - 2, currentYPos - 2, photoWidth + 4, photoHeight + 4, 3, 3, 'S');
+                
+                doc.addImage(imgData, 'JPEG', xPos, currentYPos, photoWidth, photoHeight);
+                console.log(`Photo ${photoIndex + 1} added successfully`);
+              } else {
+                throw new Error("Image data is null");
+              }
+            } catch (err) {
+              console.error(`Error loading photo ${photoIndex + 1}:`, err);
+              addPhotoPlaceholder(doc, xPos, currentYPos, photoWidth, photoHeight, colors, `${photoIndex + 1}`);
+            }
+            
+            photoIndex++;
+          }
+        }
+      } else {
+        // For many photos, use a more compact grid
+        const photosPerRow = 3;
+        const photoWidth = (availableWidth - (gutter * (photosPerRow - 1))) / photosPerRow;
+        const photoHeight = photoWidth * 0.75;
+        
+        let yPos = 40;
+        const maxPhotosToShow = 9; // Show up to 9 photos
+        
+        for (let i = 0; i < Math.min(maxPhotosToShow, villa.photos.length); i++) {
+          const row = Math.floor(i / photosPerRow);
+          const col = i % photosPerRow;
+          
+          const xPos = margin + (col * (photoWidth + gutter));
+          const currentYPos = yPos + (row * (photoHeight + gutter));
+          
+          // Check if we need a new page
+          if (currentYPos + photoHeight > 260) {
+            doc.addPage();
+            addPageHeader(doc, 'Villa Gallery (Continued)', colors, fontSizes);
+            yPos = 40;
+            // Recalculate position for new page
+            const newRow = row - Math.floor((260 - 40) / (photoHeight + gutter));
+            const newCurrentYPos = yPos + (newRow * (photoHeight + gutter));
+            
+            try {
+              console.log(`Loading photo ${i + 1}:`, villa.photos[i].url);
+              const imgData = await loadImageAsBase64(villa.photos[i].url);
+              
+              if (imgData) {
+                doc.setFillColor(255, 255, 255);
+                doc.roundedRect(xPos - 1, newCurrentYPos - 1, photoWidth + 2, photoHeight + 2, 2, 2, 'F');
+                
+                doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+                doc.setLineWidth(0.5);
+                doc.roundedRect(xPos - 1, newCurrentYPos - 1, photoWidth + 2, photoHeight + 2, 2, 2, 'S');
+                
+                doc.addImage(imgData, 'JPEG', xPos, newCurrentYPos, photoWidth, photoHeight);
+                console.log(`Photo ${i + 1} added successfully`);
+              }
+            } catch (err) {
+              console.error(`Error loading photo ${i + 1}:`, err);
+              addPhotoPlaceholder(doc, xPos, newCurrentYPos, photoWidth, photoHeight, colors, `${i + 1}`);
+            }
+          } else {
+            try {
+              console.log(`Loading photo ${i + 1}:`, villa.photos[i].url);
+              const imgData = await loadImageAsBase64(villa.photos[i].url);
+              
+              if (imgData) {
+                doc.setFillColor(255, 255, 255);
+                doc.roundedRect(xPos - 1, currentYPos - 1, photoWidth + 2, photoHeight + 2, 2, 2, 'F');
+                
+                doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+                doc.setLineWidth(0.5);
+                doc.roundedRect(xPos - 1, currentYPos - 1, photoWidth + 2, photoHeight + 2, 2, 2, 'S');
+                
+                doc.addImage(imgData, 'JPEG', xPos, currentYPos, photoWidth, photoHeight);
+                console.log(`Photo ${i + 1} added successfully`);
+              }
+            } catch (err) {
+              console.error(`Error loading photo ${i + 1}:`, err);
+              addPhotoPlaceholder(doc, xPos, currentYPos, photoWidth, photoHeight, colors, `${i + 1}`);
+            }
+          }
+        }
+        
+        // Add note if there are more photos
+        if (villa.photos.length > maxPhotosToShow) {
+          doc.setFontSize(10);
+          doc.setTextColor(colors.lightText[0], colors.lightText[1], colors.lightText[2]);
+          doc.text(`+ ${villa.photos.length - maxPhotosToShow} more photos available`, 105, 250, { align: 'center' });
+        }
+      }
+    }
+    
+    addPageFooter(doc, villa, colors, fontSizes);
+  };
+
+  // Helper function to add luxury photo placeholder
+  const addPhotoPlaceholder = (doc, x, y, width, height, colors, photoNumber) => {
+    // Elegant placeholder
+    doc.setFillColor(248, 248, 248);
+    doc.roundedRect(x, y, width, height, 3, 3, 'F');
+    
+    doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+    doc.setLineWidth(1);
+    doc.roundedRect(x, y, width, height, 3, 3, 'S');
+    
+    // Camera icon and text
+    doc.setFontSize(Math.min(width / 8, 14));
+    doc.setTextColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+    doc.text('📷', x + width/2, y + height/2 - 5, { align: 'center' });
+    
+    doc.setFontSize(8);
+    doc.setTextColor(colors.lightText[0], colors.lightText[1], colors.lightText[2]);
+    doc.text(`Photo ${photoNumber}`, x + width/2, y + height/2 + 8, { align: 'center' });
+    doc.text('Loading...', x + width/2, y + height/2 + 16, { align: 'center' });
+  };
+
+  // Helper function to add price and booking page
+  const addPriceAndBookingPage = (doc, villa, colors, fontSizes) => {
+    // Header
+    addPageHeader(doc, 'Price & Booking Information', colors, fontSizes);
+    
+    // Current vertical position tracker
+    let yPos = 40;
+    
+    // Pricing section
+    if (villa.priceConfigurations && villa.priceConfigurations.length > 0) {
+      doc.setFontSize(fontSizes.sectionTitle);
+      doc.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2]);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Rate Information', 20, yPos);
+      
+      // Gold underline
+      doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+      doc.setLineWidth(0.5);
+      doc.line(20, yPos + 2, 80, yPos + 2);
+      
+      yPos += 15;
+      
+      // Price table header
+      const colWidths = [60, 30, 80];
+      const tableWidth = colWidths.reduce((sum, width) => sum + width, 0);
+      const tableX = 20;
+      
+      // Draw table header
+      doc.setFillColor(colors.primary[0], colors.primary[1], colors.primary[2]);
+      doc.rect(tableX, yPos - 6, tableWidth, 8, 'F');
+      
+      doc.setFontSize(fontSizes.small);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      
+      let xOffset = tableX;
+      doc.text('Rate Label', xOffset + 4, yPos);
+      xOffset += colWidths[0];
+      
+      doc.text('Price', xOffset + 4, yPos);
+      xOffset += colWidths[1];
+      
+      doc.text('Conditions', xOffset + 4, yPos);
+      
+      yPos += 6;
+      
+      // Draw table rows
+      doc.setTextColor(colors.text[0], colors.text[1], colors.text[2]);
+      doc.setFont('helvetica', 'normal');
+      
+      let evenRow = true;
+      villa.priceConfigurations.forEach((config, idx) => {
+        // Check if we need to start a new page
+        if (yPos > 260) {
+          doc.addPage();
+          addPageHeader(doc, 'Price & Booking Information', colors, fontSizes);
+          yPos = 40;
+          
+          // Redraw table header on new page
+          doc.setFillColor(colors.primary[0], colors.primary[1], colors.primary[2]);
+          doc.rect(tableX, yPos - 6, tableWidth, 8, 'F');
+          
+          doc.setFontSize(fontSizes.small);
+          doc.setTextColor(255, 255, 255);
+          doc.setFont('helvetica', 'bold');
+          
+          let xOffset = tableX;
+          doc.text('Rate Label', xOffset + 4, yPos);
+          xOffset += colWidths[0];
+          
+          doc.text('Price', xOffset + 4, yPos);
+          xOffset += colWidths[1];
+          
+          doc.text('Conditions', xOffset + 4, yPos);
+          
+          yPos += 6;
+          doc.setTextColor(colors.text[0], colors.text[1], colors.text[2]);
+          doc.setFont('helvetica', 'normal');
+        }
+        
+        // Row background (alternating)
+        if (evenRow) {
+          doc.setFillColor(250, 250, 250);
+          doc.rect(tableX, yPos - 5, tableWidth, 16, 'F');
+        }
+        evenRow = !evenRow;
+        
+        // Row text
+        let rowHeight = 16;
+        xOffset = tableX;
+        
+        // Rate label
+        const label = getLocalizedContent(config.label, 'en', `Rate ${idx+1}`);
+        const labelLines = doc.splitTextToSize(label, colWidths[0] - 8);
+        doc.text(labelLines, xOffset + 4, yPos);
+        xOffset += colWidths[0];
+        
+        // Price value
+        const priceText = `€${config.price || 0}/night`;
+        doc.text(priceText, xOffset + 4, yPos);
+        xOffset += colWidths[1];
+        
+        // Conditions
+        let conditionsText = '';
+        if (config.conditions) {
+          if (config.conditions.minStay) {
+            conditionsText += `Min. Stay: ${config.conditions.minStay}\n`;
+          }
+          if (config.conditions.minGuests) {
+            conditionsText += `Min. Guests: ${config.conditions.minGuests}\n`;
+          }
+          if (config.conditions.maxGuests) {
+            conditionsText += `Max. Guests: ${config.conditions.maxGuests}`;
+          }
+        }
+        
+        if (conditionsText.trim()) {
+          const conditionLines = doc.splitTextToSize(conditionsText, colWidths[2] - 8);
+          doc.text(conditionLines, xOffset + 4, yPos);
+          
+          // Adjust row height if needed
+          const conditionHeight = conditionLines.length * 5 + 6;
+          if (conditionHeight > rowHeight) {
+            rowHeight = conditionHeight;
+          }
+        }
+        
+        // Date range (if available)
+        if (config.dateRange && (config.dateRange.start || config.dateRange.end)) {
+          let dateRangeText = '';
+          if (config.dateRange.start && config.dateRange.end) {
+            dateRangeText = `${config.dateRange.start} - ${config.dateRange.end}`;
+          } else if (config.dateRange.start) {
+            dateRangeText = `From ${config.dateRange.start}`;
+          } else if (config.dateRange.end) {
+            dateRangeText = `Until ${config.dateRange.end}`;
+          }
+          
+          if (dateRangeText) {
+            doc.setTextColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+            doc.setFontSize(fontSizes.small - 1);
+            doc.text(dateRangeText, tableX + 4, yPos + 5);
+            doc.setTextColor(colors.text[0], colors.text[1], colors.text[2]);
+            doc.setFontSize(fontSizes.small);
+          }
+        }
+        
+        yPos += rowHeight;
+      });
+      
+      // Table border
+      doc.setDrawColor(colors.lightText[0], colors.lightText[1], colors.lightText[2]);
+      doc.setLineWidth(0.3);
+      doc.rect(tableX, yPos - villa.priceConfigurations.length * 16 - 6, tableWidth, villa.priceConfigurations.length * 16 + 6);
+      
+      yPos += 15;
+    }
+    
+    // Booking information/call to action
+    if (yPos < 220) {
+      // Decorative separator
+      doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+      doc.setLineWidth(1);
+      doc.line(60, yPos, 150, yPos);
+      yPos += 15;
+      
+      // Call to action
+      doc.setFontSize(fontSizes.sectionTitle);
+      doc.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2]);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Ready to Experience Luxury?', 105, yPos, { align: 'center' });
+      yPos += 10;
+      
+      doc.setFontSize(fontSizes.normal);
+      doc.setTextColor(colors.text[0], colors.text[1], colors.text[2]);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Contact us to book this exceptional villa and start your perfect Ibiza getaway.', 105, yPos, { align: 'center' });
+      yPos += 15;
+      
+      // Contact box
+      doc.setFillColor(245, 245, 245);
+      doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(50, yPos, 110, 40, 3, 3, 'FD');
+      
+      doc.setFontSize(fontSizes.normal);
+      doc.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2]);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Ibiza Luxury Villas', 105, yPos + 10, { align: 'center' });
+      
+      doc.setFontSize(fontSizes.small);
+      doc.setTextColor(colors.text[0], colors.text[1], colors.text[2]);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Email: bookings@ibizaluxuryvillas.com', 105, yPos + 20, { align: 'center' });
+      doc.text('Phone: +34 971 123 456', 105, yPos + 30, { align: 'center' });
+    }
+    
+    // Add page footer
+    addPageFooter(doc, villa, colors, fontSizes);
+  };
+
   // Helper function to add main information page
   const addMainInfoPage = (doc, villa, colors, fontSizes) => {
     // Header section
@@ -1152,309 +1365,7 @@ const addCoverPage = async (doc, villa, villaName, colors, fontSizes) => {
     // Add page footer
     addPageFooter(doc, villa, colors, fontSizes);
   };
-  
- 
-const addPhotosPage = async (doc, villa, colors, fontSizes) => {
-  // Header
-  addPageHeader(doc, 'Villa Gallery', colors, fontSizes);
-  
-  // Photo gallery layout
-  if (villa.photos && villa.photos.length > 0) {
-    // Define grid layout
-    const margin = 20;
-    const gutter = 10;
-    const availableWidth = 210 - (margin * 2);
-    
-    // For just 1-3 photos, use larger sizes
-    if (villa.photos.length <= 3) {
-      const photoHeight = 80;
-      let yPos = 40;
-      
-      for (let i = 0; i < Math.min(3, villa.photos.length); i++) {
-        try {
-          const photoUrl = villa.photos[i].url;
-          if (photoUrl) {
-            // Load image as base64
-            const imgData = await loadImageAsBase64(photoUrl);
-            
-            // Add image to PDF with proper sizing
-            doc.addImage(imgData, 'JPEG', margin, yPos, availableWidth, photoHeight);
-          }
-        } catch (err) {
-          console.error(`Error loading villa photo ${i}:`, err);
-          
-          // Create image placeholder as fallback
-          doc.setFillColor(240, 240, 240);
-          doc.roundedRect(margin, yPos, availableWidth, photoHeight, 3, 3, 'F');
-          doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
-          doc.setLineWidth(0.5);
-          doc.roundedRect(margin, yPos, availableWidth, photoHeight, 3, 3, 'S');
-          
-          // Add placeholder text
-          doc.setFontSize(12);
-          doc.setTextColor(100, 100, 100);
-          doc.text(`Villa Photo ${i+1}`, 105, yPos + (photoHeight/2), { align: 'center' });
-        }
-        
-        yPos += photoHeight + gutter;
-      }
-    } else {
-      // For 4+ photos, use a grid
-      const itemsPerRow = 2;
-      const photoWidth = (availableWidth - ((itemsPerRow - 1) * gutter)) / itemsPerRow;
-      const photoHeight = photoWidth * 0.75; // 4:3 aspect ratio
-      
-      let yPos = 40;
-      
-      for (let i = 0; i < Math.min(8, villa.photos.length); i++) {
-        const row = Math.floor(i / itemsPerRow);
-        const col = i % itemsPerRow;
-        
-        const xPos = margin + (col * (photoWidth + gutter));
-        const currentYPos = yPos + (row * (photoHeight + gutter));
-        
-        // Check if we need a new page
-        if (currentYPos + photoHeight > 260) {
-          doc.addPage();
-          addPageHeader(doc, 'Villa Gallery', colors, fontSizes);
-          yPos = 40;
-          i -= col; // Restart at the beginning of this row
-          continue;
-        }
-        
-        try {
-          const photoUrl = villa.photos[i].url;
-          if (photoUrl) {
-            // Load image as base64
-            const imgData = await loadImageAsBase64(photoUrl);
-            
-            // Add image to PDF with proper sizing
-            doc.addImage(imgData, 'JPEG', xPos, currentYPos, photoWidth, photoHeight);
-          }
-        } catch (err) {
-          console.error(`Error loading villa photo ${i}:`, err);
-          
-          // Create image placeholder as fallback
-          doc.setFillColor(240, 240, 240);
-          doc.roundedRect(xPos, currentYPos, photoWidth, photoHeight, 3, 3, 'F');
-          doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
-          doc.setLineWidth(0.5);
-          doc.roundedRect(xPos, currentYPos, photoWidth, photoHeight, 3, 3, 'S');
-          
-          // Add placeholder text
-          doc.setFontSize(10);
-          doc.setTextColor(100, 100, 100);
-          doc.text(`Villa Photo ${i+1}`, xPos + (photoWidth/2), currentYPos + (photoHeight/2), { align: 'center' });
-        }
-      }
-    }
-  }
-  
-  // Add page footer
-  addPageFooter(doc, villa, colors, fontSizes);
-};
-  
-  // Helper function to add price and booking page
-  const addPriceAndBookingPage = (doc, villa, colors, fontSizes) => {
-    // Header
-    addPageHeader(doc, 'Price & Booking Information', colors, fontSizes);
-    
-    // Current vertical position tracker
-    let yPos = 40;
-    
-    // Pricing section
-    if (villa.priceConfigurations && villa.priceConfigurations.length > 0) {
-      doc.setFontSize(fontSizes.sectionTitle);
-      doc.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2]);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Rate Information', 20, yPos);
-      
-      // Gold underline
-      doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
-      doc.setLineWidth(0.5);
-      doc.line(20, yPos + 2, 80, yPos + 2);
-      
-      yPos += 15;
-      
-      // Price table header
-      const colWidths = [60, 30, 80];
-      const tableWidth = colWidths.reduce((sum, width) => sum + width, 0);
-      const tableX = 20;
-      
-      // Draw table header
-      doc.setFillColor(colors.primary[0], colors.primary[1], colors.primary[2]);
-      doc.rect(tableX, yPos - 6, tableWidth, 8, 'F');
-      
-      doc.setFontSize(fontSizes.small);
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      
-      let xOffset = tableX;
-      doc.text('Rate Label', xOffset + 4, yPos);
-      xOffset += colWidths[0];
-      
-      doc.text('Price', xOffset + 4, yPos);
-      xOffset += colWidths[1];
-      
-      doc.text('Conditions', xOffset + 4, yPos);
-      
-      yPos += 6;
-      
-      // Draw table rows
-      doc.setTextColor(colors.text[0], colors.text[1], colors.text[2]);
-      doc.setFont('helvetica', 'normal');
-      
-      let evenRow = true;
-      villa.priceConfigurations.forEach((config, idx) => {
-        // Check if we need to start a new page
-        if (yPos > 260) {
-          doc.addPage();
-          addPageHeader(doc, 'Price & Booking Information', colors, fontSizes);
-          yPos = 40;
-          
-          // Redraw table header on new page
-          doc.setFillColor(colors.primary[0], colors.primary[1], colors.primary[2]);
-          doc.rect(tableX, yPos - 6, tableWidth, 8, 'F');
-          
-          doc.setFontSize(fontSizes.small);
-          doc.setTextColor(255, 255, 255);
-          doc.setFont('helvetica', 'bold');
-          
-          let xOffset = tableX;
-          doc.text('Rate Label', xOffset + 4, yPos);
-          xOffset += colWidths[0];
-          
-          doc.text('Price', xOffset + 4, yPos);
-          xOffset += colWidths[1];
-          
-          doc.text('Conditions', xOffset + 4, yPos);
-          
-          yPos += 6;
-          doc.setTextColor(colors.text[0], colors.text[1], colors.text[2]);
-          doc.setFont('helvetica', 'normal');
-        }
-        
-        // Row background (alternating)
-        if (evenRow) {
-          doc.setFillColor(250, 250, 250);
-          doc.rect(tableX, yPos - 5, tableWidth, 16, 'F');
-        }
-        evenRow = !evenRow;
-        
-        // Row text
-        let rowHeight = 16; // Default row height - changed from const to let
-        xOffset = tableX;
-        
-        // Rate label
-        const label = getLocalizedContent(config.label, 'en', `Rate ${idx+1}`);
-        const labelLines = doc.splitTextToSize(label, colWidths[0] - 8);
-        doc.text(labelLines, xOffset + 4, yPos);
-        xOffset += colWidths[0];
-        
-        // Price value
-        const priceText = `€${config.price || 0}/night`;
-        doc.text(priceText, xOffset + 4, yPos);
-        xOffset += colWidths[1];
-        
-        // Conditions
-        let conditionsText = '';
-        if (config.conditions) {
-          if (config.conditions.minStay) {
-            conditionsText += `Min. Stay: ${config.conditions.minStay}\n`;
-          }
-          if (config.conditions.minGuests) {
-            conditionsText += `Min. Guests: ${config.conditions.minGuests}\n`;
-          }
-          if (config.conditions.maxGuests) {
-            conditionsText += `Max. Guests: ${config.conditions.maxGuests}`;
-          }
-        }
-        
-        if (conditionsText.trim()) {
-          const conditionLines = doc.splitTextToSize(conditionsText, colWidths[2] - 8);
-          doc.text(conditionLines, xOffset + 4, yPos);
-          
-          // Adjust row height if needed
-          const conditionHeight = conditionLines.length * 5 + 6;
-          if (conditionHeight > rowHeight) {
-            rowHeight = conditionHeight;
-          }
-        }
-        
-        // Date range (if available)
-        if (config.dateRange && (config.dateRange.start || config.dateRange.end)) {
-          let dateRangeText = '';
-          if (config.dateRange.start && config.dateRange.end) {
-            dateRangeText = `${config.dateRange.start} - ${config.dateRange.end}`;
-          } else if (config.dateRange.start) {
-            dateRangeText = `From ${config.dateRange.start}`;
-          } else if (config.dateRange.end) {
-            dateRangeText = `Until ${config.dateRange.end}`;
-          }
-          
-          if (dateRangeText) {
-            doc.setTextColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
-            doc.setFontSize(fontSizes.small - 1);
-            doc.text(dateRangeText, tableX + 4, yPos + 5);
-            doc.setTextColor(colors.text[0], colors.text[1], colors.text[2]);
-            doc.setFontSize(fontSizes.small);
-          }
-        }
-        
-        yPos += rowHeight;
-      });
-      
-      // Table border
-      doc.setDrawColor(colors.lightText[0], colors.lightText[1], colors.lightText[2]);
-      doc.setLineWidth(0.3);
-      doc.rect(tableX, yPos - villa.priceConfigurations.length * 16 - 6, tableWidth, villa.priceConfigurations.length * 16 + 6);
-      
-      yPos += 15;
-    }
-    
-    // Booking information/call to action
-    if (yPos < 220) {
-      // Decorative separator
-      doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
-      doc.setLineWidth(1);
-      doc.line(60, yPos, 150, yPos);
-      yPos += 15;
-      
-      // Call to action
-      doc.setFontSize(fontSizes.sectionTitle);
-      doc.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2]);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Ready to Experience Luxury?', 105, yPos, { align: 'center' });
-      yPos += 10;
-      
-      doc.setFontSize(fontSizes.normal);
-      doc.setTextColor(colors.text[0], colors.text[1], colors.text[2]);
-      doc.setFont('helvetica', 'normal');
-      doc.text('Contact us to book this exceptional villa and start your perfect Ibiza getaway.', 105, yPos, { align: 'center' });
-      yPos += 15;
-      
-      // Contact box
-      doc.setFillColor(245, 245, 245);
-      doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
-      doc.setLineWidth(0.5);
-      doc.roundedRect(50, yPos, 110, 40, 3, 3, 'FD');
-      
-      doc.setFontSize(fontSizes.normal);
-      doc.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2]);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Ibiza Luxury Villas', 105, yPos + 10, { align: 'center' });
-      
-      doc.setFontSize(fontSizes.small);
-      doc.setTextColor(colors.text[0], colors.text[1], colors.text[2]);
-      doc.setFont('helvetica', 'normal');
-      doc.text('Email: bookings@ibizaluxuryvillas.com', 105, yPos + 20, { align: 'center' });
-      doc.text('Phone: +34 971 123 456', 105, yPos + 30, { align: 'center' });
-    }
-    
-    // Add page footer
-    addPageFooter(doc, villa, colors, fontSizes);
-  };
-  
+
   // Helper function to add page header
   const addPageHeader = (doc, title, colors, fontSizes) => {
     // Gold decorative line at top
@@ -1471,7 +1382,7 @@ const addPhotosPage = async (doc, villa, colors, fontSizes) => {
     // Right aligned page title
     doc.text('Ibiza Luxury Villas', 190, 25, { align: 'right' });
   };
-  
+
   // Helper function to add page footer
   const addPageFooter = (doc, villa, colors, fontSizes) => {
     // Footer separator line
@@ -1488,11 +1399,200 @@ const addPhotosPage = async (doc, villa, colors, fontSizes) => {
     const villaName = getLocalizedContent(villa.name, 'en', 'Villa');
     doc.text(villaName, 20, 288);
     
-    // Center - page info (would be dynamic in real implementation)
-    // doc.text('Page 1 of 4', 105, 288, { align: 'center' });
-    
     // Right side - contact
     doc.text('www.ibizaluxuryvillas.com', 190, 288, { align: 'right' });
+  };
+  
+  // This is the only new function we're adding - no conflicts with existing code
+  const addAmenitiesPage = (doc, villa, colors, fontSizes) => {
+    // Add page heading
+    doc.setFillColor(...colors.primary);
+    doc.rect(0, 0, 210, 20, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(fontSizes.subheader);
+    doc.text('LUXURY AMENITIES', 105, 13, { align: 'center' });
+    
+    // Start content area
+    let currentY = 40;
+    
+    // Group amenities by category (if available)
+    const amenities = villa.amenities || [];
+    
+    // Create a two-column layout for amenities
+    const columnWidth = 85;
+    const leftColX = 20;
+    const rightColX = 115;
+    
+    // Prepare amenities list
+    const amenitiesList = Array.isArray(amenities) ? amenities : 
+                           (typeof amenities === 'string' ? amenities.split(',').map(a => a.trim()) : []);
+    
+    if (amenitiesList.length === 0) {
+      // No amenities available
+      doc.setTextColor(...colors.text);
+      doc.setFontSize(fontSizes.normal);
+      doc.text('Amenities information not available', 105, 150, { align: 'center' });
+      return;
+    }
+    
+    // Split amenities into two columns
+    const midPoint = Math.ceil(amenitiesList.length / 2);
+    const leftColAmenities = amenitiesList.slice(0, midPoint);
+    const rightColAmenities = amenitiesList.slice(midPoint);
+    
+    // Draw left column
+    doc.setTextColor(...colors.text);
+    doc.setFontSize(fontSizes.normal);
+    leftColAmenities.forEach((amenity, index) => {
+      doc.text(`• ${amenity}`, leftColX, currentY + (index * 10));
+    });
+    
+    // Draw right column
+    rightColAmenities.forEach((amenity, index) => {
+      doc.text(`• ${amenity}`, rightColX, currentY + (index * 10));
+    });
+    
+    // Add elegant footer note
+    doc.setTextColor(...colors.lightText);
+    doc.setFontSize(fontSizes.small);
+    doc.text('Additional amenities may be available upon request', 105, 270, { align: 'center' });
+  };
+  
+  // Handle PDF generation
+  const generateVillaPDF = async () => {
+    if (!currentPdfVilla) return;
+    
+    // Always use English for PDF generation regardless of current UI language
+    const pdfLanguage = 'en';
+    const villaName = getLocalizedContent(currentPdfVilla.name, pdfLanguage, 'Villa');
+    const villa = currentPdfVilla;
+    
+    try {
+      // Set loading state
+      setIsGeneratingPDF(true);
+      
+      // Create PDF with premium quality settings
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+        compress: true
+      });
+      
+      // Set document properties for better metadata
+      doc.setProperties({
+        title: `${villaName} - Ibiza Luxury Villas`,
+        subject: `Luxury Villa Details - ${villaName}`,
+        author: 'Ibiza Luxury Villas',
+        keywords: 'luxury, villa, ibiza, rental, premium, exclusive',
+        creator: 'Ibiza Luxury Villas PDF Generator'
+      });
+      
+      // Premium style constants for sophisticated design
+      const colors = {
+        primary: [0, 45, 114],       // Deep blue
+        secondary: [190, 167, 94],   // Gold accent
+        text: [45, 41, 38],          // Rich dark for text
+        lightText: [96, 96, 96],     // Light gray for secondary text
+        background: [252, 250, 248], // Warm white background
+        borders: [230, 215, 185]     // Subtle cream for borders
+      };
+      
+      const fontSizes = {
+        header: 28,
+        subheader: 18,
+        sectionTitle: 16,
+        normal: 12,
+        small: 10
+      };
+      
+      // ---- Create cover page ----
+      await addCoverPage(doc, villa, villaName, colors, fontSizes);
+      
+      // ---- Create interior pages ----
+      // Main information page
+      doc.addPage();
+      addMainInfoPage(doc, villa, colors, fontSizes);
+      
+      // Photos page (if available)
+      if (villa.photos && villa.photos.length > 0) {
+        doc.addPage();
+        await addPhotosPage(doc, villa, colors, fontSizes);
+      }
+      
+      // Price and booking information
+      doc.addPage();
+      addPriceAndBookingPage(doc, villa, colors, fontSizes);
+      
+      // Add amenities page if villa has amenities
+      if (villa.amenities && villa.amenities.length > 0) {
+        doc.addPage();
+        addAmenitiesPage(doc, villa, colors, fontSizes);
+      }
+      
+      // Add page numbers to all pages except the cover
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 2; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setTextColor(...colors.lightText);
+        doc.setFontSize(8);
+        doc.text(`Page ${i-1} of ${pageCount-1}`, 105, 285, { align: 'center' });
+      }
+      
+      // Save the PDF with a clean filename
+      doc.save(`${villaName.replace(/\s+/g, '_')}_luxury_villa.pdf`);
+      
+      // Close the PDF modal
+      setIsGeneratingPDF(false);
+      setCurrentPdfVilla(null);
+      
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert("There was an error generating the PDF. Please try again.");
+      setIsGeneratingPDF(false);
+      setCurrentPdfVilla(null);
+    }
+  };
+
+  const getFilteredVillas = () => {
+    return villas.filter(villa => {
+      // Search term filter (name and address)
+      const searchLower = searchTerm.toLowerCase();
+      const nameMatch = getLocalizedContent(villa.name, language, '').toLowerCase().includes(searchLower);
+      const addressMatch = getLocalizedContent(villa.address, language, '').toLowerCase().includes(searchLower);
+      
+      if (searchTerm && !nameMatch && !addressMatch) {
+        return false;
+      }
+      
+      // Bedroom filter
+      if (bedroomFilter && villa.bedrooms !== parseInt(bedroomFilter)) {
+        return false;
+      }
+      
+      // Bathroom filter
+      if (bathroomFilter && villa.bathrooms !== parseInt(bathroomFilter)) {
+        return false;
+      }
+      
+      // Price filter
+      if (priceFilter.min || priceFilter.max) {
+        const villaPrice = villa.priceConfigurations && villa.priceConfigurations.length > 0 
+          ? parseFloat(villa.priceConfigurations[0].price) || 0 
+          : 0;
+        
+        if (priceFilter.min && villaPrice < parseFloat(priceFilter.min)) {
+          return false;
+        }
+        
+        if (priceFilter.max && villaPrice > parseFloat(priceFilter.max)) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
   };
   
   // Translations (minimal version)
@@ -1543,7 +1643,18 @@ const addPhotosPage = async (doc, villa, colors, fontSizes) => {
       pdfGeneration: "PDF Generation",
       generating: "Generating PDF...",
       pdfVillaInfo: "Villa Information Document",
-      pdfRates: "Rate Information"
+      pdfRates: "Rate Information",
+      search: "Search villas...",
+      filters: "Filters",
+      showFilters: "Show Filters",
+      hideFilters: "Hide Filters",
+      priceRange: "Price Range",
+      minPrice: "Min €",
+      maxPrice: "Max €",
+      anyBedrooms: "Any Bedrooms",
+      anyBathrooms: "Any Bathrooms",
+      resultsFound: "results found",
+      clearFilters: "Clear All"
     },
     ro: {
       addVilla: "Adaugă Vilă",
@@ -1591,7 +1702,18 @@ const addPhotosPage = async (doc, villa, colors, fontSizes) => {
       pdfGeneration: "Generare PDF",
       generating: "Se generează PDF...",
       pdfVillaInfo: "Document de Informații Vilă",
-      pdfRates: "Informații despre Tarife"
+      pdfRates: "Informații despre Tarife",
+      search: "Caută vile...",
+      filters: "Filtre",
+      showFilters: "Arată Filtrele",
+      hideFilters: "Ascunde Filtrele",
+      priceRange: "Interval de Preț",
+      minPrice: "Min €",
+      maxPrice: "Max €",
+      anyBedrooms: "Orice Dormitoare",
+      anyBathrooms: "Orice Băi",
+      resultsFound: "rezultate găsite",
+      clearFilters: "Șterge Tot"
     }
   };
   
@@ -1599,14 +1721,16 @@ const addPhotosPage = async (doc, villa, colors, fontSizes) => {
   
   return (
     <div>
+      
+      
       {/* Villa List */}
       <h1 style={{ marginBottom: '1rem', fontSize: '1.5rem', fontWeight: 'bold' }}>
         {t.rentalVillas}
       </h1>
       
-   <div style={{ marginBottom: '1.5rem' }}>
-  {/* Header with Add Button */}
-  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+      <div style={{ marginBottom: '1.5rem' }}>
+        {/* Header with Add Button */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
     <h2 style={{ fontSize: '1.2rem' }}>
       {t.villaListings}
     </h2>
@@ -1629,420 +1753,410 @@ const addPhotosPage = async (doc, villa, colors, fontSizes) => {
     </button>
   </div>
 
-  {/* Search and Filter Controls Row - Responsive */}
-  <div style={{ 
-    display: 'flex', 
-    gap: '1rem', 
-    alignItems: 'flex-start', 
-    marginBottom: '1rem',
-    flexDirection: window.innerWidth < 768 ? 'column' : 'row'
-  }}>
-    {/* Search Bar - Limited width on desktop */}
-    <div style={{ 
-      flex: window.innerWidth < 768 ? 'none' : '1',
-      width: window.innerWidth < 768 ? '100%' : 'auto',
-      maxWidth: window.innerWidth >= 768 ? '400px' : 'none',
-      minWidth: window.innerWidth >= 768 ? '300px' : 'auto'
-    }}>
-      <div style={{ position: 'relative' }}>
-        <input
-          type="text"
-          placeholder={t.search}
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '0.75rem 1rem 0.75rem 2.5rem',
-            border: '2px solid #E5E7EB',
-            borderRadius: '0.5rem',
-            fontSize: '1rem',
-            outline: 'none',
-            transition: 'border-color 0.2s',
-            boxSizing: 'border-box'
-          }}
-          onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
-          onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
-        />
-        {/* Search Icon */}
-        <div style={{
-          position: 'absolute',
-          left: '0.75rem',
-          top: '50%',
-          transform: 'translateY(-50%)',
-          color: '#9CA3AF',
-          pointerEvents: 'none'
+        {/* Search and Filter Controls Row - Responsive */}
+        <div style={{ 
+          display: 'flex', 
+          gap: '1rem', 
+          alignItems: 'flex-start', 
+          marginBottom: '1rem',
+          flexWrap: 'wrap'
         }}>
-          🔍
+          {/* Search Bar - Limited width on desktop */}
+          <div style={{ 
+            flex: window.innerWidth < 768 ? 'none' : '1',
+            width: window.innerWidth < 768 ? '100%' : 'auto',
+            maxWidth: window.innerWidth >= 768 ? '400px' : 'none',
+            minWidth: window.innerWidth >= 768 ? '300px' : 'auto'
+          }}>
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                placeholder={t.search}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 1rem 0.75rem 2.5rem',
+                  border: '2px solid #E5E7EB',
+                  borderRadius: '0.5rem',
+                  fontSize: '1rem',
+                  outline: 'none',
+                  transition: 'border-color 0.2s',
+                  boxSizing: 'border-box'
+                }}
+                onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
+                onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
+              />
+              {/* Search Icon */}
+              <div style={{
+                position: 'absolute',
+                left: '0.75rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: '#9CA3AF',
+                pointerEvents: 'none'
+              }}>
+                🔍
+              </div>
+            </div>
+          </div>
+
+          {/* Controls Row - Stack on mobile */}
+          <div style={{
+            display: 'flex',
+            gap: '0.75rem',
+            alignItems: 'center',
+            flexDirection: window.innerWidth < 768 ? 'column' : 'row',
+            width: window.innerWidth < 768 ? '100%' : 'auto'
+          }}>
+            {/* Filter Toggle Button */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1rem',
+                borderRadius: '0.375rem',
+                border: '1px solid #D1D5DB',
+                fontWeight: '500',
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                transition: 'colors 0.2s',
+                backgroundColor: showFilters ? '#F3F4F6' : 'white',
+                color: showFilters ? '#374151' : '#6B7280'
+              }}
+              onMouseOver={(e) => e.target.style.backgroundColor = showFilters ? '#E5E7EB' : '#F9FAFB'}
+              onMouseOut={(e) => e.target.style.backgroundColor = showFilters ? '#F3F4F6' : 'white'}
+            >
+              <span>🔽</span>
+              {showFilters ? t.hideFilters : t.showFilters}
+            </button>
+
+            {/* Results Count and Clear Button */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.75rem',
+              backgroundColor: '#F9FAFB',
+              padding: '0.5rem 1rem',
+              borderRadius: '0.5rem',
+              border: '1px solid #E5E7EB',
+              width: window.innerWidth < 768 ? '100%' : 'auto',
+              justifyContent: window.innerWidth < 768 ? 'space-between' : 'center'
+            }}>
+              <span style={{ 
+                color: '#374151', 
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                whiteSpace: 'nowrap'
+              }}>
+                {getFilteredVillas().length} {t.resultsFound}
+              </span>
+              
+              {(searchTerm || priceFilter.min || priceFilter.max || bedroomFilter || bathroomFilter) && (
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setPriceFilter({ min: '', max: '' });
+                    setBedroomFilter('');
+                    setBathroomFilter('');
+                  }}
+                  style={{
+                    padding: '0.375rem 0.75rem',
+                    backgroundColor: '#EF4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                    fontWeight: '500',
+                    transition: 'background-color 0.2s',
+                    whiteSpace: 'nowrap'
+                  }}
+                  onMouseOver={(e) => e.target.style.backgroundColor = '#DC2626'}
+                  onMouseOut={(e) => e.target.style.backgroundColor = '#EF4444'}
+                >
+                  ✕ {t.clearFilters}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
 
-    {/* Controls Row - Stack on mobile */}
-    <div style={{
-      display: 'flex',
-      gap: '0.75rem',
-      alignItems: 'center',
-      flexDirection: window.innerWidth < 768 ? 'column' : 'row',
-      width: window.innerWidth < 768 ? '100%' : 'auto'
-    }}>
-      {/* Filter Toggle Button */}
-      <button
-  onClick={() => setShowFilters(!showFilters)}
-  className={`flex items-center justify-center gap-2 px-4 py-3 rounded border font-medium transition-colors text-sm ${
-    showFilters 
-      ? 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200' 
-      : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
-  }`}
->
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
-  </svg>
-  {showFilters ? t.hideFilters : t.showFilters}
-</button>
+        {/* Enhanced Filter Panel - Mobile Responsive */}
+        {showFilters && (
+          <div style={{
+            backgroundColor: 'white',
+            border: '2px solid #E5E7EB',
+            borderRadius: '0.75rem',
+            padding: window.innerWidth < 768 ? '1rem' : '1.5rem',
+            marginBottom: '1rem',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+            animation: 'slideDown 0.3s ease-out'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              marginBottom: '1.5rem',
+              paddingBottom: '0.75rem',
+              borderBottom: '1px solid #E5E7EB'
+            }}>
+              <span style={{ width: '1rem', height: '1rem', marginRight: '0.5rem', color: '#6B7280' }}>🔽</span>
+              <h3 style={{ 
+                fontSize: '1.1rem', 
+                fontWeight: '600', 
+                margin: 0,
+                color: '#374151'
+              }}>
+                {t.filters}
+              </h3>
+            </div>
+            
+            {/* Responsive Grid - Single column on mobile */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+              gap: window.innerWidth < 768 ? '1rem' : '1.5rem'
+            }}>
+              {/* Price Range Filter - Responsive */}
+              <div style={{
+                backgroundColor: '#F9FAFB',
+                padding: window.innerWidth < 768 ? '0.75rem' : '1rem',
+                borderRadius: '0.5rem',
+                border: '1px solid #E5E7EB'
+              }}>
+                <label style={{ 
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginBottom: '0.75rem', 
+                  fontSize: '0.875rem', 
+                  fontWeight: '600',
+                  color: '#374151'
+                }}>
+                  <span style={{ marginRight: '0.5rem' }}>💰</span>
+                  {t.priceRange} (€)
+                </label>
+                <div style={{ 
+                  display: 'flex', 
+                  gap: '0.5rem', 
+                  alignItems: 'center',
+                  flexDirection: window.innerWidth < 480 ? 'column' : 'row'
+                }}>
+                  <input
+                    type="number"
+                    placeholder={t.minPrice}
+                    value={priceFilter.min}
+                    onChange={(e) => setPriceFilter(prev => ({ ...prev, min: e.target.value }))}
+                    style={{
+                      flex: 1,
+                      width: window.innerWidth < 480 ? '100%' : 'auto',
+                      padding: '0.75rem',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      transition: 'border-color 0.2s',
+                      boxSizing: 'border-box'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
+                    onBlur={(e) => e.target.style.borderColor = '#D1D5DB'}
+                  />
+                  <span style={{ 
+                    color: '#6B7280', 
+                    fontWeight: '500',
+                    display: window.innerWidth < 480 ? 'none' : 'block'
+                  }}>—</span>
+                  <input
+                    type="number"
+                    placeholder={t.maxPrice}
+                    value={priceFilter.max}
+                    onChange={(e) => setPriceFilter(prev => ({ ...prev, max: e.target.value }))}
+                    style={{
+                      flex: 1,
+                      width: window.innerWidth < 480 ? '100%' : 'auto',
+                      padding: '0.75rem',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      transition: 'border-color 0.2s',
+                      boxSizing: 'border-box'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
+                    onBlur={(e) => e.target.style.borderColor = '#D1D5DB'}
+                  />
+                </div>
+              </div>
 
-      {/* Results Count and Clear Button */}
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: '0.75rem',
-        backgroundColor: '#F9FAFB',
-        padding: '0.5rem 1rem',
-        borderRadius: '0.5rem',
-        border: '1px solid #E5E7EB',
-        width: window.innerWidth < 768 ? '100%' : 'auto',
-        justifyContent: window.innerWidth < 768 ? 'space-between' : 'center'
-      }}>
-        <span style={{ 
-          color: '#374151', 
-          fontSize: '0.875rem',
-          fontWeight: '500',
-          whiteSpace: 'nowrap'
-        }}>
-          {getFilteredVillas().length} {t.resultsFound}
-        </span>
-        
-        {(searchTerm || priceFilter.min || priceFilter.max || bedroomFilter || bathroomFilter) && (
-          <button
-            onClick={() => {
-              setSearchTerm('');
-              setPriceFilter({ min: '', max: '' });
-              setBedroomFilter('');
-              setBathroomFilter('');
-            }}
-            style={{
-              padding: '0.375rem 0.75rem',
-              backgroundColor: '#EF4444',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.375rem',
-              fontSize: '0.75rem',
-              cursor: 'pointer',
-              fontWeight: '500',
-              transition: 'background-color 0.2s',
-              whiteSpace: 'nowrap'
-            }}
-            onMouseOver={(e) => e.target.style.backgroundColor = '#DC2626'}
-            onMouseOut={(e) => e.target.style.backgroundColor = '#EF4444'}
-          >
-            ✕ {t.clearFilters}
-          </button>
+              {/* Bedrooms Filter */}
+              <div style={{
+                backgroundColor: '#F9FAFB',
+                padding: window.innerWidth < 768 ? '0.75rem' : '1rem',
+                borderRadius: '0.5rem',
+                border: '1px solid #E5E7EB'
+              }}>
+                <label style={{ 
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginBottom: '0.75rem', 
+                  fontSize: '0.875rem', 
+                  fontWeight: '600',
+                  color: '#374151'
+                }}>
+                  <span style={{ marginRight: '0.5rem' }}>🛏️</span>
+                  {t.bedrooms}
+                </label>
+                <select
+                  value={bedroomFilter}
+                  onChange={(e) => setBedroomFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.875rem',
+                    backgroundColor: 'white',
+                    outline: 'none',
+                    transition: 'border-color 0.2s',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
+                  onBlur={(e) => e.target.style.borderColor = '#D1D5DB'}
+                >
+                  <option value="">{t.anyBedrooms}</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5+</option>
+                </select>
+              </div>
+
+              {/* Bathrooms Filter */}
+              <div style={{
+                backgroundColor: '#F9FAFB',
+                padding: window.innerWidth < 768 ? '0.75rem' : '1rem',
+                borderRadius: '0.5rem',
+                border: '1px solid #E5E7EB'
+              }}>
+                <label style={{ 
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginBottom: '0.75rem', 
+                  fontSize: '0.875rem', 
+                  fontWeight: '600',
+                  color: '#374151'
+                }}>
+                  <span style={{ marginRight: '0.5rem' }}>🚿</span>
+                  {t.bathrooms}
+                </label>
+                <select
+                  value={bathroomFilter}
+                  onChange={(e) => setBathroomFilter(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.875rem',
+                    backgroundColor: 'white',
+                    outline: 'none',
+                    transition: 'border-color 0.2s',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
+                  onBlur={(e) => e.target.style.borderColor = '#D1D5DB'}
+                >
+                  <option value="">{t.anyBathrooms}</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4+</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Active Filters Summary - Better mobile layout */}
+            {(searchTerm || priceFilter.min || priceFilter.max || bedroomFilter || bathroomFilter) && (
+              <div style={{
+                marginTop: '1.5rem',
+                paddingTop: '1rem',
+                borderTop: '1px solid #E5E7EB'
+              }}>
+                <p style={{ 
+                  fontSize: '0.75rem', 
+                  color: '#6B7280', 
+                  margin: '0 0 0.5rem 0',
+                  fontWeight: '500'
+                }}>
+                  Active Filters:
+                </p>
+                <div style={{ 
+                  display: 'flex', 
+                  flexWrap: 'wrap', 
+                  gap: '0.5rem',
+                  justifyContent: window.innerWidth < 768 ? 'flex-start' : 'flex-start'
+                }}>
+                  {searchTerm && (
+                    <span style={{
+                      backgroundColor: '#EBF8FF',
+                      color: '#1E40AF',
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.75rem',
+                      border: '1px solid #BFDBFE',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      Search: "{searchTerm.length > 15 ? searchTerm.substring(0, 15) + '...' : searchTerm}"
+                    </span>
+                  )}
+                  {(priceFilter.min || priceFilter.max) && (
+                    <span style={{
+                      backgroundColor: '#F0FDF4',
+                      color: '#15803D',
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.75rem',
+                      border: '1px solid #BBF7D0',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      €{priceFilter.min || '0'} - €{priceFilter.max || '∞'}
+                    </span>
+                  )}
+                  {bedroomFilter && (
+                    <span style={{
+                      backgroundColor: '#FEF3C7',
+                      color: '#92400E',
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.75rem',
+                      border: '1px solid #FDE68A',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {bedroomFilter} Bed
+                    </span>
+                  )}
+                  {bathroomFilter && (
+                    <span style={{
+                      backgroundColor: '#FECACA',
+                      color: '#991B1B',
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '0.375rem',
+                      fontSize: '0.75rem',
+                      border: '1px solid #FCA5A5',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {bathroomFilter} Bath
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
-    </div>
-  </div>
-
-  {/* Enhanced Filter Panel - Mobile Responsive */}
-  {showFilters && (
-    <div style={{
-      backgroundColor: 'white',
-      border: '2px solid #E5E7EB',
-      borderRadius: '0.75rem',
-      padding: window.innerWidth < 768 ? '1rem' : '1.5rem',
-      marginBottom: '1rem',
-      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-      animation: 'slideDown 0.3s ease-out'
-    }}>
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        marginBottom: '1.5rem',
-        paddingBottom: '0.75rem',
-        borderBottom: '1px solid #E5E7EB'
-      }}>
-       <svg style={{ width: '1rem', height: '1rem', marginRight: '0.5rem', color: '#6B7280' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
-      </svg>
-        <h3 style={{ 
-          fontSize: '1.1rem', 
-          fontWeight: '600', 
-          margin: 0,
-          color: '#374151'
-        }}>
-          {t.filters}
-        </h3>
-      </div>
-      
-      {/* Responsive Grid - Single column on mobile */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: window.innerWidth < 768 
-          ? '1fr' 
-          : window.innerWidth < 1024 
-            ? 'repeat(2, 1fr)' 
-            : 'repeat(3, 1fr)',
-        gap: window.innerWidth < 768 ? '1rem' : '1.5rem'
-      }}>
-        {/* Price Range Filter - Responsive */}
-        <div style={{
-          backgroundColor: '#F9FAFB',
-          padding: window.innerWidth < 768 ? '0.75rem' : '1rem',
-          borderRadius: '0.5rem',
-          border: '1px solid #E5E7EB'
-        }}>
-          <label style={{ 
-            display: 'flex',
-            alignItems: 'center',
-            marginBottom: '0.75rem', 
-            fontSize: '0.875rem', 
-            fontWeight: '600',
-            color: '#374151'
-          }}>
-            <span style={{ marginRight: '0.5rem' }}>💰</span>
-            {t.priceRange} (€)
-          </label>
-          <div style={{ 
-            display: 'flex', 
-            gap: '0.5rem', 
-            alignItems: 'center',
-            flexDirection: window.innerWidth < 480 ? 'column' : 'row'
-          }}>
-            <input
-              type="number"
-              placeholder={t.minPrice}
-              value={priceFilter.min}
-              onChange={(e) => setPriceFilter(prev => ({ ...prev, min: e.target.value }))}
-              style={{
-                flex: 1,
-                width: window.innerWidth < 480 ? '100%' : 'auto',
-                padding: '0.75rem',
-                border: '1px solid #D1D5DB',
-                borderRadius: '0.375rem',
-                fontSize: '0.875rem',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-                boxSizing: 'border-box'
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
-              onBlur={(e) => e.target.style.borderColor = '#D1D5DB'}
-            />
-            <span style={{ 
-              color: '#6B7280', 
-              fontWeight: '500',
-              display: window.innerWidth < 480 ? 'none' : 'block'
-            }}>—</span>
-            <input
-              type="number"
-              placeholder={t.maxPrice}
-              value={priceFilter.max}
-              onChange={(e) => setPriceFilter(prev => ({ ...prev, max: e.target.value }))}
-              style={{
-                flex: 1,
-                width: window.innerWidth < 480 ? '100%' : 'auto',
-                padding: '0.75rem',
-                border: '1px solid #D1D5DB',
-                borderRadius: '0.375rem',
-                fontSize: '0.875rem',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-                boxSizing: 'border-box'
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
-              onBlur={(e) => e.target.style.borderColor = '#D1D5DB'}
-            />
-          </div>
-        </div>
-
-        {/* Bedrooms Filter */}
-        <div style={{
-          backgroundColor: '#F9FAFB',
-          padding: window.innerWidth < 768 ? '0.75rem' : '1rem',
-          borderRadius: '0.5rem',
-          border: '1px solid #E5E7EB'
-        }}>
-          <label style={{ 
-            display: 'flex',
-            alignItems: 'center',
-            marginBottom: '0.75rem', 
-            fontSize: '0.875rem', 
-            fontWeight: '600',
-            color: '#374151'
-          }}>
-            <span style={{ marginRight: '0.5rem' }}>🛏️</span>
-            {t.bedrooms}
-          </label>
-          <select
-            value={bedroomFilter}
-            onChange={(e) => setBedroomFilter(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              border: '1px solid #D1D5DB',
-              borderRadius: '0.375rem',
-              fontSize: '0.875rem',
-              backgroundColor: 'white',
-              outline: 'none',
-              transition: 'border-color 0.2s',
-              boxSizing: 'border-box'
-            }}
-            onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
-            onBlur={(e) => e.target.style.borderColor = '#D1D5DB'}
-          >
-            <option value="">{t.anyBedrooms}</option>
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5">5+</option>
-          </select>
-        </div>
-
-        {/* Bathrooms Filter */}
-        <div style={{
-          backgroundColor: '#F9FAFB',
-          padding: window.innerWidth < 768 ? '0.75rem' : '1rem',
-          borderRadius: '0.5rem',
-          border: '1px solid #E5E7EB'
-        }}>
-          <label style={{ 
-            display: 'flex',
-            alignItems: 'center',
-            marginBottom: '0.75rem', 
-            fontSize: '0.875rem', 
-            fontWeight: '600',
-            color: '#374151'
-          }}>
-            <span style={{ marginRight: '0.5rem' }}>🚿</span>
-            {t.bathrooms}
-          </label>
-          <select
-            value={bathroomFilter}
-            onChange={(e) => setBathroomFilter(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              border: '1px solid #D1D5DB',
-              borderRadius: '0.375rem',
-              fontSize: '0.875rem',
-              backgroundColor: 'white',
-              outline: 'none',
-              transition: 'border-color 0.2s',
-              boxSizing: 'border-box'
-            }}
-            onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
-            onBlur={(e) => e.target.style.borderColor = '#D1D5DB'}
-          >
-            <option value="">{t.anyBathrooms}</option>
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4+</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Active Filters Summary - Better mobile layout */}
-      {(searchTerm || priceFilter.min || priceFilter.max || bedroomFilter || bathroomFilter) && (
-        <div style={{
-          marginTop: '1.5rem',
-          paddingTop: '1rem',
-          borderTop: '1px solid #E5E7EB'
-        }}>
-          <p style={{ 
-            fontSize: '0.75rem', 
-            color: '#6B7280', 
-            margin: '0 0 0.5rem 0',
-            fontWeight: '500'
-          }}>
-            Active Filters:
-          </p>
-          <div style={{ 
-            display: 'flex', 
-            flexWrap: 'wrap', 
-            gap: '0.5rem',
-            justifyContent: window.innerWidth < 768 ? 'flex-start' : 'flex-start'
-          }}>
-            {searchTerm && (
-              <span style={{
-                backgroundColor: '#EBF8FF',
-                color: '#1E40AF',
-                padding: '0.25rem 0.5rem',
-                borderRadius: '0.375rem',
-                fontSize: '0.75rem',
-                border: '1px solid #BFDBFE',
-                whiteSpace: 'nowrap'
-              }}>
-                Search: "{searchTerm.length > 15 ? searchTerm.substring(0, 15) + '...' : searchTerm}"
-              </span>
-            )}
-            {(priceFilter.min || priceFilter.max) && (
-              <span style={{
-                backgroundColor: '#F0FDF4',
-                color: '#15803D',
-                padding: '0.25rem 0.5rem',
-                borderRadius: '0.375rem',
-                fontSize: '0.75rem',
-                border: '1px solid #BBF7D0',
-                whiteSpace: 'nowrap'
-              }}>
-                €{priceFilter.min || '0'} - €{priceFilter.max || '∞'}
-              </span>
-            )}
-            {bedroomFilter && (
-              <span style={{
-                backgroundColor: '#FEF3C7',
-                color: '#92400E',
-                padding: '0.25rem 0.5rem',
-                borderRadius: '0.375rem',
-                fontSize: '0.75rem',
-                border: '1px solid #FDE68A',
-                whiteSpace: 'nowrap'
-              }}>
-                {bedroomFilter} Bed
-              </span>
-            )}
-            {bathroomFilter && (
-              <span style={{
-                backgroundColor: '#FECACA',
-                color: '#991B1B',
-                padding: '0.25rem 0.5rem',
-                borderRadius: '0.375rem',
-                fontSize: '0.75rem',
-                border: '1px solid #FCA5A5',
-                whiteSpace: 'nowrap'
-              }}>
-                {bathroomFilter} Bath
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  )}
-</div>
-
-{/* Add this CSS animation at the top of your component or in a style tag */}
-<style jsx>{`
-  @keyframes slideDown {
-    from {
-      opacity: 0;
-      transform: translateY(-10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-`}</style>
       
       <div style={{ 
         display: 'grid', 
@@ -2807,7 +2921,7 @@ const addPhotosPage = async (doc, villa, colors, fontSizes) => {
               {/* Villa Basic Info */}
               <div style={{ marginBottom: '1.5rem' }}>
                 <h2 style={{ fontSize: '1.25rem', borderBottom: '2px solid #004C99', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
-                {t.villaDetails}: {getLocalizedContent(currentPdfVilla.name, language)}
+                  {t.villaDetails}: {getLocalizedContent(currentPdfVilla.name, language)}
                 </h2>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
