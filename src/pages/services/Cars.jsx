@@ -48,26 +48,22 @@ const styles = {
     marginBottom: '16px',
     width: '100%'
   },
-  // NEW: Filter and search styles
-  // Replace this entire section in your styles object:
-// NEW: Filter and search styles
+
 filterContainer: {
   background: '#fff',
   borderRadius: '6px',
   boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
   padding: '8px',
   marginBottom: '12px',
-  
   margin: '0 auto 12px auto' // Center it
 },
-filterContainer: {
-  background: '#fff',
-  borderRadius: '6px',
-  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-  padding: '8px',
-  marginBottom: '12px',
-  
-  margin: '0 auto 12px auto' // Center it
+searchBar: {
+  width: '100%',
+  padding: '8px 12px',
+  borderRadius: '4px',
+  border: '1px solid #d1d5db',
+  fontSize: '14px',
+  marginBottom: '8px'
 },
 filterToggle: {
   display: 'flex',
@@ -89,8 +85,7 @@ filterGrid: {
   display: 'grid',
   gridTemplateColumns: 'repeat(6, 1fr)', // Fixed 6 columns max
   gap: '6px',
-  marginBottom: '6px',
-  
+  marginBottom: '6px'
 },
 filterGridMobile: {
   display: 'grid',
