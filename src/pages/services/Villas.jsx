@@ -172,17 +172,45 @@ const loadImageViaProxy = async (url) => {
   
   // Helper function to safely get localized content
   const getLocalizedContent = (obj, lang, fallback = '') => {
-    if (!obj) return fallback;
-    if (typeof obj === 'string') return obj;
-    if (typeof obj !== 'object') return String(obj);
-    if (obj[lang]) return obj[lang];
-    
-    // Try the other language if current one is missing
-    const otherLang = lang === 'en' ? 'ro' : 'en';
-    if (obj[otherLang]) return obj[otherLang];
-    
-    return fallback;
-  };
+  if (!obj) return fallback;
+  
+  // If it's already a string, return it
+  if (typeof obj === 'string') return obj || fallback;
+  
+  // If it's not an object, convert to string
+  if (typeof obj !== 'object') return String(obj) || fallback;
+  
+  // Try the requested language first
+  if (obj[lang] && obj[lang].trim()) return obj[lang];
+  
+  // Try the other language as fallback
+  const otherLang = lang === 'en' ? 'ro' : 'en';
+  if (obj[otherLang] && obj[otherLang].trim()) return obj[otherLang];
+  
+  // Try common field variations
+  const langVariations = [
+    `${lang}`,
+    `text_${lang}`,
+    `content_${lang}`,
+    `description_${lang}`,
+    `name_${lang}`,
+    `address_${lang}`,
+    `amenities_${lang}`
+  ];
+  
+  for (const variation of langVariations) {
+    if (obj[variation] && obj[variation].trim()) {
+      return obj[variation];
+    }
+  }
+  
+  // Last resort: return any non-empty value
+  const values = Object.values(obj).filter(val => 
+    val && typeof val === 'string' && val.trim()
+  );
+  
+  return values.length > 0 ? values[0] : fallback;
+};
   
   // Initialize anonymous auth to fix storage permission issues
   useEffect(() => {
@@ -456,56 +484,56 @@ const loadImageViaProxy = async (url) => {
   
   // Convert flattened form data to structured format for database
   const prepareFormDataForSave = () => {
-    // Convert flat form data to nested structure
-    return {
-      name: {
-        en: formData.name_en || '',
-        ro: formData.name_ro || ''
+  // Convert flat form data to nested structure with both languages
+  return {
+    name: {
+      en: formData.name_en || formData.name_ro || '', // Fallback to other language
+      ro: formData.name_ro || formData.name_en || ''  // Fallback to other language
+    },
+    address: {
+      en: formData.address_en || formData.address_ro || '',
+      ro: formData.address_ro || formData.address_en || ''
+    },
+    bedrooms: formData.bedrooms || '',
+    bathrooms: formData.bathrooms || '',
+    description: {
+      en: formData.description_en || formData.description_ro || '',
+      ro: formData.description_ro || formData.description_en || ''
+    },
+    amenities: {
+      en: formData.amenities_en || formData.amenities_ro || '',
+      ro: formData.amenities_ro || formData.amenities_en || ''
+    },
+    owner: {
+      name: formData.owner_name || '',
+      email: formData.owner_email || '',
+      phone: formData.owner_phone || '',
+      notes: {
+        en: formData.owner_notes_en || formData.owner_notes_ro || '',
+        ro: formData.owner_notes_ro || formData.owner_notes_en || ''
+      }
+    },
+    // Convert price configs to proper nested structure
+    priceConfigurations: priceConfigs.map(config => ({
+      id: config.id,
+      label: {
+        en: config.label_en || config.label_ro || '',
+        ro: config.label_ro || config.label_en || ''
       },
-      address: {
-        en: formData.address_en || '',
-        ro: formData.address_ro || ''
+      price: config.price || '',
+      type: config.type || 'nightly',
+      dateRange: {
+        start: config.dateRange_start || '',
+        end: config.dateRange_end || ''
       },
-      bedrooms: formData.bedrooms || '',
-      bathrooms: formData.bathrooms || '',
-      description: {
-        en: formData.description_en || '',
-        ro: formData.description_ro || ''
-      },
-      amenities: {
-        en: formData.amenities_en || '',
-        ro: formData.amenities_ro || ''
-      },
-      owner: {
-        name: formData.owner_name || '',
-        email: formData.owner_email || '',
-        phone: formData.owner_phone || '',
-        notes: {
-          en: formData.owner_notes_en || '',
-          ro: formData.owner_notes_ro || ''
-        }
-      },
-      // Convert price configs to proper nested structure
-      priceConfigurations: priceConfigs.map(config => ({
-        id: config.id,
-        label: {
-          en: config.label_en || '',
-          ro: config.label_ro || ''
-        },
-        price: config.price || '',
-        type: config.type || 'nightly',
-        dateRange: {
-          start: config.dateRange_start || '',
-          end: config.dateRange_end || ''
-        },
-        conditions: {
-          minStay: config.conditions_minStay || '',
-          minGuests: config.conditions_minGuests || '',
-          maxGuests: config.conditions_maxGuests || ''
-        }
-      }))
-    };
+      conditions: {
+        minStay: config.conditions_minStay || '',
+        minGuests: config.conditions_minGuests || '',
+        maxGuests: config.conditions_maxGuests || ''
+      }
+    }))
   };
+};
   
   // Handle add villa form submission
   const handleAddVilla = async (e) => {
@@ -642,65 +670,65 @@ const loadImageViaProxy = async (url) => {
   };
   
   // Start editing a villa
-  const startEditingVilla = (villa) => {
-    setCurrentVilla(villa);
-    
-    // Extract data to flat form structure
-    setFormData({
-      name_en: villa.name?.en || '',
-      name_ro: villa.name?.ro || '',
-      address_en: villa.address?.en || '',
-      address_ro: villa.address?.ro || '',
-      bedrooms: villa.bedrooms || '',
-      bathrooms: villa.bathrooms || '',
-      description_en: villa.description?.en || '',
-      description_ro: villa.description?.ro || '',
-      amenities_en: villa.amenities?.en || '',
-      amenities_ro: villa.amenities?.ro || '',
-      owner_name: villa.owner?.name || '',
-      owner_email: villa.owner?.email || '',
-      owner_phone: villa.owner?.phone || '',
-      owner_notes_en: villa.owner?.notes?.en || '',
-      owner_notes_ro: villa.owner?.notes?.ro || '',
-    });
-    
-    // Extract price configurations
-    if (Array.isArray(villa.priceConfigurations) && villa.priceConfigurations.length > 0) {
-      setPriceConfigs(
-        villa.priceConfigurations.map(config => ({
-          id: config.id || Date.now(),
-          label_en: config.label?.en || '',
-          label_ro: config.label?.ro || '',
-          price: config.price || '',
-          type: config.type || 'nightly',
-          dateRange_start: config.dateRange?.start || '',
-          dateRange_end: config.dateRange?.end || '',
-          conditions_minStay: config.conditions?.minStay || '',
-          conditions_minGuests: config.conditions?.minGuests || '',
-          conditions_maxGuests: config.conditions?.maxGuests || ''
-        }))
-      );
-    } else {
-      // If no price configs, create a default one
-      setPriceConfigs([{
-        id: Date.now(),
-        label_en: 'Standard Rate',
-        label_ro: 'Tarif Standard',
-        price: villa.price || '',
-        type: villa.priceType || 'nightly',
-        dateRange_start: '',
-        dateRange_end: '',
-        conditions_minStay: '',
-        conditions_minGuests: '',
-        conditions_maxGuests: ''
-      }]);
-    }
-    
-    // Set existing photos
-    setExistingPhotos(villa.photos || []);
-    
-    setIsEditingVilla(true);
-  };
+ const startEditingVilla = (villa) => {
+  setCurrentVilla(villa);
+  
+  // Extract data to flat form structure with better language handling
+  setFormData({
+    name_en: getLocalizedContent(villa.name, 'en') || villa.name_en || '',
+    name_ro: getLocalizedContent(villa.name, 'ro') || villa.name_ro || '',
+    address_en: getLocalizedContent(villa.address, 'en') || villa.address_en || '',
+    address_ro: getLocalizedContent(villa.address, 'ro') || villa.address_ro || '',
+    bedrooms: villa.bedrooms || '',
+    bathrooms: villa.bathrooms || '',
+    description_en: getLocalizedContent(villa.description, 'en') || villa.description_en || '',
+    description_ro: getLocalizedContent(villa.description, 'ro') || villa.description_ro || '',
+    amenities_en: getLocalizedContent(villa.amenities, 'en') || villa.amenities_en || '',
+    amenities_ro: getLocalizedContent(villa.amenities, 'ro') || villa.amenities_ro || '',
+    owner_name: villa.owner?.name || '',
+    owner_email: villa.owner?.email || '',
+    owner_phone: villa.owner?.phone || '',
+    owner_notes_en: getLocalizedContent(villa.owner?.notes, 'en') || villa.owner_notes_en || '',
+    owner_notes_ro: getLocalizedContent(villa.owner?.notes, 'ro') || villa.owner_notes_ro || '',
+  });
+  
+  // Extract price configurations with better language handling
+  if (Array.isArray(villa.priceConfigurations) && villa.priceConfigurations.length > 0) {
+    setPriceConfigs(
+      villa.priceConfigurations.map(config => ({
+        id: config.id || Date.now(),
+        label_en: getLocalizedContent(config.label, 'en') || '',
+        label_ro: getLocalizedContent(config.label, 'ro') || '',
+        price: config.price || '',
+        type: config.type || 'nightly',
+        dateRange_start: config.dateRange?.start || '',
+        dateRange_end: config.dateRange?.end || '',
+        conditions_minStay: config.conditions?.minStay || '',
+        conditions_minGuests: config.conditions?.minGuests || '',
+        conditions_maxGuests: config.conditions?.maxGuests || ''
+      }))
+    );
+  } else {
+    // If no price configs, create a default one
+    setPriceConfigs([{
+      id: Date.now(),
+      label_en: 'Standard Rate',
+      label_ro: 'Tarif Standard',
+      price: villa.price || '',
+      type: villa.priceType || 'nightly',
+      dateRange_start: '',
+      dateRange_end: '',
+      conditions_minStay: '',
+      conditions_minGuests: '',
+      conditions_maxGuests: ''
+    }]);
+  }
+  
+  // Set existing photos
+  setExistingPhotos(villa.photos || []);
+  
+  setIsEditingVilla(true);
+};
   
   // Start PDF generation process
   const startGeneratePDF = (villa) => {
@@ -710,15 +738,12 @@ const loadImageViaProxy = async (url) => {
 
   
 
-// ============================================================================
-// LUXURY DESIGN SYSTEM
-// ============================================================================
 
 // ============================================================================
 // LUXURY MINIMAL DESIGN SYSTEM
 // ============================================================================
 
-const getLuxuryDesignSystem = () => ({
+const getEnhancedLuxuryDesignSystem = () => ({
   colors: {
     primary: [15, 23, 42],        // Sophisticated slate
     accent: [161, 140, 111],      // Warm champagne gold
@@ -729,410 +754,730 @@ const getLuxuryDesignSystem = () => ({
     line: [229, 231, 235]         // Minimal divider
   },
   fonts: {
-    display: { size: 28, weight: 'normal' },
-    title: { size: 20, weight: 'normal' },
-    heading: { size: 14, weight: 'bold' },
-    subheading: { size: 12, weight: 'normal' },
-    body: { size: 10, weight: 'normal' },
-    caption: { size: 8, weight: 'normal' },
-    micro: { size: 7, weight: 'normal' }
+    display: { size: 32, weight: 'bold' },      // Larger for mobile
+    title: { size: 24, weight: 'bold' },        // Increased
+    heading: { size: 16, weight: 'bold' },      // Larger headings
+    subheading: { size: 14, weight: 'normal' }, // Better readability
+    body: { size: 12, weight: 'normal' },       // Increased body text
+    caption: { size: 10, weight: 'normal' },    // Better captions
+    micro: { size: 9, weight: 'normal' }        // Readable micro text
+  },
+  spacing: {
+    section: 25,      // More generous section spacing
+    element: 15,      // Better element spacing
+    text: 8,          // Better line spacing
+    margin: 25        // Page margins
   }
 });
 
 // ============================================================================
-// MINIMAL COVER PAGE
+// ENHANCED COVER PAGE - Mobile Optimized
 // ============================================================================
 
-const createLuxuryCoverPage = async (doc, villa, villaName, designSystem) => {
-  const { colors, fonts } = designSystem;
+const createEnhancedCoverPage = async (doc, villa, villaName, designSystem) => {
+  const { colors, fonts, spacing } = designSystem;
+  const pageWidth = 210;
+  const pageHeight = 297;
   
   // Clean white background
   doc.setFillColor(...colors.background);
-  doc.rect(0, 0, 210, 297, 'F');
+  doc.rect(0, 0, pageWidth, pageHeight, 'F');
   
-  // Minimal top line
+  let currentY = spacing.margin;
+  
+  // Minimal top accent line
   doc.setDrawColor(...colors.accent);
-  doc.setLineWidth(0.3);
-  doc.line(20, 15, 190, 15);
+  doc.setLineWidth(0.8);
+  doc.line(spacing.margin, currentY, pageWidth - spacing.margin, currentY);
+  currentY += 15;
   
-  // Brand name - minimal
+  // Brand name - more prominent
   doc.setFontSize(fonts.caption.size);
   doc.setTextColor(...colors.lightText);
   doc.setFont('helvetica', 'normal');
-  doc.text('IBIZA LUXURY COLLECTION', 20, 25);
+  doc.text('IBIZA LUXURY COLLECTION', spacing.margin, currentY);
+  currentY += 20;
   
-  // Villa name - elegant
+  // Villa name - much larger and bold
   doc.setFontSize(fonts.display.size);
   doc.setTextColor(...colors.primary);
-  doc.setFont('helvetica', 'normal');
+  doc.setFont('helvetica', 'bold');
   
-  const nameLines = doc.splitTextToSize(villaName, 170);
-  let nameY = 50;
-  
+  const nameLines = doc.splitTextToSize(villaName, pageWidth - (spacing.margin * 2));
   nameLines.forEach((line, index) => {
-    doc.text(line, 20, nameY + (index * 8));
+    doc.text(line, spacing.margin, currentY + (index * 10));
   });
+  currentY += (nameLines.length * 10) + 10;
   
-  // Location - subtle
+  // Location - larger and more prominent
   const location = getLocalizedContent(villa.address, 'en', 'Ibiza, Balearic Islands');
-  doc.setFontSize(fonts.body.size);
-  doc.setTextColor(...colors.lightText);
-  doc.text(location.toUpperCase(), 20, nameY + (nameLines.length * 8) + 10);
+  doc.setFontSize(fonts.subheading.size);
+  doc.setTextColor(...colors.accent);
+  doc.setFont('helvetica', 'normal');
+  doc.text(location.toUpperCase(), spacing.margin, currentY);
+  currentY += spacing.section;
   
-  // Hero image - large and clean
-  let imageY = nameY + (nameLines.length * 8) + 25;
-  
+  // HERO IMAGE - Much larger and more prominent
   if (villa.photos && villa.photos.length > 0) {
     try {
-      console.log("Loading hero image");
+      console.log("Loading hero image for enhanced PDF");
       const imgData = await loadImageAsBase64(villa.photos[0].url);
       
       if (imgData) {
-        // Simple, clean image presentation
-        doc.addImage(imgData, 'JPEG', 20, imageY, 170, 100);
-        imageY += 110;
+        // Much larger hero image - almost full width
+        const imgWidth = pageWidth - (spacing.margin * 2);
+        const imgHeight = 120; // Increased height for better visibility
+        const imgX = spacing.margin;
+        
+        // Add subtle shadow effect with multiple rectangles
+        doc.setFillColor(200, 200, 200);
+        doc.rect(imgX + 2, currentY + 2, imgWidth, imgHeight, 'F');
+        doc.setFillColor(220, 220, 220);
+        doc.rect(imgX + 1, currentY + 1, imgWidth, imgHeight, 'F');
+        
+        // Main image
+        doc.addImage(imgData, 'JPEG', imgX, currentY, imgWidth, imgHeight);
+        
+        // Elegant border
+        doc.setDrawColor(...colors.line);
+        doc.setLineWidth(0.5);
+        doc.rect(imgX, currentY, imgWidth, imgHeight);
+        
+        currentY += imgHeight + spacing.section;
       } else {
-        // Clean placeholder
+        // Enhanced placeholder
+        const imgWidth = pageWidth - (spacing.margin * 2);
+        const imgHeight = 120;
+        const imgX = spacing.margin;
+        
         doc.setFillColor(...colors.subtle);
-        doc.rect(20, imageY, 170, 100, 'F');
+        doc.rect(imgX, currentY, imgWidth, imgHeight, 'F');
         
-        doc.setFontSize(fonts.body.size);
+        doc.setDrawColor(...colors.line);
+        doc.setLineWidth(0.5);
+        doc.rect(imgX, currentY, imgWidth, imgHeight);
+        
+        doc.setFontSize(fonts.subheading.size);
         doc.setTextColor(...colors.lightText);
-        doc.text('VILLA PHOTOGRAPHY', 105, imageY + 50, { align: 'center' });
+        doc.text('VILLA PHOTOGRAPHY', imgX + (imgWidth / 2), currentY + (imgHeight / 2), { align: 'center' });
         
-        imageY += 110;
+        currentY += imgHeight + spacing.section;
       }
     } catch (err) {
       console.error("Error loading hero image:", err);
-      // Clean placeholder
+      // Same enhanced placeholder code
+      const imgWidth = pageWidth - (spacing.margin * 2);
+      const imgHeight = 120;
+      const imgX = spacing.margin;
+      
       doc.setFillColor(...colors.subtle);
-      doc.rect(20, imageY, 170, 100, 'F');
+      doc.rect(imgX, currentY, imgWidth, imgHeight, 'F');
       
-      doc.setFontSize(fonts.body.size);
+      doc.setDrawColor(...colors.line);
+      doc.setLineWidth(0.5);
+      doc.rect(imgX, currentY, imgWidth, imgHeight);
+      
+      doc.setFontSize(fonts.subheading.size);
       doc.setTextColor(...colors.lightText);
-      doc.text('VILLA PHOTOGRAPHY', 105, imageY + 50, { align: 'center' });
+      doc.text('VILLA PHOTOGRAPHY', imgX + (imgWidth / 2), currentY + (imgHeight / 2), { align: 'center' });
       
-      imageY += 110;
+      currentY += imgHeight + spacing.section;
     }
   }
   
-  // Property details - clean list format
+  // Property details - larger cards with better spacing
   const details = [
-    { label: 'BEDROOMS', value: villa.bedrooms || '—' },
-    { label: 'BATHROOMS', value: villa.bathrooms || '—' },
-    { label: 'STARTING FROM', value: villa.priceConfigurations?.[0]?.price ? `€${villa.priceConfigurations[0].price}` : 'UPON REQUEST' }
-  ];
+  { icon: '🛏️', label: 'BEDROOMS', value: villa.bedrooms || '—' },
+  { icon: '🚿', label: 'BATHROOMS', value: villa.bathrooms || '—' },
+  { icon: '💰', label: 'STARTING FROM', value: villa.priceConfigurations?.[0]?.price ? `€${villa.priceConfigurations[0].price}` : 'UPON REQUEST' }
+];
+
+// Create cards layout
+const cardWidth = (pageWidth - (spacing.margin * 2) - 20) / 3;
+const cardHeight = 40;
+
+details.forEach((detail, index) => {
+  const cardX = spacing.margin + (index * (cardWidth + 10));
   
-  let detailY = imageY + 10;
+  // Card background
+  doc.setFillColor(...colors.subtle);
+  doc.rect(cardX, currentY, cardWidth, cardHeight, 'F');
   
-  details.forEach((detail) => {
-    doc.setFontSize(fonts.caption.size);
-    doc.setTextColor(...colors.lightText);
-    doc.text(detail.label, 20, detailY);
-    
-    doc.setFontSize(fonts.subheading.size);
-    doc.setTextColor(...colors.primary);
-    doc.setFont('helvetica', 'bold');
-    doc.text(detail.value, 80, detailY);
-    doc.setFont('helvetica', 'normal');
-    
-    detailY += 12;
-  });
-  
-  // Minimal footer
-  doc.setFontSize(fonts.micro.size);
-  doc.setTextColor(...colors.lightText);
-  doc.text(`Generated ${new Date().toLocaleDateString('en-GB')}`, 20, 285);
-  
-  doc.setDrawColor(...colors.accent);
+  // Card border
+  doc.setDrawColor(...colors.line);
   doc.setLineWidth(0.3);
-  doc.line(20, 275, 190, 275);
-};
-
-// ============================================================================
-// CLEAN DETAILS PAGE
-// ============================================================================
-
-const createDetailsPage = (doc, villa, designSystem) => {
-  const { colors, fonts } = designSystem;
+  doc.rect(cardX, currentY, cardWidth, cardHeight);
   
-  addCleanHeader(doc, 'VILLA DETAILS', designSystem);
+  // Icon - with fallback for compatibility
+  doc.setFontSize(fonts.subheading.size);
+  doc.setTextColor(...colors.accent);
   
-  let currentY = 45;
+  try {
+    doc.text(detail.icon, cardX + 5, currentY + 12);
+  } catch (iconError) {
+    // Fallback to bullets if emojis don't work
+    doc.setFillColor(...colors.accent);
+    doc.circle(cardX + 7, currentY + 9, 1.5, 'F');
+  }
   
-  // Basic info - simple layout
-  const essentials = [
-    { label: 'BEDROOMS', value: villa.bedrooms || 'Not specified' },
-    { label: 'BATHROOMS', value: villa.bathrooms || 'Not specified' },
-    { label: 'LOCATION', value: getLocalizedContent(villa.address, 'en', 'Ibiza') }
-  ];
+  // Label
+  doc.setFontSize(fonts.caption.size);
+  doc.setTextColor(...colors.lightText);
+  doc.setFont('helvetica', 'normal');
+  doc.text(detail.label, cardX + 5, currentY + 20);
   
-  essentials.forEach((item) => {
-    doc.setFontSize(fonts.caption.size);
-    doc.setTextColor(...colors.lightText);
-    doc.text(item.label, 20, currentY);
-    
-    doc.setFontSize(fonts.body.size);
-    doc.setTextColor(...colors.text);
-    doc.text(item.value, 60, currentY);
-    
-    currentY += 10;
+  // Value
+  doc.setFontSize(fonts.subheading.size);
+  doc.setTextColor(...colors.primary);
+  doc.setFont('helvetica', 'bold');
+  const valueLines = doc.splitTextToSize(detail.value, cardWidth - 10);
+  valueLines.forEach((line, lineIndex) => {
+    doc.text(line, cardX + 5, currentY + 28 + (lineIndex * 6));
   });
   
-  currentY += 20;
+  doc.setFont('helvetica', 'normal');
+});
   
-  // Description - clean typography
+  currentY += cardHeight + spacing.section;
+  
+  // Description preview - if available
   const description = getLocalizedContent(villa.description, 'en', '');
   if (description.trim()) {
     doc.setFontSize(fonts.heading.size);
     doc.setTextColor(...colors.primary);
     doc.setFont('helvetica', 'bold');
-    doc.text('DESCRIPTION', 20, currentY);
-    
+    doc.text('VILLA OVERVIEW', spacing.margin, currentY);
     currentY += 12;
     
     doc.setFontSize(fonts.body.size);
     doc.setTextColor(...colors.text);
     doc.setFont('helvetica', 'normal');
     
-    const descLines = doc.splitTextToSize(description, 170);
-    descLines.forEach((line, index) => {
-      doc.text(line, 20, currentY + (index * 5));
-    });
+    // Show only first 300 characters on cover
+    const preview = description.length > 300 ? description.substring(0, 300) + '...' : description;
+    const descLines = doc.splitTextToSize(preview, pageWidth - (spacing.margin * 2));
     
-    currentY += (descLines.length * 5) + 20;
+    descLines.forEach((line, index) => {
+      if (currentY + (index * 6) < 250) { // Don't overflow page
+        doc.text(line, spacing.margin, currentY + (index * 6));
+      }
+    });
   }
   
-  // Amenities - simple list
-  const amenities = getLocalizedContent(villa.amenities, 'en', '');
-  if (amenities.trim()) {
-    if (currentY > 220) {
-      doc.addPage();
-      addCleanHeader(doc, 'VILLA DETAILS', designSystem);
-      currentY = 45;
+  // Enhanced footer
+  const footerY = pageHeight - 30;
+  doc.setDrawColor(...colors.accent);
+  doc.setLineWidth(0.8);
+  doc.line(spacing.margin, footerY, pageWidth - spacing.margin, footerY);
+  
+  doc.setFontSize(fonts.micro.size);
+  doc.setTextColor(...colors.lightText);
+  doc.text(`Generated ${new Date().toLocaleDateString('en-GB')}`, spacing.margin, footerY + 8);
+  
+  doc.setTextColor(...colors.accent);
+  doc.setFont('helvetica', 'bold');
+  doc.text('IBIZA-LUXURY-COLLECTION.COM', pageWidth - spacing.margin, footerY + 8, { align: 'right' });
+};
+
+// ============================================================================
+// ENHANCED DETAILS PAGE - Better Typography and Spacing
+// ============================================================================
+
+const createEnhancedDetailsPage = (doc, villa, designSystem) => {
+  const { colors, fonts, spacing } = designSystem;
+  const pageWidth = 210;
+  
+  addEnhancedHeader(doc, 'VILLA DETAILS', designSystem);
+  
+  let currentY = 60;
+  
+  // Essential info cards - fix icons and data fetching
+  const essentials = [
+    { 
+      icon: '🛏️', // This should display properly now
+      label: 'BEDROOMS', 
+      value: villa.bedrooms ? villa.bedrooms.toString() : 'Not specified' 
+    },
+    { 
+      icon: '🚿', // This should display properly now
+      label: 'BATHROOMS', 
+      value: villa.bathrooms ? villa.bathrooms.toString() : 'Not specified' 
+    },
+    { 
+      icon: '📍', // This should display properly now
+      label: 'LOCATION', 
+      value: getLocalizedContent(villa.address, 'en', 'Ibiza') 
+    }
+  ];
+  
+  essentials.forEach((item, index) => {
+    const cardY = currentY + (index * 20);
+    const cardHeight = 15;
+    
+    // Card background
+    doc.setFillColor(...colors.subtle);
+    doc.rect(spacing.margin, cardY, pageWidth - (spacing.margin * 2), cardHeight, 'F');
+    
+    // Icon - try different approach for better compatibility
+    doc.setFontSize(fonts.subheading.size);
+    doc.setTextColor(...colors.accent);
+    
+    // Use simple symbols instead of emoji if icons don't work
+    let iconText = item.icon;
+    if (item.label === 'BEDROOMS') iconText = '🛏️';
+    if (item.label === 'BATHROOMS') iconText = '🚿'; 
+    if (item.label === 'LOCATION') iconText = '📍';
+    
+    try {
+      doc.text(iconText, spacing.margin + 5, cardY + 10);
+    } catch (iconError) {
+      // Fallback to simple bullets if emojis don't work
+      doc.setFillColor(...colors.accent);
+      doc.circle(spacing.margin + 7, cardY + 7, 1.5, 'F');
     }
     
-    doc.setFontSize(fonts.heading.size);
+    // Label
+    doc.setFontSize(fonts.subheading.size);
+    doc.setTextColor(...colors.lightText);
+    doc.setFont('helvetica', 'bold');
+    doc.text(item.label, spacing.margin + 20, cardY + 10);
+    
+    // Value
+    doc.setFontSize(fonts.subheading.size);
+    doc.setTextColor(...colors.text);
+    doc.setFont('helvetica', 'normal');
+    doc.text(item.value, spacing.margin + 80, cardY + 10);
+  });
+  
+  currentY += (essentials.length * 20) + spacing.section;
+  
+  // Description - fix data fetching with proper fallback
+  let description = '';
+  
+  // Try multiple ways to get description
+  if (villa.description) {
+    if (typeof villa.description === 'object') {
+      description = villa.description.en || villa.description.ro || '';
+    } else if (typeof villa.description === 'string') {
+      description = villa.description;
+    }
+  }
+  
+  // Also try individual language fields as fallback
+  if (!description) {
+    description = villa.description_en || villa.description_ro || '';
+  }
+  
+  if (description && description.trim()) {
+    doc.setFontSize(fonts.title.size);
     doc.setTextColor(...colors.primary);
     doc.setFont('helvetica', 'bold');
-    doc.text('AMENITIES', 20, currentY);
+    doc.text('DESCRIPTION', spacing.margin, currentY);
     
-    currentY += 12;
+    currentY += 18;
+    
+    doc.setFontSize(fonts.body.size);
+    doc.setTextColor(...colors.text);
+    doc.setFont('helvetica', 'normal');
+    
+    const descLines = doc.splitTextToSize(description, pageWidth - (spacing.margin * 2));
+    descLines.forEach((line, index) => {
+      doc.text(line, spacing.margin, currentY + (index * 7));
+    });
+    
+    currentY += (descLines.length * 7) + spacing.section;
+  }
+  
+  // Amenities - fix data fetching with proper fallback
+  let amenities = '';
+  
+  // Try multiple ways to get amenities
+  if (villa.amenities) {
+    if (typeof villa.amenities === 'object') {
+      amenities = villa.amenities.en || villa.amenities.ro || '';
+    } else if (typeof villa.amenities === 'string') {
+      amenities = villa.amenities;
+    }
+  }
+  
+  // Also try individual language fields as fallback
+  if (!amenities) {
+    amenities = villa.amenities_en || villa.amenities_ro || '';
+  }
+  
+  if (amenities && amenities.trim()) {
+    if (currentY > 220) {
+      doc.addPage();
+      addEnhancedHeader(doc, 'VILLA DETAILS', designSystem);
+      currentY = 60;
+    }
+    
+    doc.setFontSize(fonts.title.size);
+    doc.setTextColor(...colors.primary);
+    doc.setFont('helvetica', 'bold');
+    doc.text('AMENITIES & FEATURES', spacing.margin, currentY);
+    
+    currentY += 18;
     
     if (amenities.includes(',')) {
       const amenityList = amenities.split(',').map(item => item.trim()).filter(item => item);
       
-      amenityList.forEach((amenity) => {
+      // Create two-column layout for amenities
+      const midPoint = Math.ceil(amenityList.length / 2);
+      const leftColumn = amenityList.slice(0, midPoint);
+      const rightColumn = amenityList.slice(midPoint);
+      
+      const leftX = spacing.margin;
+      const rightX = pageWidth / 2 + 10;
+      
+      leftColumn.forEach((amenity, index) => {
+        const y = currentY + (index * 8);
+        
+        // Bullet point
         doc.setFillColor(...colors.accent);
-        doc.circle(22, currentY - 2, 0.5, 'F');
+        doc.circle(leftX + 3, y - 1, 1, 'F');
         
         doc.setFontSize(fonts.body.size);
         doc.setTextColor(...colors.text);
-        doc.text(amenity, 27, currentY);
-        
-        currentY += 6;
+        doc.text(amenity, leftX + 8, y);
       });
+      
+      rightColumn.forEach((amenity, index) => {
+        const y = currentY + (index * 8);
+        
+        // Bullet point
+        doc.setFillColor(...colors.accent);
+        doc.circle(rightX + 3, y - 1, 1, 'F');
+        
+        doc.setFontSize(fonts.body.size);
+        doc.setTextColor(...colors.text);
+        doc.text(amenity, rightX + 8, y);
+      });
+      
+      currentY += Math.max(leftColumn.length, rightColumn.length) * 8;
     } else {
       doc.setFontSize(fonts.body.size);
       doc.setTextColor(...colors.text);
-      const amenityLines = doc.splitTextToSize(amenities, 170);
+      const amenityLines = doc.splitTextToSize(amenities, pageWidth - (spacing.margin * 2));
       amenityLines.forEach((line, index) => {
-        doc.text(line, 20, currentY + (index * 5));
+        doc.text(line, spacing.margin, currentY + (index * 7));
       });
+      currentY += amenityLines.length * 7;
     }
   }
   
-  addCleanFooter(doc, villa, designSystem);
+  addEnhancedFooter(doc, villa, designSystem);
 };
 
 // ============================================================================
-// CLEAN PHOTOS PAGE
+// ENHANCED PHOTOS PAGE - Much Larger Images
 // ============================================================================
 
-const createPhotosPage = async (doc, villa, designSystem) => {
-  const { colors, fonts } = designSystem;
+const createEnhancedPhotosPage = async (doc, villa, designSystem) => {
+  const { colors, fonts, spacing } = designSystem;
+  const pageWidth = 210;
+  const pageHeight = 297;
   
-  addCleanHeader(doc, 'PHOTOGRAPHY', designSystem);
+  addEnhancedHeader(doc, 'VILLA PHOTOGRAPHY', designSystem);
   
   if (!villa.photos || villa.photos.length === 0) {
-    doc.setFontSize(fonts.body.size);
+    const noPhotoY = pageHeight / 2;
+    
+    // Create a nice "no photos" section
+    doc.setFillColor(...colors.subtle);
+    doc.rect(spacing.margin, noPhotoY - 30, pageWidth - (spacing.margin * 2), 60, 'F');
+    
+    doc.setFontSize(fonts.heading.size);
     doc.setTextColor(...colors.lightText);
-    doc.text('Photography portfolio available upon request', 105, 150, { align: 'center' });
-    addCleanFooter(doc, villa, designSystem);
+    doc.text('Photography portfolio available upon request', pageWidth / 2, noPhotoY, { align: 'center' });
+    
+    addEnhancedFooter(doc, villa, designSystem);
     return;
   }
   
-  let currentY = 50;
+  let currentY = 60; // Start after header
   
-  // Featured image - large and clean
+  // FEATURED IMAGE - Very large and prominent
   try {
-    console.log("Loading featured image");
+    console.log("Loading featured image for enhanced photos page");
     const imgData = await loadImageAsBase64(villa.photos[0].url);
     
     if (imgData) {
-      const imgWidth = 140;
-      const imgHeight = 85;
-      const imgX = (210 - imgWidth) / 2;
+      const imgWidth = pageWidth - (spacing.margin * 2);
+      const imgHeight = 110; // Large featured image
+      const imgX = spacing.margin;
       
+      // Add photo caption above
+      doc.setFontSize(fonts.caption.size);
+      doc.setTextColor(...colors.lightText);
+      doc.text('FEATURED VIEW', imgX, currentY - 5);
+      
+      // Shadow effect
+      doc.setFillColor(200, 200, 200);
+      doc.rect(imgX + 2, currentY + 2, imgWidth, imgHeight, 'F');
+      
+      // Main image
       doc.addImage(imgData, 'JPEG', imgX, currentY, imgWidth, imgHeight);
-      currentY += imgHeight + 15;
+      
+      // Elegant border
+      doc.setDrawColor(...colors.line);
+      doc.setLineWidth(0.5);
+      doc.rect(imgX, currentY, imgWidth, imgHeight);
+      
+      currentY += imgHeight + spacing.section;
     }
   } catch (err) {
     console.error("Error loading featured photo:", err);
-    doc.setFillColor(...colors.subtle);
-    doc.rect(35, currentY, 140, 85, 'F');
-    currentY += 100;
+    currentY += spacing.element;
   }
   
-  // Additional photos - simple grid
+  // ADDITIONAL PHOTOS - Larger grid layout (2x2 instead of small thumbnails)
   if (villa.photos.length > 1) {
-    const additionalPhotos = villa.photos.slice(1, 5);
-    const photoWidth = 35;
-    const photoHeight = 25;
-    const spacing = 6;
+    const additionalPhotos = villa.photos.slice(1, 5); // Show up to 4 additional photos
     
-    const totalWidth = (photoWidth * additionalPhotos.length) + (spacing * (additionalPhotos.length - 1));
-    const startX = (210 - totalWidth) / 2;
-    
-    for (let i = 0; i < additionalPhotos.length; i++) {
-      const x = startX + (i * (photoWidth + spacing));
+    if (additionalPhotos.length > 0) {
+      // Section title
+      doc.setFontSize(fonts.heading.size);
+      doc.setTextColor(...colors.primary);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ADDITIONAL VIEWS', spacing.margin, currentY);
+      currentY += 15;
       
-      try {
-        console.log(`Loading photo ${i + 2}`);
-        const imgData = await loadImageAsBase64(additionalPhotos[i].url);
+      // Calculate grid layout
+      const photosPerRow = 2;
+      const photoSpacing = 10;
+      const availableWidth = pageWidth - (spacing.margin * 2);
+      const photoWidth = (availableWidth - photoSpacing) / photosPerRow;
+      const photoHeight = 65; // Much larger than before
+      
+      for (let i = 0; i < additionalPhotos.length; i++) {
+        const row = Math.floor(i / photosPerRow);
+        const col = i % photosPerRow;
         
-        if (imgData) {
-          doc.addImage(imgData, 'JPEG', x, currentY, photoWidth, photoHeight);
-        } else {
+        const x = spacing.margin + (col * (photoWidth + photoSpacing));
+        const y = currentY + (row * (photoHeight + photoSpacing));
+        
+        try {
+          console.log(`Loading additional photo ${i + 2}`);
+          const imgData = await loadImageAsBase64(additionalPhotos[i].url);
+          
+          if (imgData) {
+            // Shadow
+            doc.setFillColor(220, 220, 220);
+            doc.rect(x + 1, y + 1, photoWidth, photoHeight, 'F');
+            
+            // Image
+            doc.addImage(imgData, 'JPEG', x, y, photoWidth, photoHeight);
+            
+            // Border
+            doc.setDrawColor(...colors.line);
+            doc.setLineWidth(0.3);
+            doc.rect(x, y, photoWidth, photoHeight);
+          } else {
+            // Placeholder
+            doc.setFillColor(...colors.subtle);
+            doc.rect(x, y, photoWidth, photoHeight, 'F');
+            
+            doc.setDrawColor(...colors.line);
+            doc.setLineWidth(0.3);
+            doc.rect(x, y, photoWidth, photoHeight);
+            
+            doc.setFontSize(fonts.caption.size);
+            doc.setTextColor(...colors.lightText);
+            doc.text('IMAGE', x + (photoWidth / 2), y + (photoHeight / 2), { align: 'center' });
+          }
+        } catch (err) {
+          console.error(`Error loading photo ${i + 2}:`, err);
+          // Placeholder for failed images
           doc.setFillColor(...colors.subtle);
-          doc.rect(x, currentY, photoWidth, photoHeight, 'F');
+          doc.rect(x, y, photoWidth, photoHeight, 'F');
+          
+          doc.setDrawColor(...colors.line);
+          doc.setLineWidth(0.3);
+          doc.rect(x, y, photoWidth, photoHeight);
         }
-      } catch (err) {
-        console.error(`Error loading photo ${i + 2}:`, err);
-        doc.setFillColor(...colors.subtle);
-        doc.rect(x, currentY, photoWidth, photoHeight, 'F');
       }
+      
+      // Calculate how much space we used
+      const rows = Math.ceil(additionalPhotos.length / photosPerRow);
+      currentY += (rows * (photoHeight + photoSpacing));
     }
   }
   
-  addCleanFooter(doc, villa, designSystem);
+  addEnhancedFooter(doc, villa, designSystem);
 };
 
 // ============================================================================
-// CLEAN PRICING PAGE
+// ENHANCED PRICING PAGE - Better Tables and Layout
 // ============================================================================
 
-const createPricingPage = (doc, villa, designSystem) => {
-  const { colors, fonts } = designSystem;
+const createEnhancedPricingPage = (doc, villa, designSystem) => {
+  const { colors, fonts, spacing } = designSystem;
+  const pageWidth = 210;
   
-  addCleanHeader(doc, 'RATES & RESERVATIONS', designSystem);
+  addEnhancedHeader(doc, 'RATES & RESERVATIONS', designSystem);
   
-  let currentY = 60;
+  let currentY = 70;
   
-  // Pricing intro
-  doc.setFontSize(fonts.body.size);
-  doc.setTextColor(...colors.lightText);
-  doc.text('Exclusive rates for discerning guests', 105, currentY, { align: 'center' });
-  
-  currentY += 20;
-  
-  // Rates - clean presentation
-  if (villa.priceConfigurations && villa.priceConfigurations.length > 0) {
-    villa.priceConfigurations.forEach((config) => {
-      const rateName = getLocalizedContent(config.label, 'en', 'Standard Rate');
-      
-      doc.setFontSize(fonts.subheading.size);
-      doc.setTextColor(...colors.primary);
-      doc.setFont('helvetica', 'bold');
-      doc.text(rateName.toUpperCase(), 20, currentY);
-      
-      doc.setFontSize(fonts.title.size);
-      doc.setTextColor(...colors.accent);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`€${config.price || 0}`, 190, currentY, { align: 'right' });
-      
-      doc.setFontSize(fonts.caption.size);
-      doc.setTextColor(...colors.lightText);
-      const period = config.type === 'nightly' ? 'per night' : 
-                    config.type === 'weekly' ? 'per week' : 'per month';
-      doc.text(period, 190, currentY + 6, { align: 'right' });
-      
-      // Simple divider
-      doc.setDrawColor(...colors.line);
-      doc.setLineWidth(0.2);
-      doc.line(20, currentY + 12, 190, currentY + 12);
-      
-      currentY += 20;
-    });
-  } else {
-    doc.setFontSize(fonts.body.size);
-    doc.setTextColor(...colors.text);
-    doc.text('Bespoke rates available upon consultation', 105, currentY, { align: 'center' });
-  }
-  
-  currentY += 25;
-  
-  // Contact info - clean box
+  // Elegant intro section
   doc.setFillColor(...colors.subtle);
-  doc.rect(30, currentY, 150, 30, 'F');
+  doc.rect(spacing.margin, currentY, pageWidth - (spacing.margin * 2), 25, 'F');
   
   doc.setFontSize(fonts.subheading.size);
   doc.setTextColor(...colors.primary);
   doc.setFont('helvetica', 'bold');
-  doc.text('CONCIERGE RESERVATIONS', 105, currentY + 10, { align: 'center' });
+  doc.text('EXCLUSIVE LUXURY RATES', pageWidth / 2, currentY + 10, { align: 'center' });
   
   doc.setFontSize(fonts.body.size);
-  doc.setTextColor(...colors.text);
-  doc.setFont('helvetica', 'normal');
-  doc.text('reservations@ibiza-luxury-collection.com', 105, currentY + 18, { align: 'center' });
-  doc.text('+34 971 123 456', 105, currentY + 25, { align: 'center' });
-  
-  addCleanFooter(doc, villa, designSystem);
-};
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-const addCleanHeader = (doc, title, designSystem) => {
-  const { colors, fonts } = designSystem;
-  
-  doc.setDrawColor(...colors.line);
-  doc.setLineWidth(0.2);
-  doc.line(20, 25, 190, 25);
-  
-  doc.setFontSize(fonts.heading.size);
-  doc.setTextColor(...colors.primary);
-  doc.setFont('helvetica', 'bold');
-  doc.text(title, 20, 35);
-  
-  doc.setFontSize(fonts.micro.size);
   doc.setTextColor(...colors.lightText);
   doc.setFont('helvetica', 'normal');
-  doc.text('IBIZA LUXURY COLLECTION', 190, 35, { align: 'right' });
+  doc.text('Premium accommodations for discerning guests', pageWidth / 2, currentY + 18, { align: 'center' });
+  
+  currentY += 40;
+  
+  // Enhanced pricing table
+  if (villa.priceConfigurations && villa.priceConfigurations.length > 0) {
+    villa.priceConfigurations.forEach((config, index) => {
+      const rateName = getLocalizedContent(config.label, 'en', 'Standard Rate');
+      const rowHeight = 45;
+      
+      // Rate card
+      doc.setFillColor(...colors.background);
+      doc.rect(spacing.margin, currentY, pageWidth - (spacing.margin * 2), rowHeight, 'F');
+      
+      doc.setDrawColor(...colors.line);
+      doc.setLineWidth(0.5);
+      doc.rect(spacing.margin, currentY, pageWidth - (spacing.margin * 2), rowHeight);
+      
+      // Rate name
+      doc.setFontSize(fonts.heading.size);
+      doc.setTextColor(...colors.primary);
+      doc.setFont('helvetica', 'bold');
+      doc.text(rateName.toUpperCase(), spacing.margin + 10, currentY + 15);
+      
+      // Price - large and prominent
+      doc.setFontSize(fonts.title.size);
+      doc.setTextColor(...colors.accent);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`€${config.price || 0}`, pageWidth - spacing.margin - 10, currentY + 18, { align: 'right' });
+      
+      // Period
+      doc.setFontSize(fonts.body.size);
+      doc.setTextColor(...colors.lightText);
+      doc.setFont('helvetica', 'normal');
+      const period = config.type === 'nightly' ? 'per night' : 
+                    config.type === 'weekly' ? 'per week' : 'per month';
+      doc.text(period, pageWidth - spacing.margin - 10, currentY + 28, { align: 'right' });
+      
+      // Conditions - if any
+      let conditionsText = [];
+      if (config.conditions?.minStay) conditionsText.push(`Min. ${config.conditions.minStay} nights`);
+      if (config.conditions?.minGuests) conditionsText.push(`Min. ${config.conditions.minGuests} guests`);
+      if (config.conditions?.maxGuests) conditionsText.push(`Max. ${config.conditions.maxGuests} guests`);
+      
+      if (conditionsText.length > 0) {
+        doc.setFontSize(fonts.caption.size);
+        doc.setTextColor(...colors.lightText);
+        doc.text(conditionsText.join(' • '), spacing.margin + 10, currentY + 35);
+      }
+      
+      currentY += rowHeight + 10;
+    });
+  } else {
+    // No pricing available
+    doc.setFillColor(...colors.subtle);
+    doc.rect(spacing.margin, currentY, pageWidth - (spacing.margin * 2), 30, 'F');
+    
+    doc.setFontSize(fonts.subheading.size);
+    doc.setTextColor(...colors.text);
+    doc.text('Bespoke rates available upon consultation', pageWidth / 2, currentY + 20, { align: 'center' });
+    
+    currentY += 40;
+  }
+  
+  // Enhanced contact section
+  currentY += 20;
+  
+  doc.setFillColor(...colors.primary);
+  doc.rect(spacing.margin, currentY, pageWidth - (spacing.margin * 2), 50, 'F');
+  
+  doc.setFontSize(fonts.heading.size);
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.text('CONCIERGE RESERVATIONS', pageWidth / 2, currentY + 15, { align: 'center' });
+  
+  doc.setFontSize(fonts.body.size);
+  doc.setFont('helvetica', 'normal');
+  doc.text('reservations@ibiza-luxury-collection.com', pageWidth / 2, currentY + 25, { align: 'center' });
+  doc.text('+34 971 123 456', pageWidth / 2, currentY + 35, { align: 'center' });
+  
+  doc.setFontSize(fonts.caption.size);
+  doc.text('Available 24/7 for your convenience', pageWidth / 2, currentY + 43, { align: 'center' });
+  
+  addEnhancedFooter(doc, villa, designSystem);
 };
 
-const addCleanFooter = (doc, villa, designSystem) => {
-  const { colors, fonts } = designSystem;
+// ============================================================================
+// ENHANCED HELPER FUNCTIONS
+// ============================================================================
+
+const addEnhancedHeader = (doc, title, designSystem) => {
+  const { colors, fonts, spacing } = designSystem;
+  const pageWidth = 210;
   
-  doc.setDrawColor(...colors.line);
-  doc.setLineWidth(0.2);
-  doc.line(20, 270, 190, 270);
+  // Header background
+  doc.setFillColor(...colors.subtle);
+  doc.rect(0, 0, pageWidth, 40, 'F');
+  
+  // Accent line
+  doc.setDrawColor(...colors.accent);
+  doc.setLineWidth(1);
+  doc.line(spacing.margin, 35, pageWidth - spacing.margin, 35);
+  
+  // Title
+  doc.setFontSize(fonts.title.size);
+  doc.setTextColor(...colors.primary);
+  doc.setFont('helvetica', 'bold');
+  doc.text(title, spacing.margin, 25);
+  
+  // Brand
+  doc.setFontSize(fonts.caption.size);
+  doc.setTextColor(...colors.lightText);
+  doc.setFont('helvetica', 'normal');
+  doc.text('IBIZA LUXURY COLLECTION', pageWidth - spacing.margin, 25, { align: 'right' });
+};
+
+const addEnhancedFooter = (doc, villa, designSystem) => {
+  const { colors, fonts, spacing } = designSystem;
+  const pageWidth = 210;
+  const pageHeight = 297;
+  
+  const footerY = pageHeight - 25;
+  
+  // Footer background
+  doc.setFillColor(...colors.subtle);
+  doc.rect(0, footerY - 5, pageWidth, 30, 'F');
+  
+  // Accent line
+  doc.setDrawColor(...colors.accent);
+  doc.setLineWidth(0.5);
+  doc.line(spacing.margin, footerY, pageWidth - spacing.margin, footerY);
   
   doc.setFontSize(fonts.micro.size);
   doc.setTextColor(...colors.lightText);
   
   const villaName = getLocalizedContent(villa.name, 'en', 'Luxury Villa');
-  doc.text(villaName, 20, 280);
+  doc.text(villaName, spacing.margin, footerY + 8);
   
-  doc.text('ibiza-luxury-collection.com', 190, 280, { align: 'right' });
+  doc.setFont('helvetica', 'bold');
+  doc.text('IBIZA-LUXURY-COLLECTION.COM', pageWidth - spacing.margin, footerY + 8, { align: 'right' });
 };
 
 // ============================================================================
-// MAIN PDF GENERATION
+// MAIN ENHANCED PDF GENERATION
 // ============================================================================
 
-const generateVillaPDF = async () => {
+const generateEnhancedVillaPDF = async () => {
   if (!currentPdfVilla) return;
   
   const villaName = getLocalizedContent(currentPdfVilla.name, 'en', 'Luxury Villa');
@@ -1141,7 +1486,7 @@ const generateVillaPDF = async () => {
   try {
     setIsGeneratingPDF(true);
     
-    console.log("🏛️ Generating clean luxury villa portfolio...");
+    console.log("🏛️ Generating enhanced luxury villa portfolio...");
     
     const doc = new jsPDF({
       orientation: 'portrait',
@@ -1151,58 +1496,59 @@ const generateVillaPDF = async () => {
     });
     
     doc.setProperties({
-      title: `${villaName} - Luxury Portfolio`,
-      subject: `Exclusive Villa Collection - ${villaName}`,
+      title: `${villaName} - Enhanced Luxury Portfolio`,
+      subject: `Premium Villa Collection - ${villaName}`,
       author: 'Ibiza Luxury Collection',
-      keywords: 'luxury, villa, ibiza, exclusive, premium',
+      keywords: 'luxury, villa, ibiza, exclusive, premium, mobile-optimized',
       creator: 'Ibiza Luxury Collection'
     });
     
-    const designSystem = getLuxuryDesignSystem();
+    const designSystem = getEnhancedLuxuryDesignSystem();
     
-    console.log("📄 Creating clean cover page...");
-    await createLuxuryCoverPage(doc, villa, villaName, designSystem);
+    console.log("📄 Creating enhanced cover page...");
+    await createEnhancedCoverPage(doc, villa, villaName, designSystem);
     
-    console.log("📋 Adding details page...");
+    console.log("📋 Adding enhanced details page...");
     doc.addPage();
-    createDetailsPage(doc, villa, designSystem);
+    createEnhancedDetailsPage(doc, villa, designSystem);
     
-    console.log("📸 Adding photography...");
+    console.log("📸 Adding enhanced photography...");
     if (villa.photos && villa.photos.length > 0) {
       doc.addPage();
-      await createPhotosPage(doc, villa, designSystem);
+      await createEnhancedPhotosPage(doc, villa, designSystem);
     }
     
-    console.log("💰 Adding pricing...");
+    console.log("💰 Adding enhanced pricing...");
     doc.addPage();
-    createPricingPage(doc, villa, designSystem);
+    createEnhancedPricingPage(doc, villa, designSystem);
     
-    // Simple page numbers
+    // Enhanced page numbers
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 2; i <= pageCount; i++) {
       doc.setPage(i);
       doc.setTextColor(...designSystem.colors.lightText);
-      doc.setFontSize(7);
-      doc.text(`${i-1}`, 105, 290, { align: 'center' });
+      doc.setFontSize(8);
+      doc.text(`${i-1}`, 105, 285, { align: 'center' });
     }
     
     const cleanName = villaName.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
-    const filename = `${cleanName}_Clean_Portfolio.pdf`;
+    const filename = `${cleanName}_Enhanced_Mobile_Portfolio.pdf`;
     
     doc.save(filename);
     
-    console.log("✨ Clean luxury portfolio saved!");
+    console.log("✨ Enhanced mobile-optimized portfolio saved!");
     
     setIsGeneratingPDF(false);
     setCurrentPdfVilla(null);
     
   } catch (error) {
-    console.error("❌ Error generating clean portfolio:", error);
+    console.error("❌ Error generating enhanced portfolio:", error);
     alert("There was an error generating the portfolio. Please try again.");
     setIsGeneratingPDF(false);
     setCurrentPdfVilla(null);
   }
 };
+
 
   const getFilteredVillas = () => {
     return villas.filter(villa => {
@@ -1870,15 +2216,11 @@ const generateVillaPDF = async () => {
               {/* Actions */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
                 <button
-                  onClick={() => startGeneratePDF(villa)}
-                  style={{ 
-                    marginRight: '0.5rem',
-                    padding: '0.375rem 0.75rem', 
-                    backgroundColor: '#3B82F6', 
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '0.375rem'
-                  }}
+                  onClick={() => {
+                      setCurrentPdfVilla(villa);
+                      setIsGeneratingPDF(true);
+                      generateEnhancedVillaPDF();
+                    }}
                 >
                   {t.generatePDF}
                 </button>
@@ -2723,18 +3065,18 @@ const generateVillaPDF = async () => {
               </button>
               
               <button
-                type="button"
-                onClick={generateVillaPDF}
-                style={{
-                  padding: '0.5rem 1rem',
-                  backgroundColor: '#3B82F6',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.375rem'
-                }}
-              >
-                {t.downloadPDF}
-              </button>
+  type="button"
+  onClick={generateEnhancedVillaPDF}  // ← Changed function name
+  style={{
+    padding: '0.5rem 1rem',
+    backgroundColor: '#3B82F6',
+    color: 'white',
+    border: 'none',
+    borderRadius: '0.375rem'
+  }}
+>
+  {t.downloadPDF}
+</button>
             </div>
           </div>
         </div>
