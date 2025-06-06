@@ -484,56 +484,56 @@ const loadImageViaProxy = async (url) => {
   
   // Convert flattened form data to structured format for database
   const prepareFormDataForSave = () => {
-  // Convert flat form data to nested structure with both languages
-  return {
-    name: {
-      en: formData.name_en || formData.name_ro || '', // Fallback to other language
-      ro: formData.name_ro || formData.name_en || ''  // Fallback to other language
-    },
-    address: {
-      en: formData.address_en || formData.address_ro || '',
-      ro: formData.address_ro || formData.address_en || ''
-    },
-    bedrooms: formData.bedrooms || '',
-    bathrooms: formData.bathrooms || '',
-    description: {
-      en: formData.description_en || formData.description_ro || '',
-      ro: formData.description_ro || formData.description_en || ''
-    },
-    amenities: {
-      en: formData.amenities_en || formData.amenities_ro || '',
-      ro: formData.amenities_ro || formData.amenities_en || ''
-    },
-    owner: {
-      name: formData.owner_name || '',
-      email: formData.owner_email || '',
-      phone: formData.owner_phone || '',
-      notes: {
-        en: formData.owner_notes_en || formData.owner_notes_ro || '',
-        ro: formData.owner_notes_ro || formData.owner_notes_en || ''
-      }
-    },
-    // Convert price configs to proper nested structure
-    priceConfigurations: priceConfigs.map(config => ({
-      id: config.id,
-      label: {
-        en: config.label_en || config.label_ro || '',
-        ro: config.label_ro || config.label_en || ''
+    // Convert flat form data to nested structure
+    return {
+      name: {
+        en: formData.name_en || '',
+        ro: formData.name_ro || ''
       },
-      price: config.price || '',
-      type: config.type || 'nightly',
-      dateRange: {
-        start: config.dateRange_start || '',
-        end: config.dateRange_end || ''
+      address: {
+        en: formData.address_en || '',
+        ro: formData.address_ro || ''
       },
-      conditions: {
-        minStay: config.conditions_minStay || '',
-        minGuests: config.conditions_minGuests || '',
-        maxGuests: config.conditions_maxGuests || ''
-      }
-    }))
+      bedrooms: formData.bedrooms || '',
+      bathrooms: formData.bathrooms || '',
+      description: {
+        en: formData.description_en || '',
+        ro: formData.description_ro || ''
+      },
+      amenities: {
+        en: formData.amenities_en || '',
+        ro: formData.amenities_ro || ''
+      },
+      owner: {
+        name: formData.owner_name || '',
+        email: formData.owner_email || '',
+        phone: formData.owner_phone || '',
+        notes: {
+          en: formData.owner_notes_en || '',
+          ro: formData.owner_notes_ro || ''
+        }
+      },
+      // Convert price configs to proper nested structure
+      priceConfigurations: priceConfigs.map(config => ({
+        id: config.id,
+        label: {
+          en: config.label_en || '',
+          ro: config.label_ro || ''
+        },
+        price: config.price || '',
+        type: config.type || 'nightly',
+        dateRange: {
+          start: config.dateRange_start || '',
+          end: config.dateRange_end || ''
+        },
+        conditions: {
+          minStay: config.conditions_minStay || '',
+          minGuests: config.conditions_minGuests || '',
+          maxGuests: config.conditions_maxGuests || ''
+        }
+      }))
+    };
   };
-};
   
   // Handle add villa form submission
   const handleAddVilla = async (e) => {
@@ -670,65 +670,65 @@ const loadImageViaProxy = async (url) => {
   };
   
   // Start editing a villa
- const startEditingVilla = (villa) => {
-  setCurrentVilla(villa);
-  
-  // Extract data to flat form structure with better language handling
-  setFormData({
-    name_en: getLocalizedContent(villa.name, 'en') || villa.name_en || '',
-    name_ro: getLocalizedContent(villa.name, 'ro') || villa.name_ro || '',
-    address_en: getLocalizedContent(villa.address, 'en') || villa.address_en || '',
-    address_ro: getLocalizedContent(villa.address, 'ro') || villa.address_ro || '',
-    bedrooms: villa.bedrooms || '',
-    bathrooms: villa.bathrooms || '',
-    description_en: getLocalizedContent(villa.description, 'en') || villa.description_en || '',
-    description_ro: getLocalizedContent(villa.description, 'ro') || villa.description_ro || '',
-    amenities_en: getLocalizedContent(villa.amenities, 'en') || villa.amenities_en || '',
-    amenities_ro: getLocalizedContent(villa.amenities, 'ro') || villa.amenities_ro || '',
-    owner_name: villa.owner?.name || '',
-    owner_email: villa.owner?.email || '',
-    owner_phone: villa.owner?.phone || '',
-    owner_notes_en: getLocalizedContent(villa.owner?.notes, 'en') || villa.owner_notes_en || '',
-    owner_notes_ro: getLocalizedContent(villa.owner?.notes, 'ro') || villa.owner_notes_ro || '',
-  });
-  
-  // Extract price configurations with better language handling
-  if (Array.isArray(villa.priceConfigurations) && villa.priceConfigurations.length > 0) {
-    setPriceConfigs(
-      villa.priceConfigurations.map(config => ({
-        id: config.id || Date.now(),
-        label_en: getLocalizedContent(config.label, 'en') || '',
-        label_ro: getLocalizedContent(config.label, 'ro') || '',
-        price: config.price || '',
-        type: config.type || 'nightly',
-        dateRange_start: config.dateRange?.start || '',
-        dateRange_end: config.dateRange?.end || '',
-        conditions_minStay: config.conditions?.minStay || '',
-        conditions_minGuests: config.conditions?.minGuests || '',
-        conditions_maxGuests: config.conditions?.maxGuests || ''
-      }))
-    );
-  } else {
-    // If no price configs, create a default one
-    setPriceConfigs([{
-      id: Date.now(),
-      label_en: 'Standard Rate',
-      label_ro: 'Tarif Standard',
-      price: villa.price || '',
-      type: villa.priceType || 'nightly',
-      dateRange_start: '',
-      dateRange_end: '',
-      conditions_minStay: '',
-      conditions_minGuests: '',
-      conditions_maxGuests: ''
-    }]);
-  }
-  
-  // Set existing photos
-  setExistingPhotos(villa.photos || []);
-  
-  setIsEditingVilla(true);
-};
+  const startEditingVilla = (villa) => {
+    setCurrentVilla(villa);
+    
+    // Extract data to flat form structure
+    setFormData({
+      name_en: villa.name?.en || '',
+      name_ro: villa.name?.ro || '',
+      address_en: villa.address?.en || '',
+      address_ro: villa.address?.ro || '',
+      bedrooms: villa.bedrooms || '',
+      bathrooms: villa.bathrooms || '',
+      description_en: villa.description?.en || '',
+      description_ro: villa.description?.ro || '',
+      amenities_en: villa.amenities?.en || '',
+      amenities_ro: villa.amenities?.ro || '',
+      owner_name: villa.owner?.name || '',
+      owner_email: villa.owner?.email || '',
+      owner_phone: villa.owner?.phone || '',
+      owner_notes_en: villa.owner?.notes?.en || '',
+      owner_notes_ro: villa.owner?.notes?.ro || '',
+    });
+    
+    // Extract price configurations
+    if (Array.isArray(villa.priceConfigurations) && villa.priceConfigurations.length > 0) {
+      setPriceConfigs(
+        villa.priceConfigurations.map(config => ({
+          id: config.id || Date.now(),
+          label_en: config.label?.en || '',
+          label_ro: config.label?.ro || '',
+          price: config.price || '',
+          type: config.type || 'nightly',
+          dateRange_start: config.dateRange?.start || '',
+          dateRange_end: config.dateRange?.end || '',
+          conditions_minStay: config.conditions?.minStay || '',
+          conditions_minGuests: config.conditions?.minGuests || '',
+          conditions_maxGuests: config.conditions?.maxGuests || ''
+        }))
+      );
+    } else {
+      // If no price configs, create a default one
+      setPriceConfigs([{
+        id: Date.now(),
+        label_en: 'Standard Rate',
+        label_ro: 'Tarif Standard',
+        price: villa.price || '',
+        type: villa.priceType || 'nightly',
+        dateRange_start: '',
+        dateRange_end: '',
+        conditions_minStay: '',
+        conditions_minGuests: '',
+        conditions_maxGuests: ''
+      }]);
+    }
+    
+    // Set existing photos
+    setExistingPhotos(villa.photos || []);
+    
+    setIsEditingVilla(true);
+  };
   
   // Start PDF generation process
   const startGeneratePDF = (villa) => {
@@ -887,56 +887,48 @@ const createEnhancedCoverPage = async (doc, villa, villaName, designSystem) => {
   
   // Property details - larger cards with better spacing
   const details = [
-  { icon: '🛏️', label: 'BEDROOMS', value: villa.bedrooms || '—' },
-  { icon: '🚿', label: 'BATHROOMS', value: villa.bathrooms || '—' },
-  { icon: '💰', label: 'STARTING FROM', value: villa.priceConfigurations?.[0]?.price ? `€${villa.priceConfigurations[0].price}` : 'UPON REQUEST' }
-];
-
-// Create cards layout
-const cardWidth = (pageWidth - (spacing.margin * 2) - 20) / 3;
-const cardHeight = 40;
-
-details.forEach((detail, index) => {
-  const cardX = spacing.margin + (index * (cardWidth + 10));
+    { icon: '🛏️', label: 'BEDROOMS', value: villa.bedrooms || '—' },
+    { icon: '🚿', label: 'BATHROOMS', value: villa.bathrooms || '—' },
+    { icon: '💰', label: 'STARTING FROM', value: villa.priceConfigurations?.[0]?.price ? `€${villa.priceConfigurations[0].price}` : 'UPON REQUEST' }
+  ];
   
-  // Card background
-  doc.setFillColor(...colors.subtle);
-  doc.rect(cardX, currentY, cardWidth, cardHeight, 'F');
+  // Create cards layout
+  const cardWidth = (pageWidth - (spacing.margin * 2) - 20) / 3;
+  const cardHeight = 40;
   
-  // Card border
-  doc.setDrawColor(...colors.line);
-  doc.setLineWidth(0.3);
-  doc.rect(cardX, currentY, cardWidth, cardHeight);
-  
-  // Icon - with fallback for compatibility
-  doc.setFontSize(fonts.subheading.size);
-  doc.setTextColor(...colors.accent);
-  
-  try {
+  details.forEach((detail, index) => {
+    const cardX = spacing.margin + (index * (cardWidth + 10));
+    
+    // Card background
+    doc.setFillColor(...colors.subtle);
+    doc.rect(cardX, currentY, cardWidth, cardHeight, 'F');
+    
+    // Card border
+    doc.setDrawColor(...colors.line);
+    doc.setLineWidth(0.3);
+    doc.rect(cardX, currentY, cardWidth, cardHeight);
+    
+    // Icon
+    doc.setFontSize(fonts.subheading.size);
     doc.text(detail.icon, cardX + 5, currentY + 12);
-  } catch (iconError) {
-    // Fallback to bullets if emojis don't work
-    doc.setFillColor(...colors.accent);
-    doc.circle(cardX + 7, currentY + 9, 1.5, 'F');
-  }
-  
-  // Label
-  doc.setFontSize(fonts.caption.size);
-  doc.setTextColor(...colors.lightText);
-  doc.setFont('helvetica', 'normal');
-  doc.text(detail.label, cardX + 5, currentY + 20);
-  
-  // Value
-  doc.setFontSize(fonts.subheading.size);
-  doc.setTextColor(...colors.primary);
-  doc.setFont('helvetica', 'bold');
-  const valueLines = doc.splitTextToSize(detail.value, cardWidth - 10);
-  valueLines.forEach((line, lineIndex) => {
-    doc.text(line, cardX + 5, currentY + 28 + (lineIndex * 6));
+    
+    // Label
+    doc.setFontSize(fonts.caption.size);
+    doc.setTextColor(...colors.lightText);
+    doc.setFont('helvetica', 'normal');
+    doc.text(detail.label, cardX + 5, currentY + 20);
+    
+    // Value
+    doc.setFontSize(fonts.subheading.size);
+    doc.setTextColor(...colors.primary);
+    doc.setFont('helvetica', 'bold');
+    const valueLines = doc.splitTextToSize(detail.value, cardWidth - 10);
+    valueLines.forEach((line, lineIndex) => {
+      doc.text(line, cardX + 5, currentY + 28 + (lineIndex * 6));
+    });
+    
+    doc.setFont('helvetica', 'normal');
   });
-  
-  doc.setFont('helvetica', 'normal');
-});
   
   currentY += cardHeight + spacing.section;
   
