@@ -353,14 +353,23 @@ function AddProperty() {
   
   // Helper function to format price for display elsewhere - Enhanced for millions
   const formatPrice = (price) => {
-    if (!price) return '';
-    // Remove any existing formatting first
-    const rawValue = price.toString().replace(/,/g, '');
-    // Format with thousands separators
-    const parts = rawValue.split('.');
-    const formattedInteger = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-    return parts.length > 1 ? `${formattedInteger}.${parts[1]}` : formattedInteger;
-  };
+  if (!price) return '';
+  // Remove any existing formatting first
+  const rawValue = price.toString().replace(/,/g, '');
+  const numericValue = parseFloat(rawValue);
+  
+  if (numericValue >= 1_000_000) {
+    return `${(numericValue / 1_000_000).toFixed(1)}M`;
+  }
+  if (numericValue >= 1_000) {
+    return `${Math.round(numericValue / 1_000)}K`;
+  }
+  
+  // Format with thousands separators for display
+  const parts = rawValue.split('.');
+  const formattedInteger = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return parts.length > 1 ? `${formattedInteger}.${parts[1]}` : formattedInteger;
+};
   
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);

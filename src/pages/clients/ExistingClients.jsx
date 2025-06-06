@@ -429,53 +429,69 @@ const translations = {
 
 function ExistingClients() {
   // Function to extract image URLs from service data
-  const extractImageUrl = (data) => {
-    // Check all possible image field names in order of preference
-    if (data.imageUrl && typeof data.imageUrl === 'string' && data.imageUrl.trim() !== '') {
-      return data.imageUrl;
-    } 
+ // Function to extract image URLs from service data
+const extractImageUrl = (data) => {
+  console.log(`Extracting image for service:`, data.name?.en || data.name || 'Unknown', data.photos);
+  
+  // Priority 1: Check photos array (your main structure)
+  if (data.photos && Array.isArray(data.photos) && data.photos.length > 0) {
+    // Handle Firestore object structure with url property
+    const photoWithUrl = data.photos.find(photo => 
+      photo && typeof photo === 'object' && photo.url && typeof photo.url === 'string' && photo.url.trim() !== '');
     
-    if (data.image && typeof data.image === 'string' && data.image.trim() !== '') {
-      return data.image;
+    if (photoWithUrl) {
+      console.log(`Found image in photos array:`, photoWithUrl.url);
+      return photoWithUrl.url;
     }
     
-    if (data.thumbnail && typeof data.thumbnail === 'string' && data.thumbnail.trim() !== '') {
-      return data.thumbnail;
+    // Fallback to string URLs directly in the array
+    const firstValidPhoto = data.photos.find(photo => typeof photo === 'string' && photo.trim() !== '');
+    if (firstValidPhoto) {
+      console.log(`Found string image in photos array:`, firstValidPhoto);
+      return firstValidPhoto;
+    }
+  }
+  
+  // Priority 2: Check imageUrl field
+  if (data.imageUrl && typeof data.imageUrl === 'string' && data.imageUrl.trim() !== '') {
+    console.log(`Found imageUrl:`, data.imageUrl);
+    return data.imageUrl;
+  } 
+  
+  // Priority 3: Check image field
+  if (data.image && typeof data.image === 'string' && data.image.trim() !== '') {
+    console.log(`Found image field:`, data.image);
+    return data.image;
+  }
+  
+  // Priority 4: Check thumbnail field
+  if (data.thumbnail && typeof data.thumbnail === 'string' && data.thumbnail.trim() !== '') {
+    console.log(`Found thumbnail:`, data.thumbnail);
+    return data.thumbnail;
+  }
+  
+  // Priority 5: Check images array
+  if (data.images && Array.isArray(data.images) && data.images.length > 0) {
+    // First check if images contains objects with url property
+    const imageWithUrl = data.images.find(img => 
+      img && typeof img === 'object' && img.url && typeof img.url === 'string' && img.url.trim() !== '');
+    
+    if (imageWithUrl) {
+      console.log(`Found image in images array:`, imageWithUrl.url);
+      return imageWithUrl.url;
     }
     
-    // Check for photos array - handling Firestore object structure
-    if (data.photos && Array.isArray(data.photos) && data.photos.length > 0) {
-      // First check if photos contains objects with url property (Firestore format)
-      const photoWithUrl = data.photos.find(photo => 
-        photo && typeof photo === 'object' && photo.url && typeof photo.url === 'string');
-      
-      if (photoWithUrl) {
-        return photoWithUrl.url;
-      }
-      
-      // Fallback to check for string URLs directly in the array
-      const firstValidPhoto = data.photos.find(photo => typeof photo === 'string' && photo.trim() !== '');
-      if (firstValidPhoto) return firstValidPhoto;
+    // Fallback to string URLs
+    const firstValidImage = data.images.find(img => typeof img === 'string' && img.trim() !== '');
+    if (firstValidImage) {
+      console.log(`Found string image in images array:`, firstValidImage);
+      return firstValidImage;
     }
-    
-    // Check for images array
-    if (data.images && Array.isArray(data.images) && data.images.length > 0) {
-      // First check if images contains objects with url property
-      const imageWithUrl = data.images.find(img => 
-        img && typeof img === 'object' && img.url && typeof img.url === 'string');
-      
-      if (imageWithUrl) {
-        return imageWithUrl.url;
-      }
-      
-      // Fallback to string URLs
-      const firstValidImage = data.images.find(img => typeof img === 'string' && img.trim() !== '');
-      if (firstValidImage) return firstValidImage;
-    }
-    
-    // If no image found, return null
-    return null;
-  };
+  }
+  
+  console.log(`No image found for service:`, data.name?.en || data.name || 'Unknown');
+  return null;
+};
 
   const [language, setLanguage] = useState(getCurrentLanguage); 
   const t = translations[language]; // Translation function
@@ -1104,7 +1120,15 @@ useEffect(() => {
         }
         
         console.log("All services:", services);
-        setAvailableServices(services);
+console.log("=== IMAGE DEBUG ===");
+Object.entries(services).forEach(([category, items]) => {
+  console.log(`${category}: ${items.length} items`);
+  items.forEach(item => {
+    console.log(`  - ${item.name?.en || item.name}: ${item.imageUrl || 'NO IMAGE'}`);
+  });
+});
+console.log("=== END DEBUG ===");
+setAvailableServices(services);
       } catch (error) {
         console.error("Error fetching services:", error);
         setError(t.error);
@@ -2059,13 +2083,13 @@ for (const currentItem of offer.items) {
         
         // Add image background
         doc.setFillColor(240, 240, 240);
-        doc.rect(25, currentY + 5, 35, 35, 'F');
+        doc.rect(25, currentY + 5, 50, 35, 'F');
         
         // Try to use the actual image if available in cache
         let imageDisplayed = false;
         if (item.imageUrl && imageCache[item.imageUrl]) {
           try {
-            doc.addImage(imageCache[item.imageUrl], 'JPEG', 25, currentY + 5, 35, 35, undefined, 'FAST');
+            doc.addImage(imageCache[item.imageUrl], 'JPEG', 25, currentY + 5, 50, 35, undefined, 'FAST');
             imageDisplayed = true;
           } catch (imgError) {
             console.error(`Error adding image for item ${item.id || 'unknown'}:`, imgError);
@@ -2087,14 +2111,14 @@ for (const currentItem of offer.items) {
           
           doc.setFontSize(16);
           doc.setTextColor(100, 100, 110);
-          doc.text(icon, 42.5, currentY + 25, { align: 'center' });
+          doc.text(icon, 50, currentY + 25, { align: 'center' });
         }
         
         // Service details
         doc.setFontSize(11);
         doc.setTextColor(32, 32, 64);
         doc.setFont("helvetica", "bold");
-        doc.text(name, 65, currentY + 10);
+        doc.text(name, 80, currentY + 10);
         
         // Add additional details based on item category
         doc.setFontSize(8);
@@ -2131,13 +2155,13 @@ for (const currentItem of offer.items) {
         }
         
         if (detailsText) {
-          doc.text(detailsText, 65, currentY + 17);
+          doc.text(detailsText, 80, currentY + 17);
         }
         
         // Price and quantity
         const unitInfo = item.unit ? `per ${item.unit}` : '';
         doc.setFontSize(9);
-        doc.text(`€${item.price.toFixed(2)} ${unitInfo} × ${item.quantity}`, 65, currentY + 25);
+        doc.text(`€${item.price.toFixed(2)} ${unitInfo} × ${item.quantity}`, 80, currentY + 25);
         
         // Show if there's a discount
         if (item.discountValue > 0) {
@@ -2145,7 +2169,7 @@ for (const currentItem of offer.items) {
           const discountText = item.discountType === 'percentage' 
             ? `${item.discountValue}% discount applied` 
             : `€${item.discountValue} discount applied`;
-          doc.text(discountText, 65, currentY + 32);
+          doc.text(discountText, 80, currentY + 32);
         }
         
         // Total for this item
@@ -2318,56 +2342,73 @@ for (const currentItem of offer.items) {
   
   // Function to fetch image - works with or without Firebase SDK
   const fetchImageWithAuth = async (url, itemId = 'unknown') => {
-    if (!url) return null;
+  if (!url) return null;
+  
+  try {
+    console.log(`Attempting to fetch image for item ${itemId}: ${url}`);
     
-    try {
-      console.log(`Attempting to fetch image for item ${itemId}: ${url}`);
+    // For Firebase Storage URLs, try direct approach without proxy
+    if (url.includes('firebasestorage.googleapis.com')) {
+      console.log(`Attempting direct fetch for Firebase image: ${url}`);
       
-      // For Firebase Storage URLs, use the proxy
-      if (url.includes('firebasestorage.googleapis.com')) {
-        const proxyUrl = `http://localhost:3000/image-proxy?url=${encodeURIComponent(url)}`;
-        console.log(`Using proxy: ${proxyUrl}`);
-        
-        const response = await fetch(proxyUrl, {
-          mode: 'cors',
-          credentials: 'omit', // Important: don't send credentials
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Proxy request failed: ${response.status}`);
-        }
-        
-        const blob = await response.blob();
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-      }
-      
-      // For non-Firebase URLs
-      const response = await fetch(url, {
-        mode: 'cors',
-        credentials: 'omit',
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch image: ${response.status}`);
-      }
-      
-      const blob = await response.blob();
+      // Use Image element with canvas conversion
       return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            ctx.drawImage(img, 0, 0);
+            
+            const dataURL = canvas.toDataURL('image/jpeg', 0.8);
+            console.log(`Successfully converted image to base64 for item ${itemId}`);
+            resolve(dataURL);
+          } catch (canvasError) {
+            console.error(`Canvas conversion failed for item ${itemId}:`, canvasError);
+            reject(canvasError);
+          }
+        };
+        
+        img.onerror = (error) => {
+          console.error(`Image load failed for item ${itemId}:`, error);
+          reject(new Error('Image load failed'));
+        };
+        
+        img.src = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+        
+        setTimeout(() => {
+          reject(new Error('Image load timeout'));
+        }, 10000);
       });
-    } catch (error) {
-      console.error(`Error loading image for item ${itemId}:`, error);
-      return null;
     }
-  };
+    
+    // For non-Firebase URLs, use direct fetch
+    const response = await fetch(url, {
+      mode: 'cors',
+      credentials: 'omit',
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status}`);
+    }
+    
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error(`Error loading image for item ${itemId}:`, error);
+    return null;
+  }
+};
   
   // Handle reservation form input changes
   const handleReservationChange = (e) => {
@@ -2549,45 +2590,63 @@ const getUserName = async (userId) => {
   const renderServiceCard = (service) => {
     // Common image rendering function to maintain consistency across all card types
     const renderImage = (service, height = "h-48") => (
-      <div className={`${height} bg-gray-50 flex items-center justify-center overflow-hidden relative`}> 
-        {((service.imageUrl || (service.photos && service.photos.length > 0)) && !imageErrors[service.id]) ? (
-          <img 
-            src={service.imageUrl || (service.photos && service.photos[0])} 
-            alt={typeof service.name === 'object' ? getLocalizedText(service.name, language) : service.name}
-            className="w-full h-full object-cover absolute inset-0"
-            onError={(e) => {
-              console.error(`Failed to load image for ${typeof service.name === 'object' ? getLocalizedText(service.name, language) : service.name}:`, service.imageUrl || (service.photos && service.photos[0]));
-              console.log("Image load error:", e);
-              setImageErrors(prev => ({...prev, [service.id]: true}));
-            }}
-          />
-        ) : (
-          <div className="text-center p-4 text-sm font-medium text-gray-500 flex items-center justify-center h-full w-full">
-            <div>
-              <div className="text-3xl mb-2">
-                {service.category === 'villas' ? '🏠' :
-                 service.category === 'boats' ? '🛥️' :
-                 service.category === 'cars' ? '🚗' :
-                 service.category === 'security' ? '🔒' :
-                 service.category === 'nannies' ? '👶' :
-                 service.category === 'chefs' ? '🍽️' :
-                 service.category === 'excursions' ? '🏔️' : '✨'}
-              </div>
-              <div>
-                {typeof service.name === 'object'
-                  ? getLocalizedText(service.name, language)
-                  : service.name}
-              </div>
-            </div>
+  <div className={`${height} bg-gray-50 flex items-center justify-center overflow-hidden relative rounded-t-lg`}> 
+    {((service.imageUrl || (service.photos && service.photos.length > 0)) && !imageErrors[service.id]) ? (
+      <img 
+        src={service.imageUrl || (service.photos && service.photos[0])} 
+        alt={typeof service.name === 'object' ? getLocalizedText(service.name, language) : service.name}
+        className="w-full h-full object-cover object-center transition-transform duration-300 hover:scale-105"
+        style={{
+          objectFit: 'cover',
+          objectPosition: 'center'
+        }}
+        onError={(e) => {
+          console.error(`Failed to load image for ${typeof service.name === 'object' ? getLocalizedText(service.name, language) : service.name}:`, service.imageUrl || (service.photos && service.photos[0]));
+          setImageErrors(prev => ({...prev, [service.id]: true}));
+        }}
+        onLoad={() => {
+          console.log(`Successfully loaded image for ${typeof service.name === 'object' ? getLocalizedText(service.name, language) : service.name}`);
+          // Clear any previous error
+          setImageErrors(prev => {
+            const newErrors = {...prev};
+            delete newErrors[service.id];
+            return newErrors;
+          });
+        }}
+      />
+    ) : (
+      <div className="text-center p-4 text-sm font-medium text-gray-500 flex items-center justify-center h-full w-full">
+        <div>
+          <div className="text-3xl mb-2">
+            {service.category === 'villas' ? '🏠' :
+             service.category === 'boats' ? '🛥️' :
+             service.category === 'cars' ? '🚗' :
+             service.category === 'security' ? '🔒' :
+             service.category === 'nannies' ? '👶' :
+             service.category === 'chefs' ? '🍽️' :
+             service.category === 'excursions' ? '🏔️' : '✨'}
           </div>
-        )}
+          <div className="text-xs">
+            {typeof service.name === 'object'
+              ? getLocalizedText(service.name, language)
+              : service.name}
+          </div>
+          {!service.imageUrl && (
+            <div className="text-xs text-gray-400 mt-1">No image available</div>
+          )}
+          {service.imageUrl && imageErrors[service.id] && (
+            <div className="text-xs text-red-400 mt-1">Image failed to load</div>
+          )}
+        </div>
       </div>
-    );
+    )}
+  </div>
+);
   
     switch (service.category) {
       case 'villas':
         return (
-          <div key={service.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm h-full flex flex-col">
+          <div key={service.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 h-full flex flex-col">
             {renderImage(service, "h-32")}
             <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-3'} gap-4`}>
               <h3 className="text-base font-semibold text-gray-900 mb-3">
@@ -2616,7 +2675,7 @@ const getUserName = async (userId) => {
               <div className="flex items-center justify-between mt-auto">
                 <div>
                   <span className="text-indigo-600 font-semibold">
-                    €{service.dailyPrice || service.price}
+                    € {service.dailyPrice || service.price}
                   </span>
                   <span className="text-gray-500 text-xs ml-1">{t.perDay}</span>
                 </div>
@@ -2658,7 +2717,7 @@ const getUserName = async (userId) => {
               <div className="flex items-center justify-between mt-auto">
                 <div>
                   <span className="text-indigo-600 font-semibold">
-                    €{service.pricing?.daily || service.hourlyRate || service.price}
+                    € {service.pricing?.daily || service.hourlyRate || service.price}
                   </span>
                   <span className="text-gray-500 text-xs ml-1">/{service.unit || 'hour'}</span>
                 </div>
@@ -2696,7 +2755,7 @@ const getUserName = async (userId) => {
               <div className="flex items-center justify-between mt-auto">
                 <div>
                   <span className="text-indigo-600 font-semibold">
-                    €{service.dailyRate || service.price}
+                    € {service.dailyRate || service.price}
                   </span>
                   <span className="text-gray-500 text-xs ml-1">/{service.unit || 'day'}</span>
                 </div>
@@ -2731,7 +2790,7 @@ const getUserName = async (userId) => {
               <div className="flex items-center justify-between mt-auto">
                 <div>
                   <span className="text-indigo-600 font-semibold">
-                    €{service.price}
+                    € {service.price}
                   </span>
                   <span className="text-gray-500 text-xs ml-1">/{service.unit || 'day'}</span>
                 </div>
@@ -2871,7 +2930,7 @@ const getUserName = async (userId) => {
             {selectedClient.budget && (
               <div>
                 <p className="text-xs text-indigo-700 font-medium mb-1">Budget</p>
-                <p className="text-sm text-indigo-900">€{selectedClient.budget}</p>
+                <p className="text-sm text-indigo-900">€ {selectedClient.budget}</p>
               </div>
             )}
             
@@ -3413,10 +3472,10 @@ const getUserName = async (userId) => {
                       </div>
                       <div className="text-right">
                         <div className="text-lg font-bold text-gray-900">
-                          €{(item.price * item.quantity).toFixed(2)}
+                          € {(item.price * item.quantity).toFixed(2)}
                         </div>
                         <div className="text-xs text-gray-500">
-                          €{item.price.toFixed(2)} each
+                          € {item.price.toFixed(2)} each
                         </div>
                       </div>
                     </div>
@@ -3612,7 +3671,7 @@ const getUserName = async (userId) => {
   {item.hasCustomDiscount && item.discountValue > 0 && (
     <div className="mt-2 flex items-center justify-between text-sm">
       <span className="text-gray-500 line-through">
-        Original: €{item.originalPrice}
+        Original: € {item.originalPrice}
       </span>
       <span className="font-bold text-green-600">
         After discount: €{item.price.toFixed(2)}
@@ -3634,8 +3693,8 @@ const getUserName = async (userId) => {
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total:</span>
                   <span className="text-indigo-600">
-                    €{offerItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)}
-                  </span>
+                  € {offerItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)}
+                </span>
                 </div>
               </div>
             </div>
@@ -3815,7 +3874,7 @@ const getUserName = async (userId) => {
                         <div key={service.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300">
                           
                           {/* Service Image */}
-                          <div className={`${isMobile ? 'h-32' : 'h-40'} bg-gray-100 relative overflow-hidden`}>
+                          <div className={`${isMobile ? 'h-40' : 'h-48'} bg-gray-100 relative overflow-hidden rounded-t-xl`}>
                             {((service.imageUrl || (service.photos && service.photos.length > 0)) && !imageErrors[service.id]) ? (
                               <img 
                                 src={service.imageUrl || (service.photos && service.photos[0])} 
@@ -4258,7 +4317,7 @@ const getUserName = async (userId) => {
         Original: €{item.originalPrice}
       </span>
       <span className="font-bold text-green-600">
-        After: €{item.price.toFixed(2)}
+        After: € {item.price.toFixed(2)}
       </span>
     </div>
   )}
@@ -4266,7 +4325,7 @@ const getUserName = async (userId) => {
                         
                         {/* Price breakdown */}
                         <div className="text-xs text-gray-500 mt-2">
-                          €{item.price.toFixed(2)} × {item.quantity} = €{(item.price * item.quantity).toFixed(2)}
+                          € {item.price.toFixed(2)} × {item.quantity} = €{(item.price * item.quantity).toFixed(2)}
                         </div>
                       </div>
                     ))}
@@ -4704,9 +4763,9 @@ const getUserName = async (userId) => {
                                         {typeof item.name === 'object' ? getLocalizedText(item.name, language) : item.name}
                                       </div>
                                       <div className="text-xs text-gray-500 flex flex-wrap gap-2 ml-6">
-                                        <span>€{item.price.toFixed(2)} {item.unit ? `/${item.unit}` : ''}</span>
+                                        <span>€ {item.price.toFixed(2)} {item.unit ? `/${item.unit}` : ''}</span>
                                         <span>× {item.quantity}</span>
-                                        <span>= €{item.discountValue ? 
+                                        <span>= € {item.discountValue ? 
                                           calculateItemPrice(item).toFixed(2) : 
                                           (item.price * item.quantity).toFixed(2)}</span>
                                       </div>
@@ -4964,7 +5023,7 @@ const getUserName = async (userId) => {
                                           />
                                         </div>
                                         <div className="text-xs text-gray-500 ml-2">
-                                          {t.of} €{item.discountValue ? 
+                                          {t.of} € {item.discountValue ? 
                                             calculateItemPrice(item).toFixed(2) : 
                                             (item.price * item.quantity).toFixed(2)}
                                         </div>
@@ -5466,7 +5525,7 @@ const getUserName = async (userId) => {
                               <div className="p-3">
                                 <div className="flex justify-between mb-2">
                                   <span className="text-xs text-gray-500">{t.offerTotal}</span>
-                                  <span className="text-sm font-medium text-gray-900">€{offer.totalValue.toFixed(2)}</span>
+                                  <span className="text-sm font-medium text-gray-900">€ {offer.totalValue.toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between mb-3">
                                   <span className="text-xs text-gray-500">{t.offerItems}</span>
@@ -5490,7 +5549,7 @@ const getUserName = async (userId) => {
                                         <span className="text-gray-600">
                                           {item.discountValue > 0 ? (
                                             <span className="text-red-600">
-                                              €{(item.discountType === 'percentage' 
+                                              € {(item.discountType === 'percentage' 
                                                 ? (item.price * item.quantity) * (1 - item.discountValue/100) 
                                                 : (item.price * item.quantity) - item.discountValue).toFixed(2)}
                                             </span>

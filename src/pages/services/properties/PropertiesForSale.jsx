@@ -215,18 +215,27 @@ const PropertiesForSale = () => {
     });
   };
 
-  const formatPrice = price => {
-    if (price >= 1_000_000) {
-      const millions = price / 1_000_000;
-      return millions.toLocaleString(
-        language === 'ro' ? 'ro-RO' : 'en-US',
-        { minimumFractionDigits: 0, maximumFractionDigits: 3 }
-      );
-    }
-    return price.toLocaleString(
-      language === 'ro' ? 'ro-RO' : 'en-US'
+ const formatPrice = price => {
+  if (price >= 1_000_000) {
+    const millions = price / 1_000_000;
+    const formattedMillions = millions.toLocaleString(
+      language === 'ro' ? 'ro-RO' : 'en-US',
+      { minimumFractionDigits: 0, maximumFractionDigits: 1 }
     );
-  };
+    return `${formattedMillions}M`; // ← Added "M" suffix
+  }
+  if (price >= 1_000) {
+    const thousands = price / 1_000;
+    const formattedThousands = thousands.toLocaleString(
+      language === 'ro' ? 'ro-RO' : 'en-US',
+      { minimumFractionDigits: 0, maximumFractionDigits: 0 }
+    );
+    return `${formattedThousands}K`; // ← Added "K" suffix
+  }
+  return price.toLocaleString(
+    language === 'ro' ? 'ro-RO' : 'en-US'
+  );
+};
 
   const handleDelete = async (id, e) => {
     e.stopPropagation();
@@ -559,7 +568,7 @@ const PropertiesForSale = () => {
         </div>
       </div>
 
-      {/* Property Grid or Empty State */}
+      {/* Property Grid or Empty State - FIXED VERSION */}
       {getFilteredProperties().length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
           <svg className="w-16 h-16 text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -577,9 +586,10 @@ const PropertiesForSale = () => {
               <div
                 key={prop.id}
                 onClick={() => navigate(`/services/properties-for-sale/${prop.id}`)}
-                className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-200 max-w-sm mx-auto"
+                className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-200 max-w-sm mx-auto h-full flex flex-col"
               >
-                <div className="relative h-40 md:h-44">
+                {/* Fixed height image container */}
+                <div className="relative h-40 md:h-44 flex-shrink-0">
                   {prop.images.length > 0 ? (
                     <img src={prop.images[0]} alt={prop.title} className="w-full h-full object-cover" loading="lazy" />
                   ) : (
@@ -597,9 +607,25 @@ const PropertiesForSale = () => {
                   </div>
                 </div>
 
-                <div className="p-3">
-                  <h2 className="text-base md:text-lg font-semibold mb-2 truncate">{prop.title}</h2>
-                  <div className="flex items-center text-gray-600 mb-3 min-w-0">
+                {/* Content container that grows to fill available space */}
+                <div className="p-3 flex flex-col flex-grow">
+                  {/* Title with fixed height to prevent overflow - FIXED VERSION */}
+                  <h2 className="text-base md:text-lg font-semibold mb-2 h-12 flex items-start">
+                    <span style={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      lineHeight: '1.2',
+                      width: '100%'
+                    }}>
+                      {prop.title}
+                    </span>
+                  </h2>
+                  
+                  {/* Location with fixed height */}
+                  <div className="flex items-center text-gray-600 mb-3 min-w-0 h-5">
                     <svg className="w-4 h-4 text-indigo-600 mr-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -609,6 +635,7 @@ const PropertiesForSale = () => {
 
                   <div className="border-t border-gray-100 my-3" />
 
+                  {/* Price and size section */}
                   <div className="flex justify-between items-center mb-3 gap-2">
                     <div className="text-indigo-600 text-lg font-bold flex items-center min-w-0">
                       <span className="mr-1">€</span>
@@ -622,24 +649,31 @@ const PropertiesForSale = () => {
                     </div>
                   </div>
 
-                  {prop.type === 'villa' && (
-                    <div className="flex gap-4 mb-3">
-                      <div className="flex items-center text-gray-700">
-                        <svg className="w-4 h-4 text-indigo-600 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
-                        </svg>
-                        <span className="text-sm">{prop.bedrooms} {t.beds}</span>
+                  {/* Beds and baths section with fixed height */}
+                  <div className="h-6 mb-3">
+                    {prop.type === 'villa' && (
+                      <div className="flex gap-4">
+                        <div className="flex items-center text-gray-700">
+                          <svg className="w-4 h-4 text-indigo-600 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                          </svg>
+                          <span className="text-sm">{prop.bedrooms} {t.beds}</span>
+                        </div>
+                        <div className="flex items-center text-gray-700">
+                          <svg className="w-4 h-4 text-indigo-600 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                          </svg>
+                          <span className="text-sm">{prop.bathrooms} {t.baths}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center text-gray-700">
-                        <svg className="w-4 h-4 text-indigo-600 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                        </svg>
-                        <span className="text-sm">{prop.bathrooms} {t.baths}</span>
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
-                  <div className="flex justify-end gap-2">
+                  {/* Spacer to push buttons to bottom */}
+                  <div className="flex-grow"></div>
+
+                  {/* Action buttons - always at bottom */}
+                  <div className="flex justify-end gap-2 mt-auto">
                     <button
                       onClick={e => { e.stopPropagation(); navigate(`/services/properties-for-sale/edit/${prop.id}`); }}
                       className="p-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
