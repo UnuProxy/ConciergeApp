@@ -1244,7 +1244,83 @@ setAvailableServices(services);
     const price = parseFloat(service.price);
     return price >= appliedMinPrice && price <= appliedMaxPrice;
   });
-  
+  const fetchAdminUserFromDb = async (companyId) => {
+  try {
+    console.log(`Fetching admin user for company: ${companyId}`);
+    
+    const usersRef = collection(db, "users");
+    const adminQuery = query(
+      usersRef,
+      where("companyId", "==", companyId),
+      where("role", "==", "admin")
+    );
+    
+    const adminSnapshot = await getDocs(adminQuery);
+    
+    if (!adminSnapshot.empty) {
+      const adminDoc = adminSnapshot.docs[0];
+      const adminData = adminDoc.data();
+      console.log("Found admin user:", adminData);
+      
+      return {
+        name: adminData.displayName || adminData.name || '',
+        email: adminData.email || '',
+        phone: adminData.phone || '',
+        website: adminData.website || '',
+        address: adminData.address || ''
+      };
+    } else {
+      console.warn(`No admin user found for company ${companyId}`);
+      return null;
+    }
+  } catch (error) {
+    console.error("Error fetching admin user:", error);
+    return null;
+  }
+};
+
+const fetchCompanyAdminForPdf = async (companyId) => {
+  try {
+    console.log(`Getting PDF info for company: ${companyId}`);
+    
+    // Fetch both company details and admin user
+    const [companyDetails, adminUser] = await Promise.all([
+      fetchCompanyDetailsFromDb(companyId),
+      fetchAdminUserFromDb(companyId)
+    ]);
+    
+    console.log("Company details from DB:", companyDetails);
+    console.log("Admin user from DB:", adminUser);
+    
+    // Combine the information, preferring admin user details where available
+    const pdfInfo = {
+      companyName: companyDetails?.name || `Company ${companyId}`,
+      contactName: adminUser?.name || companyDetails?.name || `Company ${companyId}`,
+      email: adminUser?.email || companyDetails?.email || '',
+      phone: adminUser?.phone || companyDetails?.phone || '',
+      website: adminUser?.website || companyDetails?.website || '',
+      address: adminUser?.address || companyDetails?.address || '',
+      logoUrl: companyDetails?.logoUrl || companyInfo?.logoUrl || null
+    };
+    
+    console.log("Final PDF info:", pdfInfo);
+    return pdfInfo;
+    
+  } catch (error) {
+    console.error("Error getting PDF company info:", error);
+    
+    // Fallback to current companyInfo if database fetch fails
+    return {
+      companyName: companyInfo?.name || `Company ${companyId}`,
+      contactName: companyInfo?.name || `Company ${companyId}`,
+      email: companyInfo?.email || '',
+      phone: companyInfo?.phone || '',
+      website: companyInfo?.website || '',
+      address: companyInfo?.address || '',
+      logoUrl: companyInfo?.logoUrl || null
+    };
+  }
+};
   // Handle converting an offer to a reservation
   const handleConvertOfferToReservation = async (offer) => {
     if (!offer || !selectedClient || !companyInfo || !currentUser) return;
@@ -1905,297 +1981,164 @@ const handleSelectClient = async (client) => {
   };
   
   
-  // Generate PDF for offer with enhanced luxury design
-  const generateOfferPdf = async (offer) => {
-    if (!offer || !companyInfo) return;
+  
+  // Generate PDF for offer with enhanced luxury design - UPDATED for generic company use
+const generateOfferPdf = async (offer) => {
+  if (!offer || !companyInfo) return;
+  
+  setIsGeneratingPdf(true);
+  
+  try {
+    // Pre-load all images that will be needed
+    const imageCache = {};
     
-    
-    setIsGeneratingPdf(true);
-    
-    try {
-      // Pre-load all images that will be needed
-      const imageCache = {};
-      
-      // Process all items to pre-fetch images
-      // Process all items to pre-fetch images
-for (const currentItem of offer.items) {
-  if (currentItem.imageUrl) {
-    try {
-      console.log(`Pre-loading image for item: ${currentItem.id || 'unknown'}`);
-      const imageData = await fetchImageWithAuth(currentItem.imageUrl, currentItem.id || 'unknown');
-      if (imageData) {
-        imageCache[currentItem.imageUrl] = imageData;
-        console.log(`Successfully loaded image for item: ${currentItem.id || 'unknown'}`);
-      }
-    } catch (error) {
-      console.error(`Failed to pre-load image for item: ${currentItem.id || 'unknown'}`, error);
-    }
-  }
-}
-      
-      // Create the PDF document
-      const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
-      
-      // Set up luxury fonts
-      doc.setFont("helvetica", "bold");
-      
-      // Add a luxury background touch - subtle gold gradient at the top
-      doc.setFillColor(250, 246, 231); // Very light gold
-      doc.rect(0, 0, 210, 40, 'F');
-      
-      doc.setFillColor(248, 242, 220); // Slightly darker gold
-      doc.rect(0, 40, 210, 5, 'F');
-      
-      // Add company logo if available, otherwise use company name
-      if (companyInfo.logoUrl && imageCache[companyInfo.logoUrl]) {
+    // Process all items to pre-fetch images
+    for (const currentItem of offer.items) {
+      if (currentItem.imageUrl) {
         try {
-          // Add company logo in a tasteful size
-          doc.addImage(imageCache[companyInfo.logoUrl], 'JPEG', 85, 10, 40, 20, undefined, 'FAST');
-        } catch (logoError) {
-          console.error("Error adding company logo:", logoError);
-          // Fall back to text if logo fails
-          doc.setFontSize(28);
-          doc.setTextColor(32, 32, 64);
-          doc.text(companyInfo.name, 105, 22, { align: 'center' });
+          console.log(`Pre-loading image for item: ${currentItem.id || 'unknown'}`);
+          const imageData = await fetchImageWithAuth(currentItem.imageUrl, currentItem.id || 'unknown');
+          if (imageData) {
+            imageCache[currentItem.imageUrl] = imageData;
+            console.log(`Successfully loaded image for item: ${currentItem.id || 'unknown'}`);
+          }
+        } catch (error) {
+          console.error(`Failed to pre-load image for item: ${currentItem.id || 'unknown'}`, error);
         }
-      } else {
-        // No logo, use text
+      }
+    }
+    
+    // Create the PDF document
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    });
+    
+    // Set up luxury fonts
+    doc.setFont("helvetica", "bold");
+    
+    // Add a luxury background touch - subtle gold gradient at the top
+    doc.setFillColor(250, 246, 231); // Very light gold
+    doc.rect(0, 0, 210, 40, 'F');
+    
+    doc.setFillColor(248, 242, 220); // Slightly darker gold
+    doc.rect(0, 40, 210, 5, 'F');
+    
+    // Add company logo if available, otherwise use company name
+    if (companyInfo.logoUrl && imageCache[companyInfo.logoUrl]) {
+      try {
+        // Add company logo in a tasteful size
+        doc.addImage(imageCache[companyInfo.logoUrl], 'JPEG', 85, 10, 40, 20, undefined, 'FAST');
+      } catch (logoError) {
+        console.error("Error adding company logo:", logoError);
+        // Fall back to text if logo fails
         doc.setFontSize(28);
-        doc.setTextColor(32, 32, 64); // Deep navy blue
+        doc.setTextColor(32, 32, 64);
         doc.text(companyInfo.name, 105, 22, { align: 'center' });
       }
-      
-      // Add elegant divider
-      doc.setDrawColor(180, 160, 120); // Gold tone
-      doc.setLineWidth(0.5);
-      doc.line(40, 32, 170, 32);
-      
-      // Add company contact information in an elegant, centered layout
+    } else {
+      // No logo, use text
+      doc.setFontSize(28);
+      doc.setTextColor(32, 32, 64); // Deep navy blue
+      doc.text(companyInfo.name, 105, 22, { align: 'center' });
+    }
+    
+    // Add elegant divider
+    doc.setDrawColor(180, 160, 120); // Gold tone
+    doc.setLineWidth(0.5);
+    doc.line(40, 32, 170, 32);
+    
+    // ONLY SHOW COMPANY CONTACT INFORMATION IF IT HAS ACTUAL VALUES
+    const hasValidPhone = companyInfo.phone && companyInfo.phone.trim() !== '' && companyInfo.phone !== '-';
+    const hasValidEmail = companyInfo.email && companyInfo.email.trim() !== '' && companyInfo.email !== '-';
+    const hasValidWebsite = companyInfo.website && companyInfo.website.trim() !== '' && companyInfo.website !== '-';
+    
+    if (hasValidPhone || hasValidEmail || hasValidWebsite) {
       doc.setFontSize(9);
       doc.setTextColor(80, 80, 90);
       doc.setFont("helvetica", "normal");
       
       // Contact info in a horizontal layout to appear more elegant
       const contactInfoY = 38;
-      doc.text(`Tel: ${companyInfo.phone || '-'}`, 60, contactInfoY, { align: 'right' });
-      doc.text(`|`, 65, contactInfoY, { align: 'center' });
-      doc.text(`Email: ${companyInfo.email || '-'}`, 105, contactInfoY, { align: 'center' });
-      doc.text(`|`, 145, contactInfoY, { align: 'center' });
-      doc.text(`Web: ${companyInfo.website || '-'}`, 150, contactInfoY, { align: 'left' });
+      const contactParts = [];
       
-      // Add offer title with luxury styling
-      doc.setFontSize(18);
-      doc.setTextColor(32, 32, 64); // Deep navy blue
-      doc.setFont("helvetica", "bold");
-      doc.text(`EXCLUSIVE OFFER #${offer.id.slice(-5)}`, 105, 55, { align: 'center' });
+      if (hasValidPhone) contactParts.push(`Tel: ${companyInfo.phone}`);
+      if (hasValidEmail) contactParts.push(`Email: ${companyInfo.email}`);
+      if (hasValidWebsite) contactParts.push(`Web: ${companyInfo.website}`);
       
-      // Decorative line under the title
-      doc.setDrawColor(180, 160, 120); // Gold tone
-      doc.setLineWidth(0.3);
-      doc.line(65, 58, 145, 58);
-      
-      // Add offer information in a more elegant layout
-      doc.setFontSize(12);
-      doc.setTextColor(60, 60, 70);
-      doc.setFont("helvetica", "normal");
-      
-      const clientNameY = 68;
-      doc.setFont("helvetica", "bold");
-      doc.text(`PREPARED FOR:`, 30, clientNameY);
-      doc.setFont("helvetica", "normal");
-      doc.text(`${offer.clientName}`, 80, clientNameY);
-      
-      const dateY = 75;
-      doc.setFont("helvetica", "bold");
-      doc.text(`CREATED:`, 30, dateY);
-      doc.setFont("helvetica", "normal");
-      doc.text(`${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 80, dateY);
-      
-      const validY = 82;
-      doc.setFont("helvetica", "bold");
-      doc.text(`VALID UNTIL:`, 30, validY);
-      doc.setFont("helvetica", "normal");
-      
-      const validUntil = new Date();
-      validUntil.setDate(validUntil.getDate() + 30);
-      doc.text(`${validUntil.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 80, validY);
-      
-      // Add decorative touch
-      doc.setDrawColor(180, 160, 120); // Gold tone
-      doc.setLineWidth(0.3);
-      doc.line(20, 90, 190, 90);
-      
-      // Add a touch of luxury with a small decorative element
-      doc.setDrawColor(180, 160, 120); // Gold tone
-      doc.setLineWidth(0.7);
-      doc.line(20, 91, 20, 93);
-      doc.line(190, 91, 190, 93);
-      
-      // Add offer items section title with more luxury
-      doc.setFontSize(14);
-      doc.setTextColor(32, 32, 64); // Deep navy blue
-      doc.setFont("helvetica", "bold");
-      doc.text("EXCLUSIVE SERVICES", 105, 100, { align: 'center' });
-      
-      // Instead of using a traditional table, we'll create a visual display of services
-      // This approach works better with the luxury style and allows for images
-      let currentY = 110; // Starting Y position for services
-  
-      // Process the services for the PDF
-      for (let i = 0; i < offer.items.length; i++) {
-        const item = offer.items[i];
-        
-        // Check if we need to add a new page
-        if (currentY > 250) {
-          doc.addPage();
-          currentY = 20;
-          
-          // Add a small header on the new page
-          doc.setFillColor(250, 246, 231); // Very light gold
-          doc.rect(0, 0, 210, 20, 'F');
-          
-          doc.setFontSize(10);
-          doc.setTextColor(32, 32, 64);
-          doc.setFont("helvetica", "normal");
-          doc.text(`EXCLUSIVE OFFER #${offer.id.slice(-5)} - Continued`, 105, 10, { align: 'center' });
-          
-          doc.setDrawColor(180, 160, 120); // Gold tone
-          doc.setLineWidth(0.3);
-          doc.line(20, 15, 190, 15);
-          
-          currentY = 25; // Start content a bit lower
-        }
-        
-        // Get the item name
-        let name = typeof item.name === 'object' ? 
-          (item.name.en || item.name.ro || 'Service') : 
-          (item.name || 'Service');
-        
-        // Create elegant card for this service
-        doc.setDrawColor(220, 220, 230);
-        doc.setLineWidth(0.3);
-        doc.setFillColor(250, 250, 252);
-        doc.roundedRect(20, currentY, 170, 45, 2, 2, 'FD');
-        
-        // Add image background
-        doc.setFillColor(240, 240, 240);
-        doc.rect(25, currentY + 5, 50, 35, 'F');
-        
-        // Try to use the actual image if available in cache
-        let imageDisplayed = false;
-        if (item.imageUrl && imageCache[item.imageUrl]) {
-          try {
-            doc.addImage(imageCache[item.imageUrl], 'JPEG', 25, currentY + 5, 50, 35, undefined, 'FAST');
-            imageDisplayed = true;
-          } catch (imgError) {
-            console.error(`Error adding image for item ${item.id || 'unknown'}:`, imgError);
-            // Will fall back to icon
-          }
-        }
-        
-        // If no image was displayed, show the icon
-        if (!imageDisplayed) {
-          // Display category icon
-          let icon = '✦'; // Default
-          if (item.category === 'villas') icon = '🏠';
-          else if (item.category === 'boats') icon = '🛥️';
-          else if (item.category === 'cars') icon = '🚗';
-          else if (item.category === 'security') icon = '🔒';
-          else if (item.category === 'nannies') icon = '👶';
-          else if (item.category === 'chefs') icon = '🍽️';
-          else if (item.category === 'excursions') icon = '🏔️';
-          
-          doc.setFontSize(16);
-          doc.setTextColor(100, 100, 110);
-          doc.text(icon, 50, currentY + 25, { align: 'center' });
-        }
-        
-        // Service details
-        doc.setFontSize(11);
-        doc.setTextColor(32, 32, 64);
-        doc.setFont("helvetica", "bold");
-        doc.text(name, 80, currentY + 10);
-        
-        // Add additional details based on item category
-        doc.setFontSize(8);
-        doc.setTextColor(100, 100, 110);
-        doc.setFont("helvetica", "normal");
-        
-        let detailsText = '';
-        
-        if (item.category === 'villas') {
-          const location = item.location || item.address || '';
-          const bedrooms = item.bedrooms ? `${item.bedrooms} bedrooms` : '';
-          const capacity = item.capacity ? `${item.capacity} guests max` : '';
-          
-          if (location || bedrooms || capacity) {
-            detailsText = [location, bedrooms, capacity].filter(Boolean).join(' • ');
-          }
-        } 
-        else if (item.category === 'cars') {
-          const model = item.model || item.make || '';
-          const year = item.year ? `${item.year}` : '';
-          
-          if (model || year) {
-            detailsText = [model, year].filter(Boolean).join(' • ');
-          }
-        }
-        else if (item.category === 'boats') {
-          const model = item.model || '';
-          const length = item.length ? `${item.length}m` : '';
-          const capacity = item.capacity ? `${item.capacity} guests max` : '';
-          
-          if (model || length || capacity) {
-            detailsText = [model, length, capacity].filter(Boolean).join(' • ');
-          }
-        }
-        
-        if (detailsText) {
-          doc.text(detailsText, 80, currentY + 17);
-        }
-        
-        // Price and quantity
-        const unitInfo = item.unit ? `per ${item.unit}` : '';
-        doc.setFontSize(9);
-        doc.text(`€${item.price.toFixed(2)} ${unitInfo} × ${item.quantity}`, 80, currentY + 25);
-        
-        // Show if there's a discount
-        if (item.discountValue > 0) {
-          doc.setTextColor(180, 70, 70);
-          const discountText = item.discountType === 'percentage' 
-            ? `${item.discountValue}% discount applied` 
-            : `€${item.discountValue} discount applied`;
-          doc.text(discountText, 80, currentY + 32);
-        }
-        
-        // Total for this item
-        doc.setFontSize(11);
-        doc.setTextColor(32, 32, 64);
-        doc.setFont("helvetica", "bold");
-        
-        const itemTotal = item.discountValue
-          ? (item.discountType === 'percentage' 
-              ? (item.price * item.quantity) * (1 - item.discountValue/100) 
-              : (item.price * item.quantity) - item.discountValue)
-          : (item.price * item.quantity);
-          
-        doc.text(`€${itemTotal.toFixed(2)}`, 180, currentY + 25, { align: 'right' });
-        
-        // Move down for the next service
-        currentY += 55;
+      // Display contact parts with separators
+      if (contactParts.length > 0) {
+        const contactText = contactParts.join(' | ');
+        doc.text(contactText, 105, contactInfoY, { align: 'center' });
       }
+    }
+    
+    // Add offer title with luxury styling
+    doc.setFontSize(18);
+    doc.setTextColor(32, 32, 64); // Deep navy blue
+    doc.setFont("helvetica", "bold");
+    doc.text(`EXCLUSIVE OFFER #${offer.id.slice(-5)}`, 105, 55, { align: 'center' });
+    
+    // Decorative line under the title
+    doc.setDrawColor(180, 160, 120); // Gold tone
+    doc.setLineWidth(0.3);
+    doc.line(65, 58, 145, 58);
+    
+    // Add offer information in a more elegant layout
+    doc.setFontSize(12);
+    doc.setTextColor(60, 60, 70);
+    doc.setFont("helvetica", "normal");
+    
+    const clientNameY = 68;
+    doc.setFont("helvetica", "bold");
+    doc.text(`PREPARED FOR:`, 30, clientNameY);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${offer.clientName}`, 80, clientNameY);
+    
+    const dateY = 75;
+    doc.setFont("helvetica", "bold");
+    doc.text(`CREATED:`, 30, dateY);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 80, dateY);
+    
+    const validY = 82;
+    doc.setFont("helvetica", "bold");
+    doc.text(`VALID UNTIL:`, 30, validY);
+    doc.setFont("helvetica", "normal");
+    
+    const validUntil = new Date();
+    validUntil.setDate(validUntil.getDate() + 30);
+    doc.text(`${validUntil.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 80, validY);
+    
+    // Add decorative touch
+    doc.setDrawColor(180, 160, 120); // Gold tone
+    doc.setLineWidth(0.3);
+    doc.line(20, 90, 190, 90);
+    
+    // Add a touch of luxury with a small decorative element
+    doc.setDrawColor(180, 160, 120); // Gold tone
+    doc.setLineWidth(0.7);
+    doc.line(20, 91, 20, 93);
+    doc.line(190, 91, 190, 93);
+    
+    // Add offer items section title with more luxury
+    doc.setFontSize(14);
+    doc.setTextColor(32, 32, 64); // Deep navy blue
+    doc.setFont("helvetica", "bold");
+    doc.text("EXCLUSIVE SERVICES", 105, 100, { align: 'center' });
+    
+    // Instead of using a traditional table, we'll create a visual display of services
+    let currentY = 110; // Starting Y position for services
+
+    // Process the services for the PDF
+    for (let i = 0; i < offer.items.length; i++) {
+      const item = offer.items[i];
       
-      // Add totals with luxury styling
-      currentY += 5;
-      
-      // Check if we need to add a new page for totals
-      if (currentY > 240) {
+      // Check if we need to add a new page
+      if (currentY > 250) {
         doc.addPage();
-        currentY = 30;
+        currentY = 20;
         
         // Add a small header on the new page
         doc.setFillColor(250, 246, 231); // Very light gold
@@ -2204,141 +2147,295 @@ for (const currentItem of offer.items) {
         doc.setFontSize(10);
         doc.setTextColor(32, 32, 64);
         doc.setFont("helvetica", "normal");
-        doc.text(`EXCLUSIVE OFFER #${offer.id.slice(-5)} - Summary`, 105, 10, { align: 'center' });
+        doc.text(`EXCLUSIVE OFFER #${offer.id.slice(-5)} - Continued`, 105, 10, { align: 'center' });
         
         doc.setDrawColor(180, 160, 120); // Gold tone
         doc.setLineWidth(0.3);
         doc.line(20, 15, 190, 15);
+        
+        currentY = 25; // Start content a bit lower
       }
       
-      // Add a separator line above totals
+      // Get the item name
+      let name = typeof item.name === 'object' ? 
+        (item.name.en || item.name.ro || 'Service') : 
+        (item.name || 'Service');
+      
+      // Create elegant card for this service
+      doc.setDrawColor(220, 220, 230);
+      doc.setLineWidth(0.3);
+      doc.setFillColor(250, 250, 252);
+      doc.roundedRect(20, currentY, 170, 45, 2, 2, 'FD');
+      
+      // Add image background
+      doc.setFillColor(240, 240, 240);
+      doc.rect(25, currentY + 5, 50, 35, 'F');
+      
+      // Try to use the actual image if available in cache
+      let imageDisplayed = false;
+      if (item.imageUrl && imageCache[item.imageUrl]) {
+        try {
+          doc.addImage(imageCache[item.imageUrl], 'JPEG', 25, currentY + 5, 50, 35, undefined, 'FAST');
+          imageDisplayed = true;
+        } catch (imgError) {
+          console.error(`Error adding image for item ${item.id || 'unknown'}:`, imgError);
+          // Will fall back to icon
+        }
+      }
+      
+      // If no image was displayed, show the icon
+      if (!imageDisplayed) {
+        // Display category icon
+        let icon = '✦'; // Default
+        if (item.category === 'villas') icon = '🏠';
+        else if (item.category === 'boats') icon = '🛥️';
+        else if (item.category === 'cars') icon = '🚗';
+        else if (item.category === 'security') icon = '🔒';
+        else if (item.category === 'nannies') icon = '👶';
+        else if (item.category === 'chefs') icon = '🍽️';
+        else if (item.category === 'excursions') icon = '🏔️';
+        
+        doc.setFontSize(16);
+        doc.setTextColor(100, 100, 110);
+        doc.text(icon, 50, currentY + 25, { align: 'center' });
+      }
+      
+      // Service details
+      doc.setFontSize(11);
+      doc.setTextColor(32, 32, 64);
+      doc.setFont("helvetica", "bold");
+      doc.text(name, 80, currentY + 10);
+      
+      // Add additional details based on item category
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 110);
+      doc.setFont("helvetica", "normal");
+      
+      let detailsText = '';
+      
+      if (item.category === 'villas') {
+        const location = item.location || item.address || '';
+        const bedrooms = item.bedrooms ? `${item.bedrooms} bedrooms` : '';
+        const capacity = item.capacity ? `${item.capacity} guests max` : '';
+        
+        if (location || bedrooms || capacity) {
+          detailsText = [location, bedrooms, capacity].filter(Boolean).join(' • ');
+        }
+      } 
+      else if (item.category === 'cars') {
+        const model = item.model || item.make || '';
+        const year = item.year ? `${item.year}` : '';
+        
+        if (model || year) {
+          detailsText = [model, year].filter(Boolean).join(' • ');
+        }
+      }
+      else if (item.category === 'boats') {
+        const model = item.model || '';
+        const length = item.length ? `${item.length}m` : '';
+        const capacity = item.capacity ? `${item.capacity} guests max` : '';
+        
+        if (model || length || capacity) {
+          detailsText = [model, length, capacity].filter(Boolean).join(' • ');
+        }
+      }
+      
+      if (detailsText) {
+        doc.text(detailsText, 80, currentY + 17);
+      }
+      
+      // Price and quantity
+      const unitInfo = item.unit ? `per ${item.unit}` : '';
+      doc.setFontSize(9);
+      doc.text(`€${item.price.toFixed(2)} ${unitInfo} × ${item.quantity}`, 80, currentY + 25);
+      
+      // Show if there's a discount
+      if (item.discountValue > 0) {
+        doc.setTextColor(180, 70, 70);
+        const discountText = item.discountType === 'percentage' 
+          ? `${item.discountValue}% discount applied` 
+          : `€${item.discountValue} discount applied`;
+        doc.text(discountText, 80, currentY + 32);
+      }
+      
+      // Total for this item
+      doc.setFontSize(11);
+      doc.setTextColor(32, 32, 64);
+      doc.setFont("helvetica", "bold");
+      
+      const itemTotal = item.discountValue
+        ? (item.discountType === 'percentage' 
+            ? (item.price * item.quantity) * (1 - item.discountValue/100) 
+            : (item.price * item.quantity) - item.discountValue)
+        : (item.price * item.quantity);
+        
+      doc.text(`€${itemTotal.toFixed(2)}`, 180, currentY + 25, { align: 'right' });
+      
+      // Move down for the next service
+      currentY += 55;
+    }
+    
+    // Add totals with luxury styling
+    currentY += 5;
+    
+    // Check if we need to add a new page for totals
+    if (currentY > 240) {
+      doc.addPage();
+      currentY = 30;
+      
+      // Add a small header on the new page
+      doc.setFillColor(250, 246, 231); // Very light gold
+      doc.rect(0, 0, 210, 20, 'F');
+      
+      doc.setFontSize(10);
+      doc.setTextColor(32, 32, 64);
+      doc.setFont("helvetica", "normal");
+      doc.text(`EXCLUSIVE OFFER #${offer.id.slice(-5)} - Summary`, 105, 10, { align: 'center' });
+      
       doc.setDrawColor(180, 160, 120); // Gold tone
       doc.setLineWidth(0.3);
-      doc.line(120, currentY - 5, 190, currentY - 5);
+      doc.line(20, 15, 190, 15);
+    }
+    
+    // Add a separator line above totals
+    doc.setDrawColor(180, 160, 120); // Gold tone
+    doc.setLineWidth(0.3);
+    doc.line(120, currentY - 5, 190, currentY - 5);
+    
+    // Subtotal
+    doc.setFontSize(10);
+    doc.setTextColor(60, 60, 70);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Subtotal:`, 150, currentY, { align: 'right' });
+    
+    doc.setFont("helvetica", "bold");
+    doc.text(`€${offer.subtotal.toFixed(2)}`, 190, currentY, { align: 'right' });
+    
+    // Discount if applicable
+    let finalY = currentY;
+    if (offer.discountValue > 0) {
+      finalY += 7;
+      const discountAmount = offer.discountType === 'percentage' 
+        ? (offer.subtotal * (offer.discountValue / 100)) 
+        : offer.discountValue;
       
-      // Subtotal
-      doc.setFontSize(10);
-      doc.setTextColor(60, 60, 70);
+      const discountText = offer.discountType === 'percentage' 
+        ? `Discount (${offer.discountValue}%):` 
+        : `Discount:`;
+      
       doc.setFont("helvetica", "normal");
-      doc.text(`Subtotal:`, 150, currentY, { align: 'right' });
+      doc.setTextColor(180, 70, 70); // Red color for discount
+      doc.text(discountText, 150, finalY, { align: 'right' });
       
       doc.setFont("helvetica", "bold");
-      doc.text(`€${offer.subtotal.toFixed(2)}`, 190, currentY, { align: 'right' });
+      doc.text(`-€${discountAmount.toFixed(2)}`, 190, finalY, { align: 'right' });
+    }
+    
+    // Total
+    finalY += 10;
+    doc.setDrawColor(180, 160, 120); // Gold tone
+    doc.setLineWidth(0.5);
+    doc.line(120, finalY - 3, 190, finalY - 3);
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(32, 32, 64); // Deep navy blue
+    doc.text(`TOTAL:`, 150, finalY + 5, { align: 'right' });
+    
+    doc.setFontSize(14);
+    doc.text(`€${offer.totalValue.toFixed(2)}`, 190, finalY + 5, { align: 'right' });
+    
+    // Add notes with better styling
+    if (offer.notes) {
+      const notesY = finalY + 20;
       
-      // Discount if applicable
-      let finalY = currentY;
-      if (offer.discountValue > 0) {
-        finalY += 7;
-        const discountAmount = offer.discountType === 'percentage' 
-          ? (offer.subtotal * (offer.discountValue / 100)) 
-          : offer.discountValue;
+      // Check if we need a new page for notes
+      if (notesY > 240) {
+        doc.addPage();
         
-        const discountText = offer.discountType === 'percentage' 
-          ? `Discount (${offer.discountValue}%):` 
-          : `Discount:`;
+        // Add a small header on the new page
+        doc.setFillColor(250, 246, 231); // Very light gold
+        doc.rect(0, 0, 210, 20, 'F');
         
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(180, 70, 70); // Red color for discount
-        doc.text(discountText, 150, finalY, { align: 'right' });
-        
-        doc.setFont("helvetica", "bold");
-        doc.text(`-€${discountAmount.toFixed(2)}`, 190, finalY, { align: 'right' });
-      }
-      
-      // Total
-      finalY += 10;
-      doc.setDrawColor(180, 160, 120); // Gold tone
-      doc.setLineWidth(0.5);
-      doc.line(120, finalY - 3, 190, finalY - 3);
-      
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.setTextColor(32, 32, 64); // Deep navy blue
-      doc.text(`TOTAL:`, 150, finalY + 5, { align: 'right' });
-      
-      doc.setFontSize(14);
-      doc.text(`€${offer.totalValue.toFixed(2)}`, 190, finalY + 5, { align: 'right' });
-      
-      // Add notes with better styling
-      if (offer.notes) {
-        const notesY = finalY + 20;
-        
-        // Check if we need a new page for notes
-        if (notesY > 240) {
-          doc.addPage();
-          
-          // Add a small header on the new page
-          doc.setFillColor(250, 246, 231); // Very light gold
-          doc.rect(0, 0, 210, 20, 'F');
-          
-          doc.setFontSize(10);
-          doc.setTextColor(32, 32, 64);
-          doc.setFont("helvetica", "normal");
-          doc.text(`EXCLUSIVE OFFER #${offer.id.slice(-5)} - Notes`, 105, 10, { align: 'center' });
-          
-          doc.setDrawColor(180, 160, 120); // Gold tone
-          doc.setLineWidth(0.3);
-          doc.line(20, 15, 190, 15);
-          
-          finalY = 20;
-        }
-        
-        doc.setFontSize(11);
+        doc.setFontSize(10);
         doc.setTextColor(32, 32, 64);
-        doc.setFont("helvetica", "bold");
-        doc.text("ADDITIONAL NOTES", 20, finalY + 20);
+        doc.setFont("helvetica", "normal");
+        doc.text(`EXCLUSIVE OFFER #${offer.id.slice(-5)} - Notes`, 105, 10, { align: 'center' });
         
         doc.setDrawColor(180, 160, 120); // Gold tone
         doc.setLineWidth(0.3);
-        doc.line(20, finalY + 22, 80, finalY + 22);
+        doc.line(20, 15, 190, 15);
         
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(10);
-        doc.setTextColor(60, 60, 70);
-        
-        // Handle multiline notes
-        const splitNotes = doc.splitTextToSize(offer.notes, 170);
-        doc.text(splitNotes, 20, finalY + 30);
+        finalY = 20;
       }
       
-      // Add elegant footer
-      const footerY = doc.internal.pageSize.height - 20;
+      doc.setFontSize(11);
+      doc.setTextColor(32, 32, 64);
+      doc.setFont("helvetica", "bold");
+      doc.text("ADDITIONAL NOTES", 20, finalY + 20);
       
-      // Add decorative line
       doc.setDrawColor(180, 160, 120); // Gold tone
       doc.setLineWidth(0.3);
-      doc.line(20, footerY - 15, 190, footerY - 15);
+      doc.line(20, finalY + 22, 80, finalY + 22);
       
-      // Ornamental touch
-      doc.setDrawColor(180, 160, 120); // Gold tone
-      doc.setLineWidth(0.7);
-      doc.line(20, footerY - 14, 20, footerY - 12);
-      doc.line(190, footerY - 14, 190, footerY - 12);
-      
-      // Thank you text
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
-      doc.setTextColor(32, 32, 64);
-      doc.text(`Thank you for choosing ${companyInfo.name} for your luxury experience.`, 105, footerY - 8, { align: 'center' });
+      doc.setTextColor(60, 60, 70);
       
-      // Terms and contact
-      doc.setFontSize(8);
-      doc.setTextColor(100, 100, 110);
-      doc.text(`This offer is subject to our standard terms and conditions.`, 105, footerY - 3, { align: 'center' });
-      doc.text(`For any inquiries, please contact us at ${companyInfo.phone || '-'} or ${companyInfo.email || '-'}`, 105, footerY, { align: 'center' });
-      
-      // Save the PDF
-      doc.save(`Luxury_Offer_${offer.id.slice(-5)}_${offer.clientName}.pdf`);
-      
-      console.log("Luxury PDF offer generated successfully");
-      alert("Luxury PDF offer generated successfully.");
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      alert("An error occurred while generating the PDF. Please try again.");
-    } finally {
-      setIsGeneratingPdf(false);
+      // Handle multiline notes
+      const splitNotes = doc.splitTextToSize(offer.notes, 170);
+      doc.text(splitNotes, 20, finalY + 30);
     }
-  };
+    
+    // Add elegant footer
+    const footerY = doc.internal.pageSize.height - 20;
+    
+    // Add decorative line
+    doc.setDrawColor(180, 160, 120); // Gold tone
+    doc.setLineWidth(0.3);
+    doc.line(20, footerY - 15, 190, footerY - 15);
+    
+    // Ornamental touch
+    doc.setDrawColor(180, 160, 120); // Gold tone
+    doc.setLineWidth(0.7);
+    doc.line(20, footerY - 14, 20, footerY - 12);
+    doc.line(190, footerY - 14, 190, footerY - 12);
+    
+    // Thank you text - GENERIC VERSION
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(32, 32, 64);
+    doc.text(`Thank you for choosing ${companyInfo.name} for your luxury experience.`, 105, footerY - 8, { align: 'center' });
+    
+    // Terms and contact - ONLY SHOW IF VALID CONTACT INFO EXISTS
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 110);
+    doc.text(`This offer is subject to our standard terms and conditions.`, 105, footerY - 3, { align: 'center' });
+    
+    // Only show contact info if there are actual valid values - otherwise skip this line entirely
+    const hasValidFooterPhone = companyInfo.phone && companyInfo.phone.trim() !== '' && companyInfo.phone !== '-';
+    const hasValidFooterEmail = companyInfo.email && companyInfo.email.trim() !== '' && companyInfo.email !== '-';
+    
+    if (hasValidFooterPhone || hasValidFooterEmail) {
+      const contactInfo = [];
+      if (hasValidFooterPhone) contactInfo.push(companyInfo.phone);
+      if (hasValidFooterEmail) contactInfo.push(companyInfo.email);
+      
+      doc.text(`For any inquiries, please contact us at ${contactInfo.join(' or ')}`, 105, footerY, { align: 'center' });
+    }
+    
+    // Save the PDF
+    doc.save(`Luxury_Offer_${offer.id.slice(-5)}_${offer.clientName}.pdf`);
+    
+    console.log("Luxury PDF offer generated successfully");
+    alert("Luxury PDF offer generated successfully.");
+  } catch (error) {
+    console.error("Error generating PDF:", error);
+    alert("An error occurred while generating the PDF. Please try again.");
+  } finally {
+    setIsGeneratingPdf(false);
+  }
+};
   
   // Function to fetch image - works with or without Firebase SDK
   const fetchImageWithAuth = async (url, itemId = 'unknown') => {
