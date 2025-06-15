@@ -580,35 +580,40 @@ function safeRender(value) {
       return false;
     }
   };  // Bottom sheet handling
-  const showBottomSheetWithContent = (content, item, secondaryItem = null) => {
-    setBottomSheetContent(content);
-    setSelectedItem(item);
-    
-    if (content === 'edit-payment') {
-      setSelectedPayment(secondaryItem);
-      setPaymentData({
-        amount: secondaryItem?.amount || 0,
-        method: secondaryItem?.method || 'cash',
-        notes: secondaryItem?.notes || '',
-        receiptNumber: secondaryItem?.receiptNumber || '',
-        createdAt: secondaryItem?.date || new Date(),
-        modifiedAt: new Date()
-      });
-    } else if (content === 'edit-service') {
-      setSelectedService(secondaryItem);
-    } else if (content === 'quick-payment') {
-      setPaymentData({
-        amount: item?.dueAmount || 0,
-        method: 'cash',
-        notes: '',
-        receiptNumber: '',
-        createdAt: new Date(),
-        modifiedAt: new Date()
-      });
-    }
-    
-    setShowBottomSheet(true);
-  };
+ 
+
+const showBottomSheetWithContent = (content, item, secondaryItem = null) => {
+  console.log('showBottomSheetWithContent called with:', { content, item, secondaryItem });
+  
+  setBottomSheetContent(content);
+  setSelectedItem(item);
+  
+  if (content === 'edit-payment') {
+    setSelectedPayment(secondaryItem);
+    setPaymentData({
+      amount: secondaryItem?.amount || 0,
+      method: secondaryItem?.method || 'cash',
+      notes: secondaryItem?.notes || '',
+      receiptNumber: secondaryItem?.receiptNumber || '',
+      createdAt: secondaryItem?.date || new Date(),
+      modifiedAt: new Date()
+    });
+  } else if (content === 'edit-service') {
+    setSelectedService(secondaryItem);
+  } else if (content === 'quick-payment') {
+    setPaymentData({
+      amount: item?.dueAmount || 0,
+      method: 'cash',
+      notes: '',
+      receiptNumber: '',
+      createdAt: new Date(),
+      modifiedAt: new Date()
+    });
+  }
+  
+  setShowBottomSheet(true);
+  console.log('Bottom sheet state set:', { content, showBottomSheet: true });
+};
   
   const closeBottomSheet = () => {
     setShowBottomSheet(false);
@@ -621,51 +626,70 @@ function safeRender(value) {
   };
   
   // Click handlers
-  const viewClientDetails = (clientId) => {
-    const client = clientGroups[clientId];
-    if (client) {
-      showBottomSheetWithContent('client-details', client);
-    }
-  };
-  
-  const openPaymentModal = (client) => {
-    if (client) {
-      const dueAmount = client.dueAmount;
-      setPaymentData({
-        amount: dueAmount,
-        method: 'cash',
-        notes: '',
-        receiptNumber: '',
-        createdAt: new Date(),
-        modifiedAt: new Date()
-      });
-      showBottomSheetWithContent('quick-payment', client);
-    }
-  };
-  
-  const openEditPaymentModal = (client, payment) => {
-    if (client && payment) {
-      showBottomSheetWithContent('edit-payment', client, payment);
-    }
-  };
-  
-  const openAddServiceModal = (client) => {
-    if (client) {
-      showBottomSheetWithContent('add-service', client);
-    }
-  };
-  
-  const openEditServiceModal = (client, service) => {
-    if (client && service) {
-      showBottomSheetWithContent('edit-service', client, service);
-    }
-  };
-  
-  const openAddShoppingModal = (client) => {
-    if (client) {
-      showBottomSheetWithContent('add-shopping', client);
-    }
-  };
+ ;const viewClientDetails = (clientId) => {
+  console.log('viewClientDetails called with clientId:', clientId);
+  const client = clientGroups[clientId];
+  console.log('Found client:', client);
+  if (client) {
+    showBottomSheetWithContent('client-details', client);
+  } else {
+    console.error('Client not found for ID:', clientId);
+  }
+};
+
+const openPaymentModal = (client) => {
+  console.log('openPaymentModal called with client:', client);
+  if (client) {
+    const dueAmount = client.dueAmount;
+    setPaymentData({
+      amount: dueAmount,
+      method: 'cash',
+      notes: '',
+      receiptNumber: '',
+      createdAt: new Date(),
+      modifiedAt: new Date()
+    });
+    showBottomSheetWithContent('quick-payment', client);
+  } else {
+    console.error('No client provided to openPaymentModal');
+  }
+};
+
+const openEditPaymentModal = (client, payment) => {
+  console.log('openEditPaymentModal called with:', { client, payment });
+  if (client && payment) {
+    showBottomSheetWithContent('edit-payment', client, payment);
+  } else {
+    console.error('Missing client or payment data');
+  }
+};
+
+const openAddServiceModal = (client) => {
+  console.log('openAddServiceModal called with client:', client);
+  if (client) {
+    showBottomSheetWithContent('add-service', client);
+  } else {
+    console.error('No client provided to openAddServiceModal');
+  }
+};
+
+const openEditServiceModal = (client, service) => {
+  console.log('openEditServiceModal called with:', { client, service });
+  if (client && service) {
+    showBottomSheetWithContent('edit-service', client, service);
+  } else {
+    console.error('Missing client or service data');
+  }
+};
+
+const openAddShoppingModal = (client) => {
+  console.log('openAddShoppingModal called with client:', client);
+  if (client) {
+    showBottomSheetWithContent('add-shopping', client);
+  } else {
+    console.error('No client provided to openAddShoppingModal');
+  }
+};
 
 // Status colors with enhanced styling
 const statusColors = {
@@ -830,21 +854,21 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
 
   // Fetch services for selected category
   useEffect(() => {
-  const fetchServices = async () => {
-    if (!selectedCategory || selectedCategory.id === 'custom') return;
-    
-    try {
-      setLoading(true);
-      console.log(`Fetching services for category ${selectedCategory.id} and company ${userCompanyId}...`);
+    const fetchServices = async () => {
+      if (!selectedCategory || selectedCategory.id === 'custom') return;
       
-      // Create a query to fetch services from the selected category
-      const serviceQuery = query(
-        collection(db, 'services'),
-        where('companyId', '==', userCompanyId),
-        where('category', '==', selectedCategory.id),
-        where('active', '==', true)
-      );
+      try {
+        setLoading(true);
+        console.log(`Fetching services for category ${selectedCategory.id} and company ${userCompanyId}...`);
         
+        // Create a query to fetch services from the selected category
+        const serviceQuery = query(
+          collection(db, 'services'),
+          where('companyId', '==', userCompanyId),
+          where('category', '==', selectedCategory.id),
+          where('active', '==', true)
+        );
+          
         const serviceSnapshot = await getDocs(serviceQuery);
         const servicesData = [];
         
@@ -858,62 +882,54 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
         console.log(`Found ${servicesData.length} services in 'services' collection`);
         
         // If this is a standard category, also try to fetch from its dedicated collection
-        // If this is a standard category, also try to fetch from its dedicated collection
-if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.id)) {
-  try {
-    console.log(`Fetching from dedicated '${selectedCategory.id}' collection...`);
-    
-    // UPDATED: Remove companyId filter since these collections may not have it
-    const dedicatedQuery = query(
-      collection(db, selectedCategory.id)
-      // No companyId filter here
-    );
-    
-    const dedicatedSnapshot = await getDocs(dedicatedQuery);
-    const dedicatedCount = dedicatedSnapshot.size;
-    
-    console.log(`Found ${dedicatedCount} items in '${selectedCategory.id}' collection`);
-    
-    dedicatedSnapshot.forEach(doc => {
-      const data = doc.data();
-      
-      // UPDATED: Extract price correctly based on collection type
-      let price = 0;
-      if (selectedCategory.id === 'villas' && data.priceConfigurations && data.priceConfigurations.length > 0) {
-        price = parseFloat(data.priceConfigurations[0].price || 0);
-      } else {
-        price = parseFloat(data.price || 0);
-      }
-      
-      // Debug information
-      console.log(`Processing item: ${doc.id}`, {
-        name: data.name?.en || data.name || doc.id,
-        price: price
-      });
-      
-      // Convert collection items to service format
-      servicesData.push({
-        id: doc.id,
-        name: data.name?.en || data.name || doc.id,
-        description: data.description?.en || data.description || '',
-        category: selectedCategory.id,
-        price: price, // UPDATED: Use extracted price
-        unit: selectedCategory.id === 'villas' ? 'nightly' : 
-              selectedCategory.id === 'cars' || selectedCategory.id === 'boats' ? 'daily' : 'service',
-        brand: data.brand || '',
-        model: data.model || '',
-        // ADDED: Include additional details for villas
-        bedrooms: data.bedrooms || '',
-        bathrooms: data.bathrooms || '',
-        address: typeof data.address === 'object' ? data.address.en : data.address || ''
-      });
-    });
-  } catch (err) {
-    console.error(`Error fetching from ${selectedCategory.id} collection:`, err);
-  }
-}
+        if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.id)) {
+          try {
+            console.log(`Fetching from dedicated '${selectedCategory.id}' collection...`);
+            
+            const dedicatedQuery = query(
+              collection(db, selectedCategory.id)
+            );
+            
+            const dedicatedSnapshot = await getDocs(dedicatedQuery);
+            const dedicatedCount = dedicatedSnapshot.size;
+            
+            console.log(`Found ${dedicatedCount} items in '${selectedCategory.id}' collection`);
+            
+            dedicatedSnapshot.forEach(doc => {
+              const data = doc.data();
+              
+              let price = 0;
+              if (selectedCategory.id === 'villas' && data.priceConfigurations && data.priceConfigurations.length > 0) {
+                price = parseFloat(data.priceConfigurations[0].price || 0);
+              } else {
+                price = parseFloat(data.price || 0);
+              }
+              
+              console.log(`Processing item: ${doc.id}`, {
+                name: data.name?.en || data.name || doc.id,
+                price: price
+              });
+              
+              servicesData.push({
+                id: doc.id,
+                name: data.name?.en || data.name || doc.id,
+                description: data.description?.en || data.description || '',
+                category: selectedCategory.id,
+                price: price,
+                unit: selectedCategory.id === 'villas' ? 'nightly' : 
+                      selectedCategory.id === 'cars' || selectedCategory.id === 'boats' ? 'daily' : 'service',
+                brand: data.brand || '',
+                model: data.model || '',
+                bedrooms: data.bedrooms || '',
+                bathrooms: data.bathrooms || '',
+                address: typeof data.address === 'object' ? data.address.en : data.address || ''
+              });
+            });
+          } catch (err) {
+            console.error(`Error fetching from ${selectedCategory.id} collection:`, err);
+          }
+        }
         
-        // Sort services by name
         servicesData.sort((a, b) => {
           const nameA = (typeof a.name === 'object' ? a.name.en : a.name) || '';
           const nameB = (typeof b.name === 'object' ? b.name.en : b.name) || '';
@@ -945,7 +961,6 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
   };
 
   const handleServiceSelect = (service) => {
-    // Pre-fill form with service data
     setServiceData({
       ...serviceData,
       name: typeof service.name === 'object' ? service.name.en : service.name,
@@ -969,10 +984,8 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
   };
 
   const handleSubmit = () => {
-    // Calculate total price
     const totalPrice = serviceData.price * serviceData.quantity;
     
-    // Create service object
     const newService = {
       type: serviceData.category,
       name: serviceData.name,
@@ -991,14 +1004,13 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
       companyId: userCompanyId
     };
     
-    // Send back to parent component
     onServiceAdded(newService);
   };
 
   // RENDER CATEGORY SELECTION
   const renderCategorySelection = () => (
-    <div>
-      <h4 className="text-lg font-medium mb-4">{t.selectServiceCategory || 'Select Service Category'}</h4>
+    <div className="bg-white">
+      <h4 className="text-lg font-medium mb-4 text-gray-900">{t.selectServiceCategory || 'Select Service Category'}</h4>
       
       {loading ? (
         <div className="flex justify-center py-8">
@@ -1010,10 +1022,10 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
             <button
               key={category.id}
               onClick={() => handleCategorySelect(category)}
-              className="p-4 md:p-3 border rounded-lg flex flex-col items-center hover:bg-blue-50 hover:border-blue-300 transition-colors"
+              className="p-4 md:p-3 border border-gray-300 rounded-lg flex flex-col items-center hover:bg-blue-50 hover:border-blue-300 transition-colors bg-white"
             >
               <CategoryIcon type={category.icon} size="large" />
-              <span className="mt-2 text-center">{category.name}</span>
+              <span className="mt-2 text-center text-gray-900">{category.name}</span>
             </button>
           ))}
         </div>
@@ -1023,9 +1035,9 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
 
   // RENDER SERVICES LIST
   const renderServicesList = () => (
-    <div>
+    <div className="bg-white">
       <div className="flex justify-between items-center mb-4">
-        <h4 className="text-lg font-medium">{selectedCategory?.name} {t.servicesTitle || 'Services'}</h4>
+        <h4 className="text-lg font-medium text-gray-900">{selectedCategory?.name} {t.servicesTitle || 'Services'}</h4>
         <button 
           onClick={() => setStep('category')}
           className="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100"
@@ -1048,9 +1060,9 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
                 <button
                   key={service.id || index}
                   onClick={() => handleServiceSelect(service)}
-                  className="w-full p-3 border rounded-lg text-left hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                  className="w-full p-3 border border-gray-300 rounded-lg text-left hover:bg-blue-50 hover:border-blue-300 transition-colors bg-white"
                 >
-                  <div className="font-medium">
+                  <div className="font-medium text-gray-900">
                     {typeof service.name === 'object' ? service.name.en : service.name}
                   </div>
                   
@@ -1078,10 +1090,9 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
             </div>
           )}
           
-          {/* Always show "Add Custom" button */}
           <button
             onClick={handleAddCustom}
-            className="w-full p-3 mt-4 border border-dashed rounded-lg text-center hover:bg-gray-50 transition-colors"
+            className="w-full p-3 mt-4 border border-dashed border-gray-300 rounded-lg text-center hover:bg-gray-50 transition-colors bg-white"
           >
             <div className="font-medium text-blue-600">+ {t.addCustom || 'Add Custom'} {selectedCategory?.name}</div>
           </button>
@@ -1092,9 +1103,9 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
 
   // RENDER SERVICE DETAILS FORM
   const renderServiceDetailsForm = () => (
-    <div>
+    <div className="bg-white">
       <div className="flex justify-between items-center mb-4">
-        <h4 className="text-lg font-medium">
+        <h4 className="text-lg font-medium text-gray-900">
           {serviceData.name ? `${serviceData.name}` : t.serviceDetails || 'Service Details'}
         </h4>
         <button 
@@ -1114,7 +1125,7 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
             type="date"
             value={serviceData.date}
             onChange={(e) => setServiceData({...serviceData, date: e.target.value})}
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
           />
         </div>
         
@@ -1126,7 +1137,7 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
               min="1"
               value={serviceData.quantity}
               onChange={(e) => setServiceData({...serviceData, quantity: Math.max(1, parseInt(e.target.value) || 1)})}
-              className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
             />
           </div>
           
@@ -1160,7 +1171,7 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
             onChange={(e) => setServiceData({...serviceData, notes: e.target.value})}
             placeholder={t.addSpecialRequirements || "Add any special requirements or information"}
             rows={3}
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
           ></textarea>
         </div>
         
@@ -1185,9 +1196,9 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
 
   // RENDER CUSTOM SERVICE FORM
   const renderCustomForm = () => (
-    <div>
+    <div className="bg-white">
       <div className="flex justify-between items-center mb-4">
-        <h4 className="text-lg font-medium">{t.customService || 'Custom Service'}</h4>
+        <h4 className="text-lg font-medium text-gray-900">{t.customService || 'Custom Service'}</h4>
         <button 
           onClick={() => selectedCategory?.id === 'custom' ? setStep('category') : setStep('services')}
           className="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100"
@@ -1208,7 +1219,7 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
             value={serviceData.name}
             onChange={(e) => setServiceData({...serviceData, name: e.target.value})}
             placeholder={t.enterServiceName || "Enter service name"}
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
             required
           />
         </div>
@@ -1222,7 +1233,7 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
             onChange={(e) => setServiceData({...serviceData, description: e.target.value})}
             placeholder={t.enterServiceDescription || "Enter service description"}
             rows={2}
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
           ></textarea>
         </div>
         
@@ -1232,7 +1243,7 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
             type="date"
             value={serviceData.date}
             onChange={(e) => setServiceData({...serviceData, date: e.target.value})}
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
           />
         </div>
         
@@ -1246,7 +1257,7 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
                 type="number"
                 value={serviceData.price}
                 onChange={(e) => setServiceData({...serviceData, price: parseFloat(e.target.value) || 0})}
-                className="w-full pl-8 p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                className="w-full pl-8 p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
                 required
               />
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -1262,7 +1273,7 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
             <select
               value={serviceData.unit}
               onChange={(e) => setServiceData({...serviceData, unit: e.target.value})}
-              className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
             >
               <option value="hourly">{t.hourly || 'Hourly'}</option>
               <option value="daily">{t.daily || 'Daily'}</option>
@@ -1283,7 +1294,7 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
               min="1"
               value={serviceData.quantity}
               onChange={(e) => setServiceData({...serviceData, quantity: parseInt(e.target.value) || 1})}
-              className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
             />
           </div>
           
@@ -1291,7 +1302,7 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
             <label className="block text-sm font-medium text-gray-700 mb-1">
               {t.totalAmount || 'Total Amount'}
             </label>
-            <div className="w-full p-2 border border-gray-200 bg-gray-50 rounded-md font-medium">
+            <div className="w-full p-2 border border-gray-200 bg-gray-50 rounded-md font-medium text-gray-900">
               {(serviceData.price * serviceData.quantity).toLocaleString()} €
             </div>
           </div>
@@ -1306,7 +1317,7 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
             onChange={(e) => setServiceData({...serviceData, notes: e.target.value})}
             placeholder={t.addSpecialRequirements || "Any special requirements or information"}
             rows={2}
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
           ></textarea>
         </div>
         
@@ -1331,7 +1342,7 @@ if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.i
 
   // MAIN COMPONENT RENDER
   return (
-    <div className="p-4">
+    <div className="p-4 bg-white min-h-full">
       {step === 'category' && renderCategorySelection()}
       {step === 'services' && renderServicesList()}
       {step === 'details' && renderServiceDetailsForm()}
@@ -1380,7 +1391,6 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
       setIsSubmitting(true);
       setError(null);
       
-      // Create shopping expense object
       const newExpense = {
         type: 'shopping',
         name: `${t.shoppingAt || 'Shopping at'} ${shoppingData.store}`,
@@ -1398,7 +1408,6 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
         companyId: userCompanyId
       };
       
-      // Send to parent component
       await onAddShopping(newExpense);
       setIsSubmitting(false);
     } catch (err) {
@@ -1409,8 +1418,8 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
   };
   
   return (
-    <div className="p-4">
-      <h4 className="text-lg font-medium mb-4">{t.addShoppingExpense || 'Add Shopping Expense'}</h4>
+    <div className="p-4 bg-white min-h-full">
+      <h4 className="text-lg font-medium mb-4 text-gray-900">{t.addShoppingExpense || 'Add Shopping Expense'}</h4>
       
       <div className="space-y-4">
         <div>
@@ -1422,7 +1431,7 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
             value={shoppingData.store}
             onChange={(e) => setShoppingData({...shoppingData, store: e.target.value})}
             placeholder={t.storeNamePlaceholder || "E.g. Gucci, Supermarket, Pharmacy"}
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
             required
           />
         </div>
@@ -1436,7 +1445,7 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
             onChange={(e) => setShoppingData({...shoppingData, items: e.target.value})}
             placeholder={t.itemsPurchasedPlaceholder || "List of items purchased"}
             rows={3}
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
             required
           ></textarea>
         </div>
@@ -1449,7 +1458,7 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
             type="date"
             value={shoppingData.date}
             onChange={(e) => setShoppingData({...shoppingData, date: e.target.value})}
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
           />
         </div>
         
@@ -1462,7 +1471,7 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
               type="number"
               value={shoppingData.price}
               onChange={(e) => setShoppingData({...shoppingData, price: parseFloat(e.target.value) || 0})}
-              className="w-full pl-8 p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="w-full pl-8 p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
               required
             />
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -1493,7 +1502,7 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
             onChange={(e) => setShoppingData({...shoppingData, notes: e.target.value})}
             placeholder={t.additionalNotes || "Additional notes"}
             rows={2}
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
           ></textarea>
         </div>
         
@@ -1532,7 +1541,7 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
 };
 
 // CLIENT CARD COMPONENT
-const ClientCard = ({ client, onClick }) => {
+const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpenShopping }) => {
   // Get translations from the context
   const language = localStorage.getItem('appLanguage') || 'en';
   
@@ -1640,6 +1649,11 @@ const ClientCard = ({ client, onClick }) => {
   };
   
   const getPaymentStatusBadgeClass = (status) => {
+    const paymentStatusColors = {
+      paid: { cssClass: 'bg-green-100 text-green-800 border-green-200' },
+      partiallyPaid: { cssClass: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+      notPaid: { cssClass: 'bg-red-100 text-red-800 border-red-200' }
+    };
     return paymentStatusColors[status]?.cssClass || 'bg-gray-100 text-gray-800';
   };
   
@@ -1731,53 +1745,89 @@ const ClientCard = ({ client, onClick }) => {
         )}
       </div>
       
-      {/* Action buttons - Enhanced for mobile */}
-<div className="grid grid-cols-4 border-t bg-gray-50">
-  <button 
-    className="flex flex-col items-center justify-center py-3 text-gray-700 hover:bg-gray-100 transition-colors active:bg-gray-200"
-    onClick={() => window.viewClientDetails(client.clientId)}
-  >
-    <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-    <span className="text-xs font-medium">{t.details}</span>
-  </button>
-  
-  <button 
-    className={`flex flex-col items-center justify-center py-3 transition-colors active:bg-gray-200 ${
-      client.paymentStatus === 'paid' 
-        ? 'text-green-700 bg-green-50'
-        : 'text-gray-700 hover:bg-gray-100'
-    }`}
-    onClick={() => client.paymentStatus !== 'paid' ? window.openPaymentModal(client) : null}
-    disabled={client.paymentStatus === 'paid'}
-  >
-    <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
-    </svg>
-    <span className="text-xs font-medium">{client.paymentStatus === 'paid' ? t.paid : t.pay}</span>
-  </button>
-  
-  <button 
-    className="flex flex-col items-center justify-center py-3 text-gray-700 hover:bg-gray-100 transition-colors active:bg-gray-200"
-    onClick={() => window.openAddServiceModal(client)}
-  >
-    <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-    </svg>
-    <span className="text-xs font-medium">{t.service}</span>
-  </button>
-  
-  <button 
-    className="flex flex-col items-center justify-center py-3 text-gray-700 hover:bg-gray-100 transition-colors active:bg-gray-200"
-    onClick={() => window.openAddShoppingModal(client)}
-  >
-    <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-    </svg>
-    <span className="text-xs font-medium">{t.shop}</span>
-  </button>
-</div>
+      {/* Action buttons - FIXED with direct prop callbacks */}
+      <div className="grid grid-cols-4 border-t bg-gray-50">
+        <button 
+          className="flex flex-col items-center justify-center py-3 text-gray-700 hover:bg-gray-100 transition-colors active:bg-gray-200"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Details button clicked, calling onViewDetails with:', client.clientId);
+            if (onViewDetails) {
+              onViewDetails(client.clientId);
+            } else {
+              console.error('onViewDetails prop not provided');
+            }
+          }}
+        >
+          <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span className="text-xs font-medium">{t.details}</span>
+        </button>
+        
+        <button 
+          className={`flex flex-col items-center justify-center py-3 transition-colors active:bg-gray-200 ${
+            client.paymentStatus === 'paid' 
+              ? 'text-green-700 bg-green-50'
+              : 'text-gray-700 hover:bg-gray-100'
+          }`}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Pay button clicked, calling onOpenPayment with:', client);
+            if (client.paymentStatus !== 'paid' && onOpenPayment) {
+              onOpenPayment(client);
+            } else if (!onOpenPayment) {
+              console.error('onOpenPayment prop not provided');
+            }
+          }}
+          disabled={client.paymentStatus === 'paid'}
+        >
+          <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
+          </svg>
+          <span className="text-xs font-medium">{client.paymentStatus === 'paid' ? t.paid : t.pay}</span>
+        </button>
+        
+        <button 
+          className="flex flex-col items-center justify-center py-3 text-gray-700 hover:bg-gray-100 transition-colors active:bg-gray-200"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Service button clicked, calling onOpenService with:', client);
+            if (onOpenService) {
+              onOpenService(client);
+            } else {
+              console.error('onOpenService prop not provided');
+            }
+          }}
+        >
+          <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          <span className="text-xs font-medium">{t.service}</span>
+        </button>
+        
+        <button 
+          className="flex flex-col items-center justify-center py-3 text-gray-700 hover:bg-gray-100 transition-colors active:bg-gray-200"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Shop button clicked, calling onOpenShopping with:', client);
+            if (onOpenShopping) {
+              onOpenShopping(client);
+            } else {
+              console.error('onOpenShopping prop not provided');
+            }
+          }}
+        >
+          <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+          </svg>
+          <span className="text-xs font-medium">{t.shop}</span>
+        </button>
+      </div>
     </div>
   );
 };
@@ -3510,16 +3560,39 @@ useEffect(() => {
   };
    
     useEffect(() => {
-      window.upcomingBookingsInstance = {
-        viewClientDetails,
-        openPaymentModal,
-        openAddServiceModal,
-        openAddShoppingModal
-      };
-      return () => {
-        delete window.upcomingBookingsInstance;
-      };
-    }, [viewClientDetails, openPaymentModal, openAddServiceModal, openAddShoppingModal]);
+  console.log('Registering upcomingBookingsInstance with functions:', {
+    viewClientDetails: typeof viewClientDetails,
+    openPaymentModal: typeof openPaymentModal,
+    openAddServiceModal: typeof openAddServiceModal,
+    openAddShoppingModal: typeof openAddShoppingModal
+  });
+  
+  window.upcomingBookingsInstance = {
+    viewClientDetails: (clientId) => {
+      console.log('Global viewClientDetails called with:', clientId);
+      viewClientDetails(clientId);
+    },
+    openPaymentModal: (client) => {
+      console.log('Global openPaymentModal called with:', client);
+      openPaymentModal(client);
+    },
+    openAddServiceModal: (client) => {
+      console.log('Global openAddServiceModal called with:', client);
+      openAddServiceModal(client);
+    },
+    openAddShoppingModal: (client) => {
+      console.log('Global openAddShoppingModal called with:', client);
+      openAddShoppingModal(client);
+    }
+  };
+  
+  console.log('upcomingBookingsInstance registered:', window.upcomingBookingsInstance);
+  
+  return () => {
+    console.log('Cleaning up upcomingBookingsInstance');
+    delete window.upcomingBookingsInstance;
+  };
+}, [viewClientDetails, openPaymentModal, openAddServiceModal, openAddShoppingModal]);
     
 
   // Render main content based on loaded data
@@ -3549,12 +3622,19 @@ useEffect(() => {
     }
     
     return (
-      <div className="space-y-4">
-        {filteredClients.map(client => (
-          <ClientCard key={client.clientId} client={client} />
-        ))}
-      </div>
-    );
+  <div className="space-y-4">
+    {filteredClients.map(client => (
+      <ClientCard 
+        key={client.clientId} 
+        client={client} 
+        onViewDetails={viewClientDetails}
+        onOpenPayment={openPaymentModal}
+        onOpenService={openAddServiceModal}
+        onOpenShopping={openAddShoppingModal}
+      />
+    ))}
+  </div>
+);
   };
   
   // Auth error state
@@ -3738,23 +3818,24 @@ useEffect(() => {
       {showBottomSheet && (
   <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end md:items-center md:justify-center">
     <div 
-      className="bg-white rounded-t-2xl md:rounded-xl w-full md:max-w-lg h-[90vh] md:h-auto md:max-h-[90vh] overflow-hidden animate-slide-up flex flex-col"
+      className="bg-white rounded-t-2xl md:rounded-xl w-full md:max-w-lg max-h-[90vh] md:max-h-[90vh] overflow-hidden animate-slide-up flex flex-col"
       ref={bottomSheetRef}
     >
       {/* Bottom Sheet Header */}
       <div className="flex-shrink-0 p-4 border-b bg-white z-10 bottom-sheet-header">
         <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-3 md:hidden"></div>
         <div className="flex justify-between items-center">
-          <h3 className="font-bold text-lg">
-            {bottomSheetContent === 'client-details' ? t.clientDetails :
-            bottomSheetContent === 'quick-payment' ? t.addPayment :
-            bottomSheetContent === 'edit-payment' ? t.editPayment :
-            bottomSheetContent === 'add-service' ? t.addService :
-            bottomSheetContent === 'edit-service' ? t.serviceDetails :
-            bottomSheetContent === 'add-shopping' ? t.addShoppingExpense : ''}
+          <h3 className="font-bold text-lg text-gray-900">
+            {bottomSheetContent === 'client-details' && 'Client Details'}
+            {bottomSheetContent === 'quick-payment' && 'Add Payment'}
+            {bottomSheetContent === 'edit-payment' && 'Edit Payment'}
+            {bottomSheetContent === 'add-service' && 'Add Service'}
+            {bottomSheetContent === 'edit-service' && 'Service Details'}
+            {bottomSheetContent === 'add-shopping' && 'Add Shopping Expense'}
+            {!bottomSheetContent && `Modal (Debug: content="${bottomSheetContent}")`}
           </h3>
           <button 
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100"
             onClick={closeBottomSheet}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3762,398 +3843,332 @@ useEffect(() => {
             </svg>
           </button>
         </div>
+        {/* Debug Information */}
+        <div className="mt-2 text-xs text-gray-500">
+          Debug: Content="{bottomSheetContent}", Item={selectedItem ? 'present' : 'missing'}
+        </div>
       </div>
+      
+      {/* Bottom Sheet Content */}
+      <div className="flex-1 overflow-y-auto bg-white" style={{WebkitOverflowScrolling: 'touch'}}>
+        
+        {/* Debug Section - Shows current state */}
+        {!bottomSheetContent && (
+          <div className="p-4 bg-yellow-50 border-l-4 border-yellow-400">
+            <h4 className="font-medium text-yellow-800">Debug Information:</h4>
+            <p className="text-sm text-yellow-700">Content Type: "{bottomSheetContent}"</p>
+            <p className="text-sm text-yellow-700">Selected Item: {selectedItem ? 'Available' : 'Missing'}</p>
+            <p className="text-sm text-yellow-700">Show Bottom Sheet: {showBottomSheet ? 'True' : 'False'}</p>
+            {selectedItem && (
+              <div className="mt-2">
+                <p className="text-sm text-yellow-700">Client: {safeRender(selectedItem.clientName)}</p>
+                <p className="text-sm text-yellow-700">Client ID: {selectedItem.clientId}</p>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* CLIENT DETAILS */}
+        {bottomSheetContent === 'client-details' && selectedItem && (
+          <div className="p-4 bg-white space-y-4">
+            <div className="text-center border-b pb-4">
+              <h2 className="text-xl font-bold text-gray-900">{safeRender(selectedItem.clientName)}</h2>
+              <p className="text-gray-600">Total: {selectedItem.totalValue.toLocaleString()} €</p>
+              <p className="text-gray-600">Due: {selectedItem.dueAmount.toLocaleString()} €</p>
+              <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusBadgeClass(selectedItem.paymentStatus)}`}>
+                {getPaymentStatusText(selectedItem.paymentStatus)}
+              </div>
+            </div>
             
-            {/* Bottom Sheet Content */}
-            <div className="flex-1 overflow-y-auto" style={{WebkitOverflowScrolling: 'touch'}}>
-              {/* CLIENT DETAILS VIEW */}
-              {bottomSheetContent === 'client-details' && selectedItem && (
-                <div className="p-4 text-gray-700">
-                  {/* Client Header with Total Value */}
-                  <div className="flex items-center justify-between mb-4 pb-4 border-b">
-                    <div className="flex items-center">
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-semibold ${selectedItem.paymentStatus === 'paid' ? 'bg-green-500' : selectedItem.paymentStatus === 'partiallyPaid' ? 'bg-yellow-500' : 'bg-red-500'}`}>
-                        {getClientInitials(selectedItem.clientName)}
-                      </div>
-                      <div className="ml-3 min-w-0 flex-1 truncate">
-                        <h3 className="font-medium leading-tight truncate">{safeRender(selectedItem.clientName)}</h3>
-                        <p className="text-sm text-gray-600">{t.clientId} {selectedItem.clientId.substring(0, 8)}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold">{selectedItem.totalValue.toLocaleString()} €</div>
-                      <p className="text-sm text-gray-600">{t.totalValue}</p>
-                    </div>
-                  </div>
-                  
-                  {/* Client Contact Information */}
-                  {clientDetails[selectedItem.clientId] && (
-                    <div className="mb-4 pb-4 border-b">
-                      <h4 className="font-medium mb-2 text-gray-700">{t.contactInformation}</h4>
-                      <div className="space-y-2">
-                        {clientDetails[selectedItem.clientId].email && (
-                          <div className="flex items-center text-sm">
-                            <svg className="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                            </svg>
-                            <span>{safeRender(clientDetails[selectedItem.clientId].email)}</span>
-                          </div>
-                        )}
-                        {clientDetails[selectedItem.clientId].phone && (
-                          <div className="flex items-center text-sm">
-                            <svg className="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
-                            </svg>
-                            <span>{safeRender(clientDetails[selectedItem.clientId].phone)}</span>
-                          </div>
-                        )}
-                        {clientDetails[selectedItem.clientId].address && (
-                          <div className="flex items-start text-sm">
-                            <svg className="w-5 h-5 mr-2 text-gray-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                            </svg>
-                            <span>{safeRender(clientDetails[selectedItem.clientId].address)}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                        
-                  {/* Bookings Summary - WITH DELETE BUTTON */}
-                  <div className="mb-4 pb-4 border-b">
-                    <h4 className="font-medium mb-2 text-gray-700">{t.bookings} ({selectedItem.bookings.length})</h4>
-                    <div className="space-y-3">
-                      {selectedItem.bookings.map((booking, idx) => (
-                        <div key={booking.id || idx} className="bg-gray-50 p-3 rounded-lg">
-                          <div className="flex justify-between items-center mb-2">
-                            <div className="flex items-center">
-                              {booking.accommodationType?.toLowerCase().includes('vil') 
-                                ? <CategoryIcon type="villas" />
-                                : booking.accommodationType?.toLowerCase().includes('boa') || 
-                                  booking.accommodationType?.toLowerCase().includes('yac')
-                                  ? <CategoryIcon type="yacht" />
-                                : booking.accommodationType?.toLowerCase().includes('car')
-                                  ? <CategoryIcon type="car" />
-                                : <CategoryIcon type="services" />
-                              }
-                              <span className="font-medium ml-2">{safeRender(booking.accommodationType)}</span>
-                            </div>
-                            <div className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(booking.status)}`}>
-                              {getStatusText(booking.status)}
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div>
-                              <span className="text-gray-600">{t.checkIn}</span> {formatShortDate(booking.checkIn)}
-                            </div>
-                            <div>
-                              <span className="text-gray-600">{t.checkOut}</span> {formatShortDate(booking.checkOut)}
-                            </div>
-                            <div>
-                              <span className="text-gray-600">{t.guests}</span> {booking.guests || 'N/A'}
-                            </div>
-                            <div>
-                              <span className="text-gray-600">{t.totalValue}</span> {booking.totalValue?.toLocaleString() || 0} €
-                            </div>
-                          </div>
-                    
-                          {/* DELETE BOOKING BUTTON */}
-                          <div className="mt-3 flex justify-end">
-                            <button 
-                              className="py-1 px-3 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors flex items-center"
-                              onClick={() => handleDeleteBooking(selectedItem, booking)}
-                            >
-                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                              </svg>
-                              {t.deleteBooking}
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-            
-                  {/* Services List */}
-                  <div className="mb-4 pb-4 border-b">
-                    <h4 className="font-medium mb-2 text-gray-700">{t.servicesAndExtras} ({selectedItem.services.length})</h4>
-                    {selectedItem.services.length === 0 ? (
-                      <div className="text-center py-3 bg-gray-50 rounded-lg text-sm text-gray-500">
-                        {t.noAdditionalServices}
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {selectedItem.services.map((service, idx) => (
-                          <div 
-                            key={idx} 
-                            className="flex justify-between items-center p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
-                            onClick={() => openEditServiceModal(selectedItem, service)}
-                          >
-                            <div className="flex items-center">
-                              <CategoryIcon type={service.type || "services"} />
-                              <div className="ml-2">
-                                <div className="font-medium text-sm">{safeRender(service.name)}</div>
-                                <div className="text-xs text-gray-500">{formatShortDate(service.date)}</div>
-                              </div>
-                            </div>
-                            <div className="text-sm font-medium">
-                              {service.price * service.quantity} €
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Payment History */}
-                  <div className="mb-4">
-                    <h4 className="font-medium mb-2 text-gray-700">{t.paymentHistory} ({selectedItem.paymentHistory.length})</h4>
-                    {selectedItem.paymentHistory.length === 0 ? (
-                      <div className="text-center py-3 bg-gray-50 rounded-lg text-sm text-gray-500">
-                        {t.noPaymentsRecorded}
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {selectedItem.paymentHistory.map((payment, idx) => (
-                          <div 
-                            key={idx} 
-                            className="flex justify-between items-center p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
-                            onClick={() => openEditPaymentModal(selectedItem, payment)}
-                          >
-                            <div className="flex items-center">
-                              <PaymentIcon type={payment.method} />
-                              <div className="ml-2">
-                                <div className="font-medium text-sm">{payment.amount.toLocaleString()} €</div>
-                                <div className="text-xs text-gray-500">{formatLongDate(payment.date)}</div>
-                              </div>
-                            </div>
-                            <div className="flex items-center">
-                              <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">
-                                {payment.method}
-                              </span>
-                              <svg className="w-5 h-5 text-gray-400 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
-                              </svg>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Quick Actions */}
-                  <div className="grid grid-cols-2 gap-3 mt-4">
-                    <button 
-                      className="py-2 px-4 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors flex items-center justify-center"
-                      onClick={() => {
-                        closeBottomSheet();
-                        openAddServiceModal(selectedItem);
-                      }}
-                    >
-                      <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                      </svg>
-                      {t.addService}
-                    </button>
-                    
-                    <button 
-                      className={`py-2 px-4 rounded-lg font-medium flex items-center justify-center ${
-                        selectedItem.paymentStatus === 'paid'
-                          ? 'bg-gray-200 text-gray-500'
-                          : 'bg-green-500 text-white hover:bg-green-600 transition-colors'
-                      }`}
-                      onClick={() => {
-                        closeBottomSheet();
-                        if (selectedItem.paymentStatus !== 'paid') {
-                          openPaymentModal(selectedItem);
-                        }
-                      }}
-                      disabled={selectedItem.paymentStatus === 'paid'}
-                    >
-                      <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z"></path>
-                      </svg>
-                      {t.addPayment}
-                    </button>
-                  </div>
-                </div>
-              )}
-              
-              {/* PAYMENT FORM */}
-              {(bottomSheetContent === 'quick-payment' || bottomSheetContent === 'edit-payment') && selectedItem && (
-                <div className="p-4 space-y-4">
-                  <div className="flex justify-between items-center">
+            <div className="space-y-3">
+              <h3 className="font-semibold text-gray-900">Bookings ({selectedItem.bookings.length})</h3>
+              {selectedItem.bookings.map((booking, idx) => (
+                <div key={idx} className="p-3 bg-gray-50 rounded-lg">
+                  <div className="flex justify-between items-start mb-2">
                     <div>
-                      <p className="font-medium">{t.client}</p>
-                      <p className="text-gray-700">{safeRender(selectedItem.clientName)}</p>
+                      <p className="font-medium text-gray-900">{safeRender(booking.accommodationType)}</p>
+                      <p className="text-sm text-gray-600">{formatShortDate(booking.checkIn)} - {formatShortDate(booking.checkOut)}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-medium">{t.amountDue}</p>
-                      <p className="text-lg font-semibold text-red-600">{selectedItem.dueAmount.toLocaleString()} €</p>
-                    </div>
-                  </div>
-                  
-                  <div className="border-t pt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {t.paymentAmount}
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        value={paymentData.amount}
-                        onChange={(e) => setPaymentData({...paymentData, amount: parseFloat(e.target.value) || 0})}
-                        className="w-full pl-8 pr-4 py-3 md:py-2 border border-gray-300 rounded-md text-base md:text-sm focus:ring-blue-500 focus:border-blue-500"
-                      />
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <span className="text-gray-500">€</span>
+                      <p className="font-medium text-gray-900">{booking.totalValue?.toLocaleString() || 0} €</p>
+                      <div className={`px-2 py-0.5 rounded text-xs ${getStatusBadgeClass(booking.status)}`}>
+                        {getStatusText(booking.status)}
                       </div>
                     </div>
                   </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {t.paymentMethod}
-                    </label>
-                    <div className="grid grid-cols-4 gap-2">
-                      <button 
-                        type="button" 
-                        onClick={() => setPaymentData({...paymentData, method: 'cash'})}
-                        className={`flex flex-col items-center justify-center p-2 border rounded-md ${paymentData.method === 'cash' ? 'bg-blue-50 border-blue-300' : 'border-gray-300'}`}
-                      >
-                        <PaymentIcon type="cash" size="large" />
-                        <span className="mt-1 text-xs">{t.cash}</span>
-                      </button>
-                      <button 
-                        type="button" 
-                        onClick={() => setPaymentData({...paymentData, method: 'card'})}
-                        className={`flex flex-col items-center justify-center p-2 border rounded-md ${paymentData.method === 'card' ? 'bg-blue-50 border-blue-300' : 'border-gray-300'}`}
-                      >
-                        <PaymentIcon type="card" size="large" />
-                        <span className="mt-1 text-xs">{t.card}</span>
-                      </button>
-                      <button 
-                        type="button" 
-                        onClick={() => setPaymentData({...paymentData, method: 'bankTransfer'})}
-                        className={`flex flex-col items-center justify-center p-2 border rounded-md ${paymentData.method === 'bankTransfer' ? 'bg-blue-50 border-blue-300' : 'border-gray-300'}`}
-                      >
-                        <PaymentIcon type="bankTransfer" size="large" />
-                        <span className="mt-1 text-xs">{t.transfer}</span>
-                      </button>
-                      <button 
-                        type="button" 
-                        onClick={() => setPaymentData({...paymentData, method: 'crypto'})}
-                        className={`flex flex-col items-center justify-center p-2 border rounded-md ${paymentData.method === 'crypto' ? 'bg-blue-50 border-blue-300' : 'border-gray-300'}`}
-                      >
-                        <PaymentIcon type="crypto" size="large" />
-                        <span className="mt-1 text-xs">{t.crypto}</span>
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {t.receiptNumber}
-                    </label>
-                    <input
-                      type="text"
-                      value={paymentData.receiptNumber}
-                      onChange={(e) => setPaymentData({...paymentData, receiptNumber: e.target.value})}
-                      placeholder={t.enterReceiptNumber}
-                      className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {t.notes}
-                    </label>
-                    <textarea
-                      value={paymentData.notes}
-                      onChange={(e) => setPaymentData({...paymentData, notes: e.target.value})}
-                      placeholder={t.addPaymentDetails}
-                      rows={3}
-                      className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                    ></textarea>
-                  </div>
-                  
-                  <button
-                    className="w-full py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors"
-                    onClick={() => handleQuickPayment(selectedItem, paymentData.amount)}
-                    disabled={paymentData.amount <= 0}
+                  <button 
+                    className="w-full py-1 px-2 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 mt-2"
+                    onClick={() => handleDeleteBooking(selectedItem, booking)}
                   >
-                    {t.completePayment}
+                    Delete Booking
                   </button>
                 </div>
-              )}
-              
-              {/* SERVICE SELECTION */}
-              {bottomSheetContent === 'add-service' && (
-                <ServiceSelectionPanel 
-                  onServiceAdded={handleServiceSelectionAdd}
-                  onCancel={closeBottomSheet}
-                  userCompanyId={userCompanyId}
-                  t={t}
-                />
-              )}
-              
-              {/* SERVICE DETAILS */}
-              {bottomSheetContent === 'edit-service' && selectedItem && selectedService && (
-                <div className="p-4 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center">
-                      <CategoryIcon type={selectedService.type || "services"} />
-                      <span className="ml-2 font-medium capitalize">{selectedService.type}</span>
-                    </div>
-                    <div className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusBadgeClass(selectedService.status || 'confirmed')}`}>
-                      {getStatusText(selectedService.status || 'confirmed')}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">{safeRender(selectedService.name)}</h4>
-                    <div className="text-lg font-bold">{(selectedService.price * selectedService.quantity).toLocaleString()} €</div>
-                  </div>
-                  
-                  <div>
-                    <div className="text-sm text-gray-600">
-                      {t.date} {formatShortDate(selectedService.date)}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {selectedService.quantity} × {selectedService.price.toLocaleString()} € / {selectedService.unit}
-                    </div>
-                    {selectedService.notes && (
-                      <div className="mt-2 p-2 bg-gray-50 rounded border text-sm">
-                        {safeRender(selectedService.notes)}
+              ))}
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="font-semibold text-gray-900">Services & Extras ({selectedItem.services.length})</h3>
+              {selectedItem.services.length === 0 ? (
+                <div className="text-center py-4 bg-gray-50 rounded-lg">
+                  <p className="text-gray-500">No additional services</p>
+                </div>
+              ) : (
+                selectedItem.services.map((service, idx) => (
+                  <div 
+                    key={idx} 
+                    className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
+                    onClick={() => openEditServiceModal(selectedItem, service)}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-medium text-gray-900">{safeRender(service.name)}</p>
+                        <p className="text-sm text-gray-600">{formatShortDate(service.date)}</p>
                       </div>
-                    )}
+                      <p className="font-medium text-gray-900">{(service.price * service.quantity).toLocaleString()} €</p>
+                    </div>
                   </div>
-                  
-                  <button
-                    className="w-full py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center"
-                    onClick={() => handleDeleteService(selectedItem, selectedService)}
-                  >
-                    <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                    </svg>
-                    {t.deleteService}
-                  </button>
-                </div>
-              )}
-              
-              {/* SHOPPING EXPENSE FORM */}
-              {bottomSheetContent === 'add-shopping' && (
-                <ShoppingExpenseForm
-                  onAddShopping={handleShoppingFormSubmit}
-                  onCancel={closeBottomSheet}
-                  userCompanyId={userCompanyId}
-                  t={t}
-                />
+                ))
               )}
             </div>
+
+            <div className="space-y-3">
+              <h3 className="font-semibold text-gray-900">Payment History ({selectedItem.paymentHistory.length})</h3>
+              {selectedItem.paymentHistory.length === 0 ? (
+                <div className="text-center py-4 bg-gray-50 rounded-lg">
+                  <p className="text-gray-500">No payments recorded</p>
+                </div>
+              ) : (
+                selectedItem.paymentHistory.map((payment, idx) => (
+                  <div 
+                    key={idx} 
+                    className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
+                    onClick={() => openEditPaymentModal(selectedItem, payment)}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-medium text-gray-900">{payment.amount.toLocaleString()} €</p>
+                        <p className="text-sm text-gray-600">{formatLongDate(payment.date)}</p>
+                      </div>
+                      <span className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs">{payment.method}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-4 border-t">
+              <button 
+                className="py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600"
+                onClick={() => {
+                  closeBottomSheet();
+                  setTimeout(() => openAddServiceModal(selectedItem), 100);
+                }}
+              >
+                Add Service
+              </button>
+              <button 
+                className={`py-3 rounded-lg font-medium ${
+                  selectedItem.paymentStatus === 'paid'
+                    ? 'bg-gray-200 text-gray-500'
+                    : 'bg-green-500 text-white hover:bg-green-600'
+                }`}
+                onClick={() => {
+                  closeBottomSheet();
+                  setTimeout(() => openPaymentModal(selectedItem), 100);
+                }}
+                disabled={selectedItem.paymentStatus === 'paid'}
+              >
+                Add Payment
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+        
+        {/* PAYMENT FORM */}
+        {(bottomSheetContent === 'quick-payment' || bottomSheetContent === 'edit-payment') && selectedItem && (
+          <div className="p-4 bg-white space-y-4">
+            <div className="text-center border-b pb-4">
+              <h2 className="text-lg font-semibold text-gray-900">{safeRender(selectedItem.clientName)}</h2>
+              <p className="text-red-600 font-bold text-xl">Due: {selectedItem.dueAmount.toLocaleString()} €</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Payment Amount *</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="0.01"
+                  value={paymentData.amount || ''}
+                  onChange={(e) => setPaymentData({...paymentData, amount: parseFloat(e.target.value) || 0})}
+                  className="w-full pl-8 pr-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                  placeholder="0.00"
+                />
+                <span className="absolute left-3 top-3 text-gray-500 font-medium">€</span>
+              </div>
+              <div className="flex gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setPaymentData({...paymentData, amount: selectedItem.dueAmount})}
+                  className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                >
+                  Full Amount
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentData({...paymentData, amount: Math.round(selectedItem.dueAmount / 2)})}
+                  className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                >
+                  Half
+                </button>
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method *</label>
+              <div className="grid grid-cols-2 gap-2">
+                {['cash', 'card', 'bankTransfer', 'crypto'].map((method) => (
+                  <button 
+                    key={method}
+                    type="button" 
+                    onClick={() => setPaymentData({...paymentData, method})}
+                    className={`p-3 border-2 rounded-lg text-center ${
+                      paymentData.method === method 
+                        ? 'bg-blue-50 border-blue-500 text-blue-700' 
+                        : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
+                    }`}
+                  >
+                    <div className="text-sm font-medium">
+                      {method === 'cash' ? 'Cash' : 
+                       method === 'card' ? 'Card' : 
+                       method === 'bankTransfer' ? 'Transfer' : 
+                       'Crypto'}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Receipt Number (optional)</label>
+              <input
+                type="text"
+                value={paymentData.receiptNumber || ''}
+                onChange={(e) => setPaymentData({...paymentData, receiptNumber: e.target.value})}
+                className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                placeholder="Enter receipt number"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Notes (optional)</label>
+              <textarea
+                value={paymentData.notes || ''}
+                onChange={(e) => setPaymentData({...paymentData, notes: e.target.value})}
+                rows={3}
+                className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 resize-none"
+                placeholder="Add payment details"
+              ></textarea>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={closeBottomSheet}
+                className="flex-1 py-3 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleQuickPayment(selectedItem, paymentData.amount)}
+                disabled={!paymentData.amount || paymentData.amount <= 0}
+                className="flex-2 py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white rounded-lg font-medium"
+              >
+                Complete Payment
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {/* SERVICE SELECTION */}
+        {bottomSheetContent === 'add-service' && selectedItem && (
+          <div className="bg-white">
+            <div className="p-4 border-b">
+              <h2 className="text-lg font-semibold text-gray-900">Add Service for {safeRender(selectedItem.clientName)}</h2>
+            </div>
+            <ServiceSelectionPanel 
+              onServiceAdded={handleServiceSelectionAdd}
+              onCancel={closeBottomSheet}
+              userCompanyId={userCompanyId}
+              t={t}
+            />
+          </div>
+        )}
+        
+        {/* SERVICE DETAILS */}
+        {bottomSheetContent === 'edit-service' && selectedItem && selectedService && (
+          <div className="p-4 bg-white space-y-4">
+            <div className="text-center border-b pb-4">
+              <h2 className="text-lg font-semibold text-gray-900">{safeRender(selectedService.name)}</h2>
+              <p className="text-xl font-bold text-gray-900">{(selectedService.price * selectedService.quantity).toLocaleString()} €</p>
+            </div>
+            
+            <div className="space-y-2">
+              <p className="text-sm"><span className="text-gray-500">Date:</span> <span className="text-gray-900">{formatShortDate(selectedService.date)}</span></p>
+              <p className="text-sm"><span className="text-gray-500">Quantity:</span> <span className="text-gray-900">{selectedService.quantity} × {selectedService.price.toLocaleString()} €</span></p>
+              {selectedService.notes && (
+                <div className="p-3 bg-gray-50 rounded text-sm text-gray-700">
+                  <span className="font-medium">Notes:</span> {safeRender(selectedService.notes)}
+                </div>
+              )}
+            </div>
+            
+            <button
+              className="w-full py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium"
+              onClick={() => handleDeleteService(selectedItem, selectedService)}
+            >
+              Delete Service
+            </button>
+          </div>
+        )}
+        
+        {/* SHOPPING FORM */}
+        {bottomSheetContent === 'add-shopping' && selectedItem && (
+          <div className="bg-white">
+            <div className="p-4 border-b">
+              <h2 className="text-lg font-semibold text-gray-900">Add Shopping Expense for {safeRender(selectedItem.clientName)}</h2>
+            </div>
+            <ShoppingExpenseForm
+              onAddShopping={handleShoppingFormSubmit}
+              onCancel={closeBottomSheet}
+              userCompanyId={userCompanyId}
+              t={t}
+            />
+          </div>
+        )}
+
+        {/* Fallback content with detailed debug info */}
+        {!bottomSheetContent && (
+          <div className="p-4 bg-white">
+            <div className="text-center space-y-3">
+              <h3 className="text-lg font-semibold text-gray-900">Debug Mode</h3>
+              <p className="text-gray-700">Content type is not set. Check console for debugging information.</p>
+              <div className="bg-gray-100 p-3 rounded text-left text-sm">
+                <p><strong>Bottom Sheet Content:</strong> "{bottomSheetContent}"</p>
+                <p><strong>Selected Item:</strong> {selectedItem ? 'Present' : 'Missing'}</p>
+                <p><strong>Show Bottom Sheet:</strong> {showBottomSheet ? 'True' : 'False'}</p>
+              </div>
+              <button 
+                onClick={closeBottomSheet}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Close Modal
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
       
       {/* Enhanced Toast Notification */}
       {showNotification && (
@@ -4180,30 +4195,7 @@ useEffect(() => {
   );
 };
 
-// Make the functions available in the global window object for clientCard to access
-window.viewClientDetails = (clientId) => {
-  // Implemented by the ClientCard component to call back to the main component
-  if (typeof window.upcomingBookingsInstance?.viewClientDetails === 'function') {
-    window.upcomingBookingsInstance.viewClientDetails(clientId);
-  }
-};
 
-window.openPaymentModal = (client) => {
-  if (typeof window.upcomingBookingsInstance?.openPaymentModal === 'function') {
-    window.upcomingBookingsInstance.openPaymentModal(client);
-  }
-};
-
-window.openAddServiceModal = (client) => {
-  if (typeof window.upcomingBookingsInstance?.openAddServiceModal === 'function') {
-    window.upcomingBookingsInstance.openAddServiceModal(client);
-  }
-};
-
-window.openAddShoppingModal = (client) => {
-  if (typeof window.upcomingBookingsInstance?.openAddShoppingModal === 'function') {
-    window.upcomingBookingsInstance.openAddShoppingModal(client);
-  }
-};
+  
 
 export default UpcomingBookings;
