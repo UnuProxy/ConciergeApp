@@ -708,6 +708,27 @@ const openAddShoppingModal = (client) => {
     console.error('No client provided to openAddShoppingModal');
   }
 };
+const handleServiceSelectionAdd = async (service) => {
+  if (!selectedItem) {
+    showNotificationMessage(t.noClientSelected || 'No client selected', 'error');
+    return;
+  }
+  
+  try {
+    // Call the enhanced service add function
+    const success = await handleQuickServiceAdd(selectedItem, service);
+    
+    if (success) {
+      showNotificationMessage(t.serviceAddedSuccess || 'Service added successfully');
+      closeBottomSheet();
+    }
+  } catch (err) {
+    console.error('Error adding service:', err);
+    showNotificationMessage(err.message || t.failedAddService || 'Failed to add service', 'error');
+  }
+};
+
+
 
 // Status colors with enhanced styling
 const statusColors = {
@@ -2882,6 +2903,7 @@ const openAddShoppingModal = (client) => {
   }
 };
 
+
 // 4. FIXED: renderMainContent function (around line 1200)
 const renderMainContent = () => {
   const filteredClients = getFilteredClients();
@@ -2936,44 +2958,7 @@ const renderMainContent = () => {
   );
 };
 
-// 5. CRITICAL: Remove the global instance registration (around line 950)
-// COMMENT OUT OR DELETE this entire useEffect block:
-/*
-useEffect(() => {
-  console.log('Registering upcomingBookingsInstance with functions:', {
-    viewClientDetails: typeof viewClientDetails,
-    openPaymentModal: typeof openPaymentModal,
-    openAddServiceModal: typeof openAddServiceModal,
-    openAddShoppingModal: typeof openAddShoppingModal
-  });
-  
-  window.upcomingBookingsInstance = {
-    viewClientDetails: (clientId) => {
-      console.log('Global viewClientDetails called with:', clientId);
-      viewClientDetails(clientId);
-    },
-    openPaymentModal: (client) => {
-      console.log('Global openPaymentModal called with:', client);
-      openPaymentModal(client);
-    },
-    openAddServiceModal: (client) => {
-      console.log('Global openAddServiceModal called with:', client);
-      openAddServiceModal(client);
-    },
-    openAddShoppingModal: (client) => {
-      console.log('Global openAddShoppingModal called with:', client);
-      openAddShoppingModal(client);
-    }
-  };
-  
-  console.log('upcomingBookingsInstance registered:', window.upcomingBookingsInstance);
-  
-  return () => {
-    console.log('Cleaning up upcomingBookingsInstance');
-    delete window.upcomingBookingsInstance;
-  };
-}, [viewClientDetails, openPaymentModal, openAddServiceModal, openAddShoppingModal]);
-*/
+
 
 // 6. FIXED: Bottom Sheet JSX (replace the entire bottom sheet section around line 1400)
 {showBottomSheet && (
@@ -3693,7 +3678,7 @@ useEffect(() => {
   };
   
   // Handle add service from selection panel
-  const handleServiceSelectionAdd = async (service) => {
+ const handleServiceSelectionAdd = async (service) => {
   if (!selectedItem) {
     showNotificationMessage(t.noClientSelected || 'No client selected', 'error');
     return;
@@ -3715,7 +3700,7 @@ useEffect(() => {
 
   
   // Handle add shopping expense from form
-  const handleShoppingFormSubmit = async (shoppingExpense) => {
+ const handleShoppingFormSubmit = async (shoppingExpense) => {
   if (!selectedItem) {
     showNotificationMessage(t.noClientSelected || 'No client selected', 'error');
     return;
@@ -3734,6 +3719,7 @@ useEffect(() => {
     showNotificationMessage(err.message || t.failedAddShopping || 'Failed to add shopping expense', 'error');
   }
 };
+
   
   // PAYMENT HANDLING
   const handleQuickPayment = async (client, amount) => {
@@ -3863,40 +3849,7 @@ useEffect(() => {
     }
   };
    
-    useEffect(() => {
-  console.log('Registering upcomingBookingsInstance with functions:', {
-    viewClientDetails: typeof viewClientDetails,
-    openPaymentModal: typeof openPaymentModal,
-    openAddServiceModal: typeof openAddServiceModal,
-    openAddShoppingModal: typeof openAddShoppingModal
-  });
-  
-  window.upcomingBookingsInstance = {
-    viewClientDetails: (clientId) => {
-      console.log('Global viewClientDetails called with:', clientId);
-      viewClientDetails(clientId);
-    },
-    openPaymentModal: (client) => {
-      console.log('Global openPaymentModal called with:', client);
-      openPaymentModal(client);
-    },
-    openAddServiceModal: (client) => {
-      console.log('Global openAddServiceModal called with:', client);
-      openAddServiceModal(client);
-    },
-    openAddShoppingModal: (client) => {
-      console.log('Global openAddShoppingModal called with:', client);
-      openAddShoppingModal(client);
-    }
-  };
-  
-  console.log('upcomingBookingsInstance registered:', window.upcomingBookingsInstance);
-  
-  return () => {
-    console.log('Cleaning up upcomingBookingsInstance');
-    delete window.upcomingBookingsInstance;
-  };
-}, [viewClientDetails, openPaymentModal, openAddServiceModal, openAddShoppingModal]);
+
     
 
   // Render main content based on loaded data
@@ -4080,7 +4033,7 @@ useEffect(() => {
       </div>
       
       {/* Bottom Sheet with Enhanced Content */}
-      {showBottomSheet && (
+    {showBottomSheet && (
   <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end md:items-center md:justify-center">
     <div 
       className="bg-white rounded-t-2xl md:rounded-xl w-full md:max-w-lg max-h-[90vh] md:max-h-[90vh] overflow-hidden animate-slide-up flex flex-col"
@@ -4091,13 +4044,12 @@ useEffect(() => {
         <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-3 md:hidden"></div>
         <div className="flex justify-between items-center">
           <h3 className="font-bold text-lg text-gray-900">
-            {bottomSheetContent === 'client-details' && 'Client Details'}
-            {bottomSheetContent === 'quick-payment' && 'Add Payment'}
-            {bottomSheetContent === 'edit-payment' && 'Edit Payment'}
-            {bottomSheetContent === 'add-service' && 'Add Service'}
-            {bottomSheetContent === 'edit-service' && 'Service Details'}
-            {bottomSheetContent === 'add-shopping' && 'Add Shopping Expense'}
-            {!bottomSheetContent && `Modal (Debug: content="${bottomSheetContent}")`}
+            {bottomSheetContent === 'client-details' && (t.clientDetails || 'Client Details')}
+            {bottomSheetContent === 'quick-payment' && (t.addPayment || 'Add Payment')}
+            {bottomSheetContent === 'edit-payment' && (t.editPayment || 'Edit Payment')}
+            {bottomSheetContent === 'add-service' && (t.addService || 'Add Service')}
+            {bottomSheetContent === 'edit-service' && (t.serviceDetails || 'Service Details')}
+            {bottomSheetContent === 'add-shopping' && (t.addShoppingExpense || 'Add Shopping Expense')}
           </h3>
           <button 
             className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100"
@@ -4108,313 +4060,308 @@ useEffect(() => {
             </svg>
           </button>
         </div>
-        {/* Debug Information */}
-        <div className="mt-2 text-xs text-gray-500">
-          Debug: Content="{bottomSheetContent}", Item={selectedItem ? 'present' : 'missing'}
-        </div>
       </div>
       
       {/* Bottom Sheet Content */}
       <div className="flex-1 overflow-y-auto bg-white" style={{WebkitOverflowScrolling: 'touch'}}>
-  
-  {/* Debug Section - Shows current state */}
-  {(!bottomSheetContent || !selectedItem) && (
-    <div className="p-4 bg-yellow-50 border-l-4 border-yellow-400">
-      <h4 className="font-medium text-yellow-800">Debug Information:</h4>
-      <p className="text-sm text-yellow-700">Content Type: "{bottomSheetContent}"</p>
-      <p className="text-sm text-yellow-700">Selected Item: {selectedItem ? 'Available' : 'Missing'}</p>
-      <p className="text-sm text-yellow-700">Show Bottom Sheet: {showBottomSheet ? 'True' : 'False'}</p>
-      {selectedItem && (
-        <div className="mt-2">
-          <p className="text-sm text-yellow-700">Client: {safeRender(selectedItem.clientName)}</p>
-          <p className="text-sm text-yellow-700">Client ID: {selectedItem.clientId}</p>
-        </div>
-      )}
-      <button 
-        onClick={closeBottomSheet}
-        className="mt-3 px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
-      >
-        Close Modal
-      </button>
-    </div>
-  )}
-  
-  {/* CLIENT DETAILS */}
-  {bottomSheetContent === 'client-details' && selectedItem && (
-    <div className="p-4 bg-white space-y-4">
-      <div className="text-center border-b pb-4">
-        <h2 className="text-xl font-bold text-gray-900">{safeRender(selectedItem.clientName)}</h2>
-        <p className="text-gray-600">Total: {selectedItem.totalValue.toLocaleString()} €</p>
-        <p className="text-gray-600">Due: {selectedItem.dueAmount.toLocaleString()} €</p>
-        <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusBadgeClass(selectedItem.paymentStatus)}`}>
-          {getPaymentStatusText(selectedItem.paymentStatus)}
-        </div>
-      </div>
-      
-      <div className="space-y-3">
-        <h3 className="font-semibold text-gray-900">Bookings ({selectedItem.bookings.length})</h3>
-        {selectedItem.bookings.map((booking, idx) => (
-          <div key={idx} className="p-3 bg-gray-50 rounded-lg">
-            <div className="flex justify-between items-start mb-2">
-              <div>
-                <p className="font-medium text-gray-900">{safeRender(booking.accommodationType)}</p>
-                <p className="text-sm text-gray-600">{formatShortDate(booking.checkIn)} - {formatShortDate(booking.checkOut)}</p>
-              </div>
-              <div className="text-right">
-                <p className="font-medium text-gray-900">{booking.totalValue?.toLocaleString() || 0} €</p>
-                <div className={`px-2 py-0.5 rounded text-xs ${getStatusBadgeClass(booking.status)}`}>
-                  {getStatusText(booking.status)}
-                </div>
+        
+        {/* CLIENT DETAILS */}
+        {bottomSheetContent === 'client-details' && selectedItem && (
+          <div className="p-4 bg-white space-y-4">
+            <div className="text-center border-b pb-4">
+              <h2 className="text-xl font-bold text-gray-900">{safeRender(selectedItem.clientName)}</h2>
+              <p className="text-gray-600">{t.totalValue || 'Total'}: {selectedItem.totalValue.toLocaleString()} €</p>
+              <p className="text-gray-600">{t.amountDue || 'Due'}: {selectedItem.dueAmount.toLocaleString()} €</p>
+              <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusBadgeClass(selectedItem.paymentStatus)}`}>
+                {getPaymentStatusText(selectedItem.paymentStatus)}
               </div>
             </div>
-            <button 
-              className="w-full py-1 px-2 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 mt-2"
-              onClick={() => handleDeleteBooking(selectedItem, booking)}
+            
+            {/* Bookings Section */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-gray-900">{t.bookings || 'Bookings'} ({selectedItem.bookings.length})</h3>
+              {selectedItem.bookings.map((booking, idx) => (
+                <div key={idx} className="p-3 bg-gray-50 rounded-lg">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="font-medium text-gray-900">{safeRender(booking.accommodationType)}</p>
+                      <p className="text-sm text-gray-600">{formatShortDate(booking.checkIn)} - {formatShortDate(booking.checkOut)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-gray-900">{(booking.totalValue || 0).toLocaleString()} €</p>
+                      <div className={`px-2 py-0.5 rounded text-xs ${getStatusBadgeClass(booking.status)}`}>
+                        {getStatusText(booking.status)}
+                      </div>
+                    </div>
+                  </div>
+                  <button 
+                    className="w-full py-1 px-2 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 mt-2"
+                    onClick={() => handleDeleteBooking(selectedItem, booking)}
+                  >
+                    {t.deleteBooking || 'Delete Booking'}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Services Section */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-gray-900">{t.servicesAndExtras || 'Services & Extras'} ({selectedItem.services.length})</h3>
+              {selectedItem.services.length === 0 ? (
+                <div className="text-center py-4 bg-gray-50 rounded-lg">
+                  <p className="text-gray-500">{t.noAdditionalServices || 'No additional services'}</p>
+                </div>
+              ) : (
+                selectedItem.services.map((service, idx) => (
+                  <div 
+                    key={idx} 
+                    className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
+                    onClick={() => openEditServiceModal(selectedItem, service)}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-medium text-gray-900">{safeRender(service.name)}</p>
+                        <p className="text-sm text-gray-600">{formatShortDate(service.date)}</p>
+                      </div>
+                      <p className="font-medium text-gray-900">{((service.price || 0) * (service.quantity || 1)).toLocaleString()} €</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Payment History Section */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-gray-900">{t.paymentHistory || 'Payment History'} ({selectedItem.paymentHistory.length})</h3>
+              {selectedItem.paymentHistory.length === 0 ? (
+                <div className="text-center py-4 bg-gray-50 rounded-lg">
+                  <p className="text-gray-500">{t.noPaymentsRecorded || 'No payments recorded'}</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {selectedItem.paymentHistory.map((payment, idx) => (
+                    <div 
+                      key={idx} 
+                      className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
+                      onClick={() => openEditPaymentModal(selectedItem, payment)}
+                    >
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="font-medium text-gray-900">{(payment.amount || 0).toLocaleString()} €</p>
+                          <p className="text-sm text-gray-600">{formatLongDate(payment.date)}</p>
+                        </div>
+                        <span className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs">{payment.method}</span>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="p-3 bg-green-50 rounded-lg border">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium text-green-800">{t.paymentsTotal || 'Total Payments'}:</span>
+                      <span className="font-bold text-green-800">{selectedItem.paidAmount.toLocaleString()} €</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-3 pt-4 border-t">
+              <button 
+                className="py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600"
+                onClick={() => {
+                  closeBottomSheet();
+                  setTimeout(() => openAddServiceModal(selectedItem), 300);
+                }}
+              >
+                {t.addService || 'Add Service'}
+              </button>
+              <button 
+                className={`py-3 rounded-lg font-medium ${
+                  selectedItem.paymentStatus === 'paid'
+                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    : 'bg-green-500 text-white hover:bg-green-600'
+                }`}
+                onClick={() => {
+                  if (selectedItem.paymentStatus !== 'paid') {
+                    closeBottomSheet();
+                    setTimeout(() => openPaymentModal(selectedItem), 300);
+                  }
+                }}
+                disabled={selectedItem.paymentStatus === 'paid'}
+              >
+                {selectedItem.paymentStatus === 'paid' ? t.paid : (t.addPayment || 'Add Payment')}
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {/* PAYMENT FORM */}
+        {(bottomSheetContent === 'quick-payment' || bottomSheetContent === 'edit-payment') && selectedItem && (
+          <div className="p-4 bg-white space-y-4">
+            <div className="text-center border-b pb-4">
+              <h2 className="text-lg font-semibold text-gray-900">{t.client || 'Client'}: {safeRender(selectedItem.clientName)}</h2>
+              <p className="text-red-600 font-bold text-xl">{t.amountDue || 'Due'}: {selectedItem.dueAmount.toLocaleString()} €</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t.paymentAmount || 'Payment Amount'} *</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="0.01"
+                  value={paymentData.amount || ''}
+                  onChange={(e) => setPaymentData({...paymentData, amount: parseFloat(e.target.value) || 0})}
+                  className="w-full pl-8 pr-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                  placeholder="0.00"
+                />
+                <span className="absolute left-3 top-3 text-gray-500 font-medium">€</span>
+              </div>
+              <div className="flex gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setPaymentData({...paymentData, amount: selectedItem.dueAmount})}
+                  className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                >
+                  {t.fullAmount || 'Full Amount'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentData({...paymentData, amount: Math.round(selectedItem.dueAmount / 2)})}
+                  className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                >
+                  {t.half || 'Half'}
+                </button>
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t.paymentMethod || 'Payment Method'} *</label>
+              <div className="grid grid-cols-2 gap-2">
+                {['cash', 'card', 'bankTransfer', 'crypto'].map((method) => (
+                  <button 
+                    key={method}
+                    type="button" 
+                    onClick={() => setPaymentData({...paymentData, method})}
+                    className={`p-3 border-2 rounded-lg text-center transition-colors ${
+                      paymentData.method === method 
+                        ? 'bg-blue-50 border-blue-500 text-blue-700' 
+                        : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
+                    }`}
+                  >
+                    <div className="text-sm font-medium">
+                      {method === 'cash' ? (t.cash || 'Cash') : 
+                       method === 'card' ? (t.card || 'Card') : 
+                       method === 'bankTransfer' ? (t.transfer || 'Transfer') : 
+                       (t.crypto || 'Crypto')}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t.receiptNumber || 'Receipt Number'} ({t.optional || 'optional'})</label>
+              <input
+                type="text"
+                value={paymentData.receiptNumber || ''}
+                onChange={(e) => setPaymentData({...paymentData, receiptNumber: e.target.value})}
+                className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                placeholder={t.enterReceiptNumber || 'Enter receipt number if available'}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t.notes || 'Notes'} ({t.optional || 'optional'})</label>
+              <textarea
+                value={paymentData.notes || ''}
+                onChange={(e) => setPaymentData({...paymentData, notes: e.target.value})}
+                rows={3}
+                className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 resize-none"
+                placeholder={t.addPaymentDetails || 'Add payment details or reference'}
+              ></textarea>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={closeBottomSheet}
+                className="flex-1 py-3 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300"
+              >
+                {t.cancel || 'Cancel'}
+              </button>
+              <button
+                onClick={() => handleQuickPayment(selectedItem, paymentData.amount)}
+                disabled={!paymentData.amount || paymentData.amount <= 0}
+                className="flex-2 py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium"
+              >
+                {t.completePayment || 'Complete Payment'}
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {/* SERVICE SELECTION */}
+        {bottomSheetContent === 'add-service' && selectedItem && (
+          <div className="bg-white">
+            <ServiceSelectionPanel 
+              onServiceAdded={handleServiceSelectionAdd}
+              onCancel={closeBottomSheet}
+              userCompanyId={userCompanyId}
+              t={t}
+            />
+          </div>
+        )}
+        
+        {/* SERVICE DETAILS */}
+        {bottomSheetContent === 'edit-service' && selectedItem && selectedService && (
+          <div className="p-4 bg-white space-y-4">
+            <div className="text-center border-b pb-4">
+              <h2 className="text-lg font-semibold text-gray-900">{safeRender(selectedService.name)}</h2>
+              <p className="text-xl font-bold text-gray-900">{((selectedService.price || 0) * (selectedService.quantity || 1)).toLocaleString()} €</p>
+            </div>
+            
+            <div className="space-y-2">
+              <p className="text-sm"><span className="text-gray-500">{t.date || 'Date'}:</span> <span className="text-gray-900">{formatShortDate(selectedService.date)}</span></p>
+              <p className="text-sm"><span className="text-gray-500">{t.quantity || 'Quantity'}:</span> <span className="text-gray-900">{selectedService.quantity} × {(selectedService.price || 0).toLocaleString()} €</span></p>
+              {selectedService.notes && (
+                <div className="p-3 bg-gray-50 rounded text-sm text-gray-700">
+                  <span className="font-medium">{t.notes || 'Notes'}:</span> {safeRender(selectedService.notes)}
+                </div>
+              )}
+            </div>
+            
+            <button
+              className="w-full py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium"
+              onClick={() => handleDeleteService(selectedItem, selectedService)}
             >
-              Delete Booking
+              {t.deleteService || 'Delete Service'}
             </button>
           </div>
-        ))}
-      </div>
-
-      <div className="space-y-3">
-        <h3 className="font-semibold text-gray-900">Services & Extras ({selectedItem.services.length})</h3>
-        {selectedItem.services.length === 0 ? (
-          <div className="text-center py-4 bg-gray-50 rounded-lg">
-            <p className="text-gray-500">No additional services</p>
-          </div>
-        ) : (
-          selectedItem.services.map((service, idx) => (
-            <div 
-              key={idx} 
-              className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
-              onClick={() => openEditServiceModal(selectedItem, service)}
-            >
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="font-medium text-gray-900">{safeRender(service.name)}</p>
-                  <p className="text-sm text-gray-600">{formatShortDate(service.date)}</p>
-                </div>
-                <p className="font-medium text-gray-900">{(service.price * service.quantity).toLocaleString()} €</p>
-              </div>
-            </div>
-          ))
         )}
-      </div>
-
-      <div className="space-y-3">
-        <h3 className="font-semibold text-gray-900">Payment History ({selectedItem.paymentHistory.length})</h3>
-        {selectedItem.paymentHistory.length === 0 ? (
-          <div className="text-center py-4 bg-gray-50 rounded-lg">
-            <p className="text-gray-500">No payments recorded</p>
+        
+        {/* SHOPPING FORM */}
+        {bottomSheetContent === 'add-shopping' && selectedItem && (
+          <div className="bg-white">
+            <ShoppingExpenseForm
+              onAddShopping={handleShoppingFormSubmit}
+              onCancel={closeBottomSheet}
+              userCompanyId={userCompanyId}
+              t={t}
+            />
           </div>
-        ) : (
-          selectedItem.paymentHistory.map((payment, idx) => (
-            <div 
-              key={idx} 
-              className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
-              onClick={() => openEditPaymentModal(selectedItem, payment)}
-            >
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="font-medium text-gray-900">{payment.amount.toLocaleString()} €</p>
-                  <p className="text-sm text-gray-600">{formatLongDate(payment.date)}</p>
-                </div>
-                <span className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs">{payment.method}</span>
-              </div>
-            </div>
-          ))
         )}
-      </div>
 
-      <div className="grid grid-cols-2 gap-3 pt-4 border-t">
-        <button 
-          className="py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600"
-          onClick={() => {
-            closeBottomSheet();
-            setTimeout(() => openAddServiceModal(selectedItem), 200);
-          }}
-        >
-          Add Service
-        </button>
-        <button 
-          className={`py-3 rounded-lg font-medium ${
-            selectedItem.paymentStatus === 'paid'
-              ? 'bg-gray-200 text-gray-500'
-              : 'bg-green-500 text-white hover:bg-green-600'
-          }`}
-          onClick={() => {
-            closeBottomSheet();
-            setTimeout(() => openPaymentModal(selectedItem), 200);
-          }}
-          disabled={selectedItem.paymentStatus === 'paid'}
-        >
-          Add Payment
-        </button>
-      </div>
-    </div>
-  )}
-  
-  {/* PAYMENT FORM */}
-  {(bottomSheetContent === 'quick-payment' || bottomSheetContent === 'edit-payment') && selectedItem && (
-    <div className="p-4 bg-white space-y-4">
-      <div className="text-center border-b pb-4">
-        <h2 className="text-lg font-semibold text-gray-900">{safeRender(selectedItem.clientName)}</h2>
-        <p className="text-red-600 font-bold text-xl">Due: {selectedItem.dueAmount.toLocaleString()} €</p>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Payment Amount *</label>
-        <div className="relative">
-          <input
-            type="number"
-            step="0.01"
-            value={paymentData.amount || ''}
-            onChange={(e) => setPaymentData({...paymentData, amount: parseFloat(e.target.value) || 0})}
-            className="w-full pl-8 pr-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-            placeholder="0.00"
-          />
-          <span className="absolute left-3 top-3 text-gray-500 font-medium">€</span>
-        </div>
-        <div className="flex gap-2 mt-2">
-          <button
-            type="button"
-            onClick={() => setPaymentData({...paymentData, amount: selectedItem.dueAmount})}
-            className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-          >
-            Full Amount
-          </button>
-          <button
-            type="button"
-            onClick={() => setPaymentData({...paymentData, amount: Math.round(selectedItem.dueAmount / 2)})}
-            className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
-          >
-            Half
-          </button>
-        </div>
-      </div>
-      
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method *</label>
-        <div className="grid grid-cols-2 gap-2">
-          {['cash', 'card', 'bankTransfer', 'crypto'].map((method) => (
+        {/* Fallback for unknown content */}
+        {!['client-details', 'quick-payment', 'edit-payment', 'add-service', 'edit-service', 'add-shopping'].includes(bottomSheetContent) && (
+          <div className="p-4 bg-white text-center">
+            <p className="text-gray-500">Unknown content type: {bottomSheetContent}</p>
             <button 
-              key={method}
-              type="button" 
-              onClick={() => setPaymentData({...paymentData, method})}
-              className={`p-3 border-2 rounded-lg text-center ${
-                paymentData.method === method 
-                  ? 'bg-blue-50 border-blue-500 text-blue-700' 
-                  : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
-              }`}
+              onClick={closeBottomSheet}
+              className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
             >
-              <div className="text-sm font-medium">
-                {method === 'cash' ? 'Cash' : 
-                 method === 'card' ? 'Card' : 
-                 method === 'bankTransfer' ? 'Transfer' : 
-                 'Crypto'}
-              </div>
+              Close
             </button>
-          ))}
-        </div>
-      </div>
-      
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Receipt Number (optional)</label>
-        <input
-          type="text"
-          value={paymentData.receiptNumber || ''}
-          onChange={(e) => setPaymentData({...paymentData, receiptNumber: e.target.value})}
-          className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
-          placeholder="Enter receipt number"
-        />
-      </div>
-      
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Notes (optional)</label>
-        <textarea
-          value={paymentData.notes || ''}
-          onChange={(e) => setPaymentData({...paymentData, notes: e.target.value})}
-          rows={3}
-          className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 resize-none"
-          placeholder="Add payment details"
-        ></textarea>
-      </div>
-      
-      <div className="flex gap-3">
-        <button
-          onClick={closeBottomSheet}
-          className="flex-1 py-3 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={() => handleQuickPayment(selectedItem, paymentData.amount)}
-          disabled={!paymentData.amount || paymentData.amount <= 0}
-          className="flex-2 py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white rounded-lg font-medium"
-        >
-          Complete Payment
-        </button>
-      </div>
-    </div>
-  )}
-  
-  {/* SERVICE SELECTION */}
-  {bottomSheetContent === 'add-service' && selectedItem && (
-    <div className="bg-white">
-      <div className="p-4 border-b">
-        <h2 className="text-lg font-semibold text-gray-900">Add Service for {safeRender(selectedItem.clientName)}</h2>
-      </div>
-      <ServiceSelectionPanel 
-        onServiceAdded={handleServiceSelectionAdd}
-        onCancel={closeBottomSheet}
-        userCompanyId={userCompanyId}
-        t={t}
-      />
-    </div>
-  )}
-  
-  {/* SERVICE DETAILS */}
-  {bottomSheetContent === 'edit-service' && selectedItem && selectedService && (
-    <div className="p-4 bg-white space-y-4">
-      <div className="text-center border-b pb-4">
-        <h2 className="text-lg font-semibold text-gray-900">{safeRender(selectedService.name)}</h2>
-        <p className="text-xl font-bold text-gray-900">{(selectedService.price * selectedService.quantity).toLocaleString()} €</p>
-      </div>
-      
-      <div className="space-y-2">
-        <p className="text-sm"><span className="text-gray-500">Date:</span> <span className="text-gray-900">{formatShortDate(selectedService.date)}</span></p>
-        <p className="text-sm"><span className="text-gray-500">Quantity:</span> <span className="text-gray-900">{selectedService.quantity} × {selectedService.price.toLocaleString()} €</span></p>
-        {selectedService.notes && (
-          <div className="p-3 bg-gray-50 rounded text-sm text-gray-700">
-            <span className="font-medium">Notes:</span> {safeRender(selectedService.notes)}
           </div>
         )}
-      </div>
-      
-      <button
-        className="w-full py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium"
-        onClick={() => handleDeleteService(selectedItem, selectedService)}
-      >
-        Delete Service
-      </button>
-    </div>
-  )}
-  
-  {/* SHOPPING FORM */}
-  {bottomSheetContent === 'add-shopping' && selectedItem && (
-    <div className="bg-white">
-      <div className="p-4 border-b">
-        <h2 className="text-lg font-semibold text-gray-900">Add Shopping Expense for {safeRender(selectedItem.clientName)}</h2>
-      </div>
-      <ShoppingExpenseForm
-        onAddShopping={handleShoppingFormSubmit}
-        onCancel={closeBottomSheet}
-        userCompanyId={userCompanyId}
-        t={t}
-      />
-    </div>
-  )}
       </div>
     </div>
   </div>
