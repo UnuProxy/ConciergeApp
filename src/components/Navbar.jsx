@@ -1,6 +1,60 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../utils/languageHelper';
+
+const NAVBAR_TRANSLATIONS = {
+  en: {
+    pageTitles: {
+      dashboard: 'Dashboard',
+      addClient: 'Add Client',
+      existingClients: 'Existing Clients',
+      collaborators: 'Collaborators',
+      rentalVillas: 'Rental Villas',
+      boats: 'Boats',
+      cars: 'Cars',
+      security: 'Security',
+      chef: 'Chef',
+      finance: 'Finance',
+      settings: 'Settings'
+    },
+    newClientButton: '+ New Client',
+    synced: 'Synced',
+    online: 'Online',
+    signOut: 'Sign out',
+    roles: {
+      user: 'User',
+      admin: 'Administrator',
+      manager: 'Manager',
+      agent: 'Agent'
+    }
+  },
+  ro: {
+    pageTitles: {
+      dashboard: 'Tablou de Bord',
+      addClient: 'Adaugă Client',
+      existingClients: 'Clienți Existenți',
+      collaborators: 'Colaboratori',
+      rentalVillas: 'Vile de Închiriat',
+      boats: 'Bărci',
+      cars: 'Mașini',
+      security: 'Securitate',
+      chef: 'Bucătar',
+      finance: 'Finanțe',
+      settings: 'Setări'
+    },
+    newClientButton: '+ Client Nou',
+    synced: 'Sincronizat',
+    online: 'Online',
+    signOut: 'Deconectare',
+    roles: {
+      user: 'Utilizator',
+      admin: 'Administrator',
+      manager: 'Manager',
+      agent: 'Agent'
+    }
+  }
+};
 
 function Navbar({ sidebarOpen, setSidebarOpen }) {
   const location = useLocation();
@@ -9,31 +63,25 @@ function Navbar({ sidebarOpen, setSidebarOpen }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { currentUser, userCompany, userRole: authUserRole, logout } = useAuth();
   const userMenuRef = useRef(null);
+  const { language } = useLanguage();
+  const navbarStrings = NAVBAR_TRANSLATIONS[language] || NAVBAR_TRANSLATIONS.en;
   
-  // DIRECT FIX: Override userRole based on email using useMemo to prevent recalculations
-  // This runs only when currentUser or authUserRole changes
   const userRole = useMemo(() => {
     if (!currentUser) return null;
     
-    // Directly check email and return the correct role
     if (currentUser.email === 'conciergeapp2025@gmail.com' || 
         currentUser.email === 'unujulian@gmail.com') {
-      // Log only once when the component mounts or when dependencies change
       return 'admin';
     }
     
-    // Fallback to the context value
     return authUserRole;
   }, [currentUser, authUserRole]);
   
-  // Log only once when userRole changes, not on every render
   useEffect(() => {
-    // Only log when the role actually changes
     console.log('FIXED Navbar - Email:', currentUser?.email);
     console.log('FIXED Navbar - Override userRole:', userRole);
   }, [userRole, currentUser?.email]);
   
-  // Get user initials from display name
   const getUserInitials = () => {
     if (!currentUser || !currentUser.displayName) return 'U';
     
@@ -43,14 +91,12 @@ function Navbar({ sidebarOpen, setSidebarOpen }) {
     return (nameParts[0].charAt(0) + nameParts[nameParts.length - 1].charAt(0)).toUpperCase();
   };
   
-  // Get company name
   const getCompanyName = () => {
     if (userCompany === 'company1') return 'Luxury Concierge';
     if (userCompany === 'company2') return 'VIP Services';
     return '';
   };
   
-  // Handle logout
   const handleLogout = async () => {
     try {
       await logout();
@@ -60,45 +106,37 @@ function Navbar({ sidebarOpen, setSidebarOpen }) {
     }
   };
   
-  // Get current page title based on location
   const getPageTitle = () => {
     const path = location.pathname;
     
-    if (path === '/') return 'Dashboard';
-    if (path.startsWith('/clients/add')) return 'Add Client';
-    if (path.startsWith('/clients/existing')) return 'Existing Clients';
-    if (path.startsWith('/clients/collaborators')) return 'Collaborators';
-    if (path.startsWith('/services/villas')) return 'Rental Villas';
-    if (path.startsWith('/services/boats')) return 'Boats';
-    if (path.startsWith('/services/cars')) return 'Cars';
-    if (path.startsWith('/services/security')) return 'Security';
-    if (path.startsWith('/services/chef')) return 'Chef';
-    if (path.startsWith('/finance')) return 'Finance';
-    if (path.startsWith('/settings')) return 'Settings';
+    if (path === '/') return navbarStrings.pageTitles.dashboard;
+    if (path.startsWith('/clients/add')) return navbarStrings.pageTitles.addClient;
+    if (path.startsWith('/clients/existing')) return navbarStrings.pageTitles.existingClients;
+    if (path.startsWith('/clients/collaborators')) return navbarStrings.pageTitles.collaborators;
+    if (path.startsWith('/services/villas')) return navbarStrings.pageTitles.rentalVillas;
+    if (path.startsWith('/services/boats')) return navbarStrings.pageTitles.boats;
+    if (path.startsWith('/services/cars')) return navbarStrings.pageTitles.cars;
+    if (path.startsWith('/services/security')) return navbarStrings.pageTitles.security;
+    if (path.startsWith('/services/chef')) return navbarStrings.pageTitles.chef;
+    if (path.startsWith('/finance')) return navbarStrings.pageTitles.finance;
+    if (path.startsWith('/settings')) return navbarStrings.pageTitles.settings;
     
-    return 'Dashboard';
+    return navbarStrings.pageTitles.dashboard;
   };
   
-  // Get the appropriate role display text - memoize this for performance
   const roleDisplay = useMemo(() => {
-    // If no role, return 'User'
-    if (!userRole) return 'User';
-    
-    // If role is 'admin', return 'Administrator'
-    if (typeof userRole === 'string' && userRole.toLowerCase() === 'admin') {
-      return 'Administrator';
+    if (!userRole || typeof userRole !== 'string') {
+      return navbarStrings.roles.user;
     }
-    
-    // For any other role, capitalize first letter
-    if (typeof userRole === 'string') {
-      return userRole.charAt(0).toUpperCase() + userRole.slice(1);
-    }
-    
-    // Fallback
-    return 'User';
-  }, [userRole]);
 
-  // Close user menu when clicking outside
+    const normalizedRole = userRole.toLowerCase();
+    if (navbarStrings.roles[normalizedRole]) {
+      return navbarStrings.roles[normalizedRole];
+    }
+
+    return userRole.charAt(0).toUpperCase() + userRole.slice(1);
+  }, [userRole, language]);
+
   useEffect(() => {
     function handleClickOutside(event) {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
@@ -112,7 +150,6 @@ function Navbar({ sidebarOpen, setSidebarOpen }) {
     };
   }, []);
 
-  // Handle window resize
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
@@ -123,247 +160,72 @@ function Navbar({ sidebarOpen, setSidebarOpen }) {
   }, []);
 
   return (
-    <header style={{
-      backgroundColor: 'white',
-      padding: '1rem',
-      borderBottom: '1px solid #e5e7eb',
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center'
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        <button
-          style={{
-            marginRight: '1rem',
-            padding: '0.5rem',
-            backgroundColor: 'transparent',
-            border: 'none',
-            cursor: 'pointer'
-          }}
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-        >
-          <svg
-            style={{ width: '1.5rem', height: '1.5rem', color: '#6B7280' }}
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 6h16M4 12h16M4 18h16"
-            />
+    <header className="app-navbar">
+      <div className="app-navbar__left">
+        <button className="app-navbar__icon-button" onClick={() => setSidebarOpen(!sidebarOpen)}>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <div style={{ fontWeight: 'bold', fontSize: '1.25rem' }}>{getPageTitle()}</div>
-        
-        {/* Company name badge */}
-        {getCompanyName() && !isMobile && (
-          <div style={{
-            marginLeft: '1rem',
-            padding: '0.25rem 0.75rem',
-            borderRadius: '9999px',
-            backgroundColor: '#EEF2FF',
-            color: '#4F46E5',
-            fontSize: '0.75rem',
-            fontWeight: '500'
-          }}>
-            {getCompanyName()}
+        <div className="app-navbar__page">{getPageTitle()}</div>
+        {!isMobile && getCompanyName() && (
+          <div className="app-navbar__company">
+            <strong>{getCompanyName()}</strong>
+            <span>{roleDisplay}</span>
+          </div>
+        )}
+        {!isMobile && (
+          <div className="pill">
+            <span className="status-dot" />
+            {userRole ? `${navbarStrings.synced} ${roleDisplay}` : navbarStrings.online}
           </div>
         )}
       </div>
-      
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        {/* Notifications button */}
+      <div className="app-navbar__right">
         <button
-          style={{
-            padding: '0.5rem',
-            backgroundColor: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            marginRight: '1rem'
-          }}
+          className="app-navbar__quick-action"
+          onClick={() => navigate('/clients/add')}
         >
-          <svg
-            style={{ width: '1.5rem', height: '1.5rem', color: '#6B7280' }}
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-            />
+          {navbarStrings.newClientButton}
+        </button>
+        <button className="app-navbar__icon-button" onClick={() => navigate('/services/villas')}>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 13.5l9-9 9 9M4.5 12H7v8H4.5zM17 12h2.5v8H17zM9.5 21v-6h5v6" />
           </svg>
         </button>
-        
-        {/* User menu */}
-        <div style={{ position: 'relative' }} ref={userMenuRef}>
-          <div 
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center',
-              cursor: 'pointer'
-            }}
-            onClick={() => setUserMenuOpen(!userMenuOpen)}
-          >
-            {/* User avatar/initials */}
-            <div style={{
-              width: '2.5rem',
-              height: '2.5rem',
-              borderRadius: '50%',
-              backgroundColor: '#4F46E5',
-              color: 'white',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.875rem',
-              fontWeight: 'bold'
-            }}>
-              {currentUser?.photoURL ? (
-                <img 
-                  src={currentUser.photoURL} 
-                  alt={currentUser.displayName || 'User'} 
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    borderRadius: '50%',
-                    objectFit: 'cover'
-                  }}
-                />
-              ) : (
-                getUserInitials()
-              )}
-            </div>
-            
-            {/* User name and role (visible on larger screens) */}
-            {!isMobile && (
-              <div style={{ marginLeft: '0.75rem' }}>
-                <div style={{ fontWeight: '500', fontSize: '0.875rem' }}>
-                  {currentUser?.displayName || 'User'}
-                </div>
-                <div style={{ fontSize: '0.75rem', color: '#6B7280' }}>
-                  {roleDisplay}
-                </div>
-              </div>
+        <button className="app-navbar__icon-button">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 00-4-5.7V5a2 2 0 10-4 0v.3C7.7 6.2 6 8.4 6 11v3.2a2 2 0 01-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1" />
+          </svg>
+        </button>
+        <div className="app-navbar__user" ref={userMenuRef} onClick={() => setUserMenuOpen(prev => !prev)}>
+          <div className="app-navbar__avatar">
+            {currentUser?.photoURL ? (
+              <img
+                src={currentUser.photoURL}
+                alt={currentUser?.displayName || navbarStrings.roles.user}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              getUserInitials()
             )}
-            
-            {/* Dropdown chevron */}
-            <svg 
-              style={{ 
-                width: '1rem', 
-                height: '1rem', 
-                color: '#6B7280', 
-                marginLeft: '0.5rem',
-                transition: 'transform 0.2s ease',
-                transform: userMenuOpen ? 'rotate(180deg)' : 'rotate(0)'
-              }}
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
           </div>
-          
-          {/* Dropdown menu */}
+          {!isMobile && (
+            <div>
+              <div style={{ fontWeight: 600 }}>{currentUser?.displayName || navbarStrings.roles.user}</div>
+              <small style={{ color: 'rgba(255,255,255,0.7)' }}>{currentUser?.email}</small>
+            </div>
+          )}
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16" style={{ opacity: 0.6 }}>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
           {userMenuOpen && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              right: 0,
-              marginTop: '0.5rem',
-              width: '12rem',
-              backgroundColor: 'white',
-              borderRadius: '0.375rem',
-              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-              border: '1px solid #e5e7eb',
-              zIndex: 50,
-              overflow: 'hidden'
-            }}>
-              {/* User info section */}
-              <div style={{ padding: '1rem', borderBottom: '1px solid #e5e7eb' }}>
-                <div style={{ fontWeight: '500' }}>{currentUser?.displayName}</div>
-                <div style={{ fontSize: '0.75rem', color: '#6B7280' }}>{currentUser?.email}</div>
-                <div style={{ 
-                  marginTop: '0.5rem',
-                  fontSize: '0.75rem',
-                  fontWeight: '500',
-                  color: '#4F46E5'
-                }}>
-                  {getCompanyName()} · {roleDisplay}
-                </div>
+            <div className="app-navbar__user-menu">
+              <div style={{ marginBottom: '0.75rem' }}>
+                <div style={{ fontWeight: 600 }}>{currentUser?.displayName || navbarStrings.roles.user}</div>
+                <div style={{ fontSize: '0.8rem', color: 'rgba(15,23,42,0.6)' }}>{currentUser?.email || 'user@example.com'}</div>
               </div>
-              
-              {/* Menu items */}
-              <div>
-                <a 
-                  href="/settings"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '0.75rem 1rem',
-                    color: '#374151',
-                    fontSize: '0.875rem',
-                    textDecoration: 'none',
-                    borderBottom: '1px solid #e5e7eb'
-                  }}
-                >
-                  <svg 
-                    style={{ width: '1.25rem', height: '1.25rem', marginRight: '0.5rem' }}
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                    />
-                  </svg>
-                  Settings
-                </a>
-                
-                <button
-                  onClick={handleLogout}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    width: '100%',
-                    padding: '0.75rem 1rem',
-                    color: '#EF4444',
-                    fontSize: '0.875rem',
-                    textAlign: 'left',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <svg 
-                    style={{ width: '1.25rem', height: '1.25rem', marginRight: '0.5rem' }}
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                    />
-                  </svg>
-                  Logout
-                </button>
-              </div>
+              <button onClick={handleLogout}>{navbarStrings.signOut}</button>
             </div>
           )}
         </div>

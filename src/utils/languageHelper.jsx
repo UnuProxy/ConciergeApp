@@ -1,3 +1,4 @@
+import React, { useEffect, useState } from 'react';
 // languageHelper.js
 /**
  * A simple utility for handling language in components
@@ -25,9 +26,9 @@ export const getCurrentLanguage = () => {
   
   // Custom hook for using language in components
   export const useLanguage = () => {
-    const [language, setLanguage] = React.useState(getCurrentLanguage());
+    const [language, setLanguage] = useState(getCurrentLanguage());
     
-    React.useEffect(() => {
+    useEffect(() => {
       const handleStorageChange = () => {
         setLanguage(getCurrentLanguage());
       };

@@ -4,9 +4,16 @@ export const translations = {
       // General
       viewingDataFor: "Viewing data for company:",
       bookingManager: "Booking Manager",
+      heroSubtitle: "Monitor reservations, payments, and concierge requests in a single workspace.",
       loading: "Loading bookings...",
       error: "Error",
       errorLoading: "Error loading bookings:",
+      totalRevenueLabel: "Total Revenue",
+      outstandingBalanceLabel: "Outstanding Balance",
+      totalBookingsLabel: "Total Bookings",
+      activeBookingsLabel: "Active Stays",
+      upcomingTripsLabel: "Upcoming Trips",
+      clients: "clients",
       
       // Filters & Search
       search: "Search client, booking...",
@@ -37,7 +44,6 @@ export const translations = {
       
       // Client Card
       booking: "booking",
-      bookings: "bookings",
       guests: "guests",
       paymentProgress: "Payment Progress",
       servicesAndExtras: "Services & Extras",
@@ -45,7 +51,6 @@ export const translations = {
       
       // Action buttons
       details: "Details",
-      paid: "Paid",
       pay: "Pay",
       service: "Service",
       shop: "Shop",
@@ -99,7 +104,6 @@ export const translations = {
       receiptAvailable: "Receipt available",
       additionalNotes: "Additional notes",
       cancel: "Cancel",
-      addShoppingExpense: "Add Shopping Expense",
       adding: "Adding...",
       
       // Messages
@@ -148,9 +152,16 @@ export const translations = {
       // General
       viewingDataFor: "Vizualizare date pentru compania:",
       bookingManager: "Manager Rezervări",
+      heroSubtitle: "Monitorizează rezervările, plățile și cererile de concierge într-un singur loc.",
       loading: "Se încarcă rezervările...",
       error: "Eroare",
       errorLoading: "Eroare la încărcarea rezervărilor:",
+      totalRevenueLabel: "Venit Total",
+      outstandingBalanceLabel: "Sold Neachitat",
+      totalBookingsLabel: "Total Rezervări",
+      activeBookingsLabel: "Sejururi Active",
+      upcomingTripsLabel: "Călătorii Viitoare",
+      clients: "clienți",
       
       // Filters & Search
       search: "Caută client, rezervare...",
@@ -181,7 +192,6 @@ export const translations = {
       
       // Client Card
       booking: "rezervare",
-      bookings: "rezervări",
       guests: "oaspeți",
       paymentProgress: "Progres Plată",
       servicesAndExtras: "Servicii și Extra",
@@ -189,7 +199,6 @@ export const translations = {
       
       // Action buttons
       details: "Detalii",
-      paid: "Plătit",
       pay: "Plătește",
       service: "Serviciu",
       shop: "Cumpărături",
@@ -243,7 +252,6 @@ export const translations = {
       receiptAvailable: "Chitanță disponibilă",
       additionalNotes: "Note adiționale",
       cancel: "Anulează",
-      addShoppingExpense: "Adaugă Cheltuială Cumpărături",
       adding: "Se adaugă...",
       
       // Messages

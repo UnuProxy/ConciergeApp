@@ -374,7 +374,14 @@ export function AuthProvider({ children }) {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         console.log("User authenticated:", user.email);
-        setCurrentUser(user);
+        let safePhotoURL = user.photoURL || '';
+        if (safePhotoURL.includes('googleusercontent.com')) {
+          safePhotoURL = safePhotoURL.replace(/=s\d+-c/, '=s96-c');
+        }
+        setCurrentUser({
+          ...user,
+          photoURL: safePhotoURL
+        });
         const userData = await fetchUserCompanyData(user.uid);
         
         // If user exists in Firestore but no company assigned, they still need to select one
