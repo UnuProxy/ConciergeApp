@@ -114,31 +114,26 @@ function Dashboard() {
         const clientsSnapshot = await getDocs(clientsQuery);
         const totalClients = clientsSnapshot.size;
 
-        const recentReservationsQuery = query(
-          collection(db, 'reservations'),
-          where('companyId', '==', userCompanyId),
-          orderBy('createdAt', 'desc'),
-          limit(6)
-        );
-        const recentReservationsSnapshot = await getDocs(recentReservationsQuery);
-        
-        const recentActivity = [];
-        recentReservationsSnapshot.forEach(doc => {
-          const data = doc.data();
-          const createdAt = data.createdAt?.toDate?.() || new Date();
-          const timeAgo = getTimeAgo(createdAt);
-          
-          recentActivity.push({
-            id: doc.id,
-            type: 'booking',
-            client: data.clientName || 'Unknown Client',
-            action: `${data.accommodationType || 'Booking'} - ${data.status || 'confirmed'}`,
-            time: timeAgo,
-            status: data.paymentStatus || 'pending',
-            value: data.totalValue || 0,
-            createdAt: createdAt
+        const recentActivity = [...reservations]
+          .sort((a, b) => {
+            const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt || 0);
+            const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt || 0);
+            return dateB - dateA;
+          })
+          .slice(0, 6)
+          .map(item => {
+            const createdAt = item.createdAt?.toDate?.() || new Date(item.createdAt || Date.now());
+            return {
+              id: item.id,
+              type: 'booking',
+              client: item.clientName || 'Unknown Client',
+              action: `${item.accommodationType || 'Booking'} - ${item.status || 'confirmed'}`,
+              time: getTimeAgo(createdAt),
+              status: item.paymentStatus || 'pending',
+              value: item.totalValue || 0,
+              createdAt
+            };
           });
-        });
 
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);

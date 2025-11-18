@@ -4,61 +4,61 @@ import { collection, getDocs, addDoc, updateDoc, doc, deleteDoc } from 'firebase
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import { db, storage } from '../../firebase/config';
+import { useDatabase } from '../../context/DatabaseContext';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-function Villas() {
-  const [villas, setVillas] = useState([]);
-  const [isAddingVilla, setIsAddingVilla] = useState(false);
-  const [isEditingVilla, setIsEditingVilla] = useState(false);
-  const [currentVilla, setCurrentVilla] = useState(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
-  const [photoFiles, setPhotoFiles] = useState([]);
-  const [previewUrls, setPreviewUrls] = useState([]);
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-  const [currentPdfVilla, setCurrentPdfVilla] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [priceFilter, setPriceFilter] = useState({ min: '', max: '' });
-  const [bedroomFilter, setBedroomFilter] = useState('');
-  const [bathroomFilter, setBathroomFilter] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
+const ensureStorageDownloadUrl = (url = '') => {
+  if (!url) return '';
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+  if (!trimmed.startsWith('http')) return trimmed;
+  if (trimmed.includes('alt=media')) return trimmed;
+  return trimmed.includes('?') ? `${trimmed}&alt=media` : `${trimmed}?alt=media`;
+};
 
-  // Enhanced image loading function that handles Firebase Storage URLs better
- const loadImageAsBase64 = async (url) => {
-  if (!url) return null;
-  
-  console.log("Loading image from:", url);
-  
-  // Method 1: Try direct loading (should work now with CORS fixed)
-  try {
-    const directResult = await loadImageDirectly(url);
-    if (directResult) {
-      console.log("✅ Image loaded via direct method");
-      return directResult;
-    }
-  } catch (error) {
-    console.warn("Direct method failed, trying proxy...");
-  }
-  
-  // Method 2: Fallback to proxy if direct fails
-  try {
-    const proxyResult = await loadImageViaProxy(url);
-    if (proxyResult) {
-      console.log("✅ Image loaded via proxy");
-      return proxyResult;
-    }
-  } catch (error) {
-    console.warn("Proxy method also failed");
-  }
-  
-  console.warn("❌ All image loading methods failed");
-  return null;
+const normalizeVillaPhotos = (photos = []) => {
+  if (!Array.isArray(photos)) return [];
+  return photos
+    .map(photo => {
+      if (!photo) return null;
+      if (typeof photo === 'string') {
+        const safeUrl = ensureStorageDownloadUrl(photo);
+        return safeUrl ? { url: safeUrl, path: null } : null;
+      }
+      const safeUrl = ensureStorageDownloadUrl(photo.url || '');
+      if (!safeUrl) return null;
+      return { ...photo, url: safeUrl };
+    })
+    .filter(Boolean);
+};
+
+const readFileAsDataURL = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Failed to read file for preview'));
+    reader.readAsDataURL(file);
+  });
+};
+
+const generateSafeFileName = (file) => {
+  const original = file?.name || 'photo';
+  const sanitized = original.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const unique = globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
+  return `${unique}_${sanitized}`;
+};
+
+const buildStoragePath = (file, companyId) => {
+  const safeName = generateSafeFileName(file);
+  const baseFolder = companyId ? `${companyId}/villas` : 'villas/shared';
+  return `${baseFolder}/${safeName}`;
 };
 
 const loadImageDirectly = (url) => {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     
     img.onload = function() {
       try {
@@ -115,7 +115,57 @@ const loadImageViaProxy = async (url) => {
     reader.readAsDataURL(blob);
   });
 };
+
+const loadImageAsBase64 = async (url) => {
+  if (!url) return null;
   
+  console.log("Loading image from:", url);
+  
+  // Method 1: Try direct loading (should work now with CORS fixed)
+  try {
+    const directResult = await loadImageDirectly(url);
+    if (directResult) {
+      console.log("✅ Image loaded via direct method");
+      return directResult;
+    }
+  } catch (error) {
+    console.warn("Direct method failed, trying proxy...");
+  }
+  
+  // Method 2: Fallback to proxy if direct fails
+  try {
+    const proxyResult = await loadImageViaProxy(url);
+    if (proxyResult) {
+      console.log("✅ Image loaded via proxy");
+      return proxyResult;
+    }
+  } catch (error) {
+    console.warn("Proxy method also failed");
+  }
+  
+  console.warn("❌ All image loading methods failed");
+  return null;
+};
+
+function Villas() {
+  const dbContext = useDatabase();
+  const userCompanyId = dbContext?.companyId || dbContext?.companyInfo?.id || null;
+  const [villas, setVillas] = useState([]);
+  const [isAddingVilla, setIsAddingVilla] = useState(false);
+  const [isEditingVilla, setIsEditingVilla] = useState(false);
+  const [currentVilla, setCurrentVilla] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [photoFiles, setPhotoFiles] = useState([]);
+  const [previewUrls, setPreviewUrls] = useState([]);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [currentPdfVilla, setCurrentPdfVilla] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [priceFilter, setPriceFilter] = useState({ min: '', max: '' });
+  const [bedroomFilter, setBedroomFilter] = useState('');
+  const [bathroomFilter, setBathroomFilter] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+
   // Use a simple flat form structure to avoid nesting problems
   const [formData, setFormData] = useState({
     name_en: '',
@@ -239,10 +289,14 @@ const loadImageViaProxy = async (url) => {
     try {
       const villaCollection = collection(db, "villas");
       const villaSnapshot = await getDocs(villaCollection);
-      const villaList = villaSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const villaList = villaSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          photos: normalizeVillaPhotos(data.photos)
+        };
+      });
       setVillas(villaList);
     } catch (error) {
       console.error("Error fetching villas:", error);
@@ -391,7 +445,7 @@ const loadImageViaProxy = async (url) => {
   };
   
   // Handle photo file selection
-  const handlePhotoChange = (e) => {
+  const handlePhotoChange = async (e) => {
     if (!e.target.files) return;
     
     const filesArray = Array.from(e.target.files);
@@ -405,9 +459,14 @@ const loadImageViaProxy = async (url) => {
     
     setPhotoFiles(prev => [...prev, ...filesArray]);
     
-    // Create preview URLs
-    const newPreviewUrls = filesArray.map(file => URL.createObjectURL(file));
-    setPreviewUrls(prev => [...prev, ...newPreviewUrls]);
+    try {
+      const newPreviewUrls = await Promise.all(
+        filesArray.map(file => readFileAsDataURL(file))
+      );
+      setPreviewUrls(prev => [...prev, ...newPreviewUrls]);
+    } catch (previewError) {
+      console.error("Error creating image previews:", previewError);
+    }
   };
   
   // Upload photos to Firebase Storage
@@ -429,8 +488,8 @@ const loadImageViaProxy = async (url) => {
   
   for (let i = 0; i < photoFiles.length; i++) {
     const file = photoFiles[i];
-    const fileName = `villas/${Date.now()}_${file.name}`;
-    const storageRef = ref(storage, fileName);
+    const filePath = buildStoragePath(file, userCompanyId);
+    const storageRef = ref(storage, filePath);
     
     try {
       const uploadTask = uploadBytesResumable(storageRef, file);
@@ -443,24 +502,22 @@ const loadImageViaProxy = async (url) => {
             setUploadProgress(progress);
           },
           (error) => {
-            console.error("Upload error:", error);
+            console.error("Upload error:", {
+              code: error?.code,
+              message: error?.message,
+              serverResponse: error?.serverResponse
+            });
             reject(error);
           },
           async () => {
             try {
               // Get download URL with proper token
               let downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-              
-              // Ensure URL has alt=media parameter for better CORS compatibility
-              if (!downloadURL.includes('alt=media')) {
-                downloadURL = downloadURL.includes('?') 
-                  ? downloadURL + '&alt=media'
-                  : downloadURL + '?alt=media';
-              }
+              const safeUrl = ensureStorageDownloadUrl(downloadURL);
               
               photoUrls.push({
-                url: downloadURL,
-                path: fileName
+                url: safeUrl,
+                path: filePath
               });
               
               console.log("✅ Photo uploaded successfully:", fileName);
@@ -547,6 +604,7 @@ const loadImageViaProxy = async (url) => {
       const villaData = {
         ...prepareFormDataForSave(),
         photos: photoUrls,
+        companyId: userCompanyId,
         createdAt: new Date()
       };
       
@@ -583,6 +641,7 @@ const loadImageViaProxy = async (url) => {
       const villaData = {
         ...prepareFormDataForSave(),
         photos: updatedPhotos,
+        companyId: userCompanyId,
         updatedAt: new Date()
       };
       
@@ -662,7 +721,6 @@ const loadImageViaProxy = async (url) => {
       
       setPreviewUrls(prev => {
         const updated = [...prev];
-        URL.revokeObjectURL(updated[index]); // Clean up URL
         updated.splice(index, 1);
         return updated;
       });
@@ -724,8 +782,8 @@ const loadImageViaProxy = async (url) => {
       }]);
     }
     
-    // Set existing photos
-    setExistingPhotos(villa.photos || []);
+    // Set existing photos with normalized urls
+    setExistingPhotos(normalizeVillaPhotos(villa.photos));
     
     setIsEditingVilla(true);
   };
@@ -806,47 +864,11 @@ const createEnhancedCoverPage = async (doc, villa, villaName, designSystem) => {
   currentY += 20;
   
   // Main image - simplified loading
-  if (villa.photos && villa.photos.length > 0) {
+  const coverPhoto = Array.isArray(villa.photos) ? villa.photos.find(photo => photo?.url) : null;
+  if (coverPhoto?.url) {
     try {
       console.log("Loading cover image...");
-      
-      const imgData = await new Promise((resolve, reject) => {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        
-        img.onload = function() {
-          try {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            // High quality settings
-            let { width, height } = this;
-            const maxSize = 600;
-            const ratio = Math.min(maxSize / width, maxSize / height);
-            
-            if (ratio < 1) {
-              width = Math.round(width * ratio);
-              height = Math.round(height * ratio);
-            }
-            
-            canvas.width = width;
-            canvas.height = height;
-            
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(this, 0, 0, width, height);
-            
-            resolve(canvas.toDataURL('image/jpeg', 0.85));
-          } catch (error) {
-            reject(error);
-          }
-        };
-        
-        img.onerror = () => reject(new Error('Image load failed'));
-        img.src = villa.photos[0].url;
-        
-        setTimeout(() => reject(new Error('Timeout')), 6000);
-      });
+      const imgData = await loadImageAsBase64(ensureStorageDownloadUrl(coverPhoto.url));
       
       if (imgData) {
         const imgWidth = pageWidth - (spacing.page * 2);
@@ -864,6 +886,8 @@ const createEnhancedCoverPage = async (doc, villa, villaName, designSystem) => {
         doc.rect(spacing.page, currentY, imgWidth, imgHeight);
         
         currentY += imgHeight + spacing.section;
+      } else {
+        currentY += spacing.element;
       }
     } catch (err) {
       console.warn("Cover image failed:", err);
@@ -1101,71 +1125,39 @@ const createEnhancedPhotosPage = async (doc, villa, designSystem) => {
   let currentY = 35;
   
   // Featured image with better quality
-  try {
-    console.log("Loading featured photo...");
-    
-    const imgData = await new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
+  const featuredPhoto = Array.isArray(villa.photos) ? villa.photos[0] : null;
+  if (featuredPhoto?.url) {
+    try {
+      console.log("Loading featured photo...");
+      const imgData = await loadImageAsBase64(ensureStorageDownloadUrl(featuredPhoto.url));
       
-      img.onload = function() {
-        try {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          
-          // Higher quality settings
-          let { width, height } = this;
-          const maxSize = 700;
-          const ratio = Math.min(maxSize / width, maxSize / height);
-          
-          if (ratio < 1) {
-            width = Math.round(width * ratio);
-            height = Math.round(height * ratio);
-          }
-          
-          canvas.width = width;
-          canvas.height = height;
-          
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-          ctx.drawImage(this, 0, 0, width, height);
-          
-          resolve(canvas.toDataURL('image/jpeg', 0.85));
-        } catch (error) {
-          reject(error);
-        }
-      };
-      
-      img.onerror = () => reject(new Error('Load failed'));
-      img.src = villa.photos[0].url;
-      
-      setTimeout(() => reject(new Error('Timeout')), 6000);
-    });
-    
-    if (imgData) {
-      const imgWidth = pageWidth - (spacing.page * 2);
-      const imgHeight = 80;
-      
-      doc.setFontSize(fonts.caption.size);
-      doc.setTextColor(...colors.lightText);
-      doc.text('FEATURED VIEW', spacing.page, currentY - 2);
-      
-      doc.addImage(imgData, 'JPEG', spacing.page, currentY, imgWidth, imgHeight);
-      
-      doc.setDrawColor(...colors.line);
-      doc.setLineWidth(0.3);
-      doc.rect(spacing.page, currentY, imgWidth, imgHeight);
-      
-      currentY += imgHeight + spacing.section;
+      if (imgData) {
+        const imgWidth = pageWidth - (spacing.page * 2);
+        const imgHeight = 80;
+        
+        doc.setFontSize(fonts.caption.size);
+        doc.setTextColor(...colors.lightText);
+        doc.text('FEATURED VIEW', spacing.page, currentY - 2);
+        
+        doc.addImage(imgData, 'JPEG', spacing.page, currentY, imgWidth, imgHeight);
+        
+        doc.setDrawColor(...colors.line);
+        doc.setLineWidth(0.3);
+        doc.rect(spacing.page, currentY, imgWidth, imgHeight);
+        
+        currentY += imgHeight + spacing.section;
+      } else {
+        currentY += spacing.element;
+      }
+    } catch (err) {
+      console.warn("Featured photo failed:", err);
+      currentY += spacing.element;
     }
-  } catch (err) {
-    console.warn("Featured photo failed:", err);
-    currentY += spacing.element;
   }
   
   // Additional photos in a clean grid
   if (villa.photos.length > 1) {
-    const additionalPhotos = villa.photos.slice(1, 5);
+    const additionalPhotos = villa.photos.slice(1, 5).filter(photo => photo?.url);
     
     if (additionalPhotos.length > 0) {
       doc.setFontSize(fonts.heading.size);
@@ -1189,34 +1181,9 @@ const createEnhancedPhotosPage = async (doc, villa, designSystem) => {
         
         try {
           console.log(`Loading photo ${i + 2}...`);
-          
-          const imgData = await new Promise((resolve, reject) => {
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            
-            img.onload = function() {
-              try {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                
-                canvas.width = 300;
-                canvas.height = 225;
-                
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = 'high';
-                ctx.drawImage(this, 0, 0, 300, 225);
-                
-                resolve(canvas.toDataURL('image/jpeg', 0.8));
-              } catch (error) {
-                reject(error);
-              }
-            };
-            
-            img.onerror = () => reject(new Error('Failed'));
-            img.src = additionalPhotos[i].url;
-            
-            setTimeout(() => reject(new Error('Timeout')), 4000);
-          });
+          const imgData = await loadImageAsBase64(
+            ensureStorageDownloadUrl(additionalPhotos[i].url)
+          );
           
           if (imgData) {
             doc.addImage(imgData, 'JPEG', x, y, photoWidth, photoHeight);
@@ -1224,6 +1191,8 @@ const createEnhancedPhotosPage = async (doc, villa, designSystem) => {
             doc.setDrawColor(...colors.line);
             doc.setLineWidth(0.2);
             doc.rect(x, y, photoWidth, photoHeight);
+          } else {
+            throw new Error('Missing image data');
           }
         } catch (err) {
           console.warn(`Photo ${i + 2} failed:`, err);

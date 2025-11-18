@@ -10,13 +10,12 @@ function Sidebar({ open, setOpen }) {
   const [systemExpanded, setSystemExpanded] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const { userRole } = useDatabase();
-  
-  // Get language from localStorage or use default (Romanian)
+  const { language: currentLanguage, setLanguage: updateAppLanguage } = useLanguage();
+
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem('appLanguage') || 'ro';
   });
-  
-  // Listen for language changes from other components
+
   useEffect(() => {
     const handleStorageChange = () => {
       const currentLang = localStorage.getItem('appLanguage');
@@ -24,17 +23,12 @@ function Sidebar({ open, setOpen }) {
         setLanguage(currentLang);
       }
     };
-    
     window.addEventListener('storage', handleStorageChange);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, [language]);
-  
-  // Check if user is admin
+
   const isAdmin = userRole === 'admin';
 
-  // Translations
   const translations = {
     ro: {
       appName: 'ConciergeApp',
@@ -84,10 +78,8 @@ function Sidebar({ open, setOpen }) {
     }
   };
 
-  // Get current translation
   const t = translations[language];
 
-  // Handle window resize
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
@@ -95,12 +87,10 @@ function Sidebar({ open, setOpen }) {
         setOpen(true);
       }
     };
-
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [setOpen]);
 
-  // Auto-expand section for current page
   useEffect(() => {
     if (location.pathname.startsWith('/clients')) {
       setClientsExpanded(true);
@@ -113,111 +103,13 @@ function Sidebar({ open, setOpen }) {
     }
   }, [location.pathname]);
 
-  const sidebarStyle = {
-    width: isMobile ? '85%' : '280px',
-    maxWidth: '280px',
-    backgroundColor: '#4F46E5',
-    position: isMobile ? 'fixed' : 'sticky',
-    top: 0,
-    left: 0,
-    height: '100vh',
-    transform: open ? 'translateX(0)' : 'translateX(-100%)',
-    transition: 'transform 0.3s ease-in-out',
-    zIndex: 40,
-    overflowY: 'auto',
-    display: 'flex',
-    flexDirection: 'column',
-    boxShadow: isMobile && open ? '0 0 15px rgba(0, 0, 0, 0.2)' : 'none'
-  };
-
-  const headerStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: isMobile ? 'space-between' : 'center',
-    padding: '0 1rem',
-    height: '70px',
-    backgroundColor: '#4338CA',
-  };
-
-  const headerTextStyle = {
-    fontSize: '1.25rem',
-    fontWeight: 'bold',
-    color: 'white'
-  };
-
-  const closeButtonStyle = {
-    color: 'white',
-    background: 'none',
-    border: 'none',
-    display: isMobile ? 'flex' : 'none',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '0.5rem',
-    cursor: 'pointer',
-    fontSize: '1.5rem'
-  };
-
-  const navContainerStyle = {
-    padding: '1rem',
-    flex: 1,
-    overflowY: 'auto'
-  };
-
-  const categoryStyle = {
-    fontSize: '0.875rem',
-    fontWeight: 'bold',
-    color: 'rgba(255, 255, 255, 0.6)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    marginTop: '1.5rem',
-    marginBottom: '0.5rem',
-    paddingLeft: '0.75rem'
-  };
-
-  const navItemStyle = (isActive) => ({
-    display: 'flex',
-    alignItems: 'center',
-    padding: '0.75rem',
-    marginBottom: '0.375rem',
-    borderRadius: '0.375rem',
-    color: isActive ? 'white' : 'rgba(255, 255, 255, 0.8)',
-    backgroundColor: isActive ? '#4338CA' : 'transparent',
-    textDecoration: 'none',
-    fontWeight: 500,
-    cursor: 'pointer',
-    transition: 'background-color 0.2s ease'
-  });
-
-  const subNavItemStyle = (isActive) => ({
-    display: 'flex',
-    alignItems: 'center',
-    padding: '0.75rem 0.75rem 0.75rem 2.5rem',
-    marginBottom: '0.25rem',
-    borderRadius: '0.375rem',
-    color: isActive ? 'white' : 'rgba(255, 255, 255, 0.7)',
-    backgroundColor: isActive ? '#4338CA' : 'rgba(255, 255, 255, 0.05)',
-    textDecoration: 'none',
-    fontWeight: 400,
-    cursor: 'pointer',
-    transition: 'background-color 0.2s ease'
-  });
-
-  const iconStyle = {
-    width: '1.25rem',
-    height: '1.25rem',
-    marginRight: '0.875rem',
-    color: 'rgba(255, 255, 255, 0.7)',
-    flexShrink: 0
-  };
-
-  const chevronStyle = (expanded) => ({
-    width: '1rem',
-    height: '1rem',
-    marginLeft: 'auto',
-    transform: expanded ? 'rotate(90deg)' : 'rotate(0)',
-    transition: 'transform 0.2s ease-in-out',
-    color: 'rgba(255, 255, 255, 0.7)'
-  });
+  const sidebarClass = [
+    'app-sidebar',
+    isMobile ? 'app-sidebar--mobile' : '',
+    open ? 'app-sidebar--open' : ''
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   const handleLinkClick = () => {
     if (isMobile) {
@@ -227,294 +119,226 @@ function Sidebar({ open, setOpen }) {
 
   return (
     <>
-      {/* Mobile overlay */}
       {open && isMobile && (
-        <div 
+        <div
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            zIndex: 30,
-            opacity: open ? 1 : 0,
-            transition: 'opacity 0.3s ease-in-out'
+            backgroundColor: 'rgba(0, 0, 0, 0.55)',
+            zIndex: 30
           }}
           onClick={() => setOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
-      <div style={sidebarStyle}>
-        <div style={headerStyle}>
-          <span style={headerTextStyle}>{t.appName}</span>
-          <button 
-            style={closeButtonStyle} 
+      <nav className={sidebarClass}>
+        <div className="app-sidebar__header">
+          <span>{t.appName}</span>
+          <button
+            style={{
+              color: 'white',
+              background: 'none',
+              border: 'none',
+              display: isMobile ? 'flex' : 'none',
+              fontSize: '1.5rem',
+              cursor: 'pointer'
+            }}
             onClick={() => setOpen(false)}
-            aria-label="Close menu"
           >
-            ✕
+            ×
           </button>
         </div>
-        
-        <div style={navContainerStyle}>
-          <Link 
-            to="/reservations" 
-            style={navItemStyle(location.pathname === '/reservations')}
+
+        <div className="app-sidebar__nav">
+          <div className="app-sidebar__meta">
+            <div>
+              <div className="app-sidebar__meta-label">{t.language}</div>
+            </div>
+            <button
+              className="pill"
+              style={{ border: 'none', background: 'rgba(255,255,255,0.08)', color: 'white' }}
+              onClick={() => updateAppLanguage(currentLanguage === 'ro' ? 'en' : 'ro')}
+            >
+              {currentLanguage === 'ro' ? 'EN' : 'RO'}
+            </button>
+          </div>
+
+          <div className="app-sidebar__category">{t.reservations}</div>
+          <Link
+            to="/"
+            className={`app-sidebar__item ${location.pathname === '/' ? 'app-sidebar__item--active' : ''}`}
             onClick={handleLinkClick}
           >
-            <svg 
-              style={iconStyle}
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                strokeWidth={2} 
-                d="M8 7V3m8 4V3M3 11h18M5 19h14a2 2 0 002-2v-7H3v7a2 2 0 002 2z"
-              />
-            </svg>
+            <SidebarIcon path="M9.75 17a2.25 2.25 0 104.5 0m-7.5-3h10.5A1.5 1.5 0 0018 12.5V9a6 6 0 00-6-6 6 6 0 00-6 6v3.5A1.5 1.5 0 006.75 14z" />
             {t.reservations}
           </Link>
 
-          {/* Clients Section */}
-          <div style={categoryStyle}>{t.clients}</div>
-          
-          <div 
-            style={navItemStyle(location.pathname.startsWith('/clients'))}
-            onClick={() => setClientsExpanded(!clientsExpanded)}
+          <div className="app-sidebar__category">{t.clients}</div>
+          <div
+            className={`app-sidebar__item ${location.pathname.startsWith('/clients') ? 'app-sidebar__item--active' : ''}`}
+            onClick={() => setClientsExpanded((prev) => !prev)}
           >
-            <svg 
-              style={iconStyle}
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-              />
-            </svg>
+            <SidebarIcon path="M17 20h5V10H2v10h5m10-8v8M7 12v8m0 0a3 3 0 006 0m-6 0a3 3 0 016 0" />
             {t.clients}
-            <svg 
-              style={chevronStyle(clientsExpanded)}
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
+            <Chevron expanded={clientsExpanded} />
           </div>
-
           {clientsExpanded && (
-            <>
-              <Link 
-                to="/clients/add" 
-                style={subNavItemStyle(location.pathname === '/clients/add')}
+            <div>
+              <SidebarLink
+                to="/clients/add"
+                label={t.addClient}
+                active={location.pathname === '/clients/add'}
                 onClick={handleLinkClick}
-              >
-                {t.addClient}
-              </Link>
-              <Link 
-                to="/clients/existing" 
-                style={subNavItemStyle(location.pathname === '/clients/existing')}
+              />
+              <SidebarLink
+                to="/clients/existing"
+                label={t.existingClients}
+                active={location.pathname === '/clients/existing'}
                 onClick={handleLinkClick}
-              >
-                {t.existingClients}
-              </Link>
-              <Link 
-                to="/clients/collaborators" 
-                style={subNavItemStyle(location.pathname === '/clients/collaborators')}
+              />
+              <SidebarLink
+                to="/clients/collaborators"
+                label={t.collaborators}
+                active={location.pathname === '/clients/collaborators'}
                 onClick={handleLinkClick}
-              >
-                {t.collaborators}
-              </Link>
-            </>
+              />
+            </div>
           )}
 
-          {/* Services Section */}
-          <div style={categoryStyle}>{t.services}</div>
-          
-          <div 
-            style={navItemStyle(location.pathname.startsWith('/services'))}
-            onClick={() => setServicesExpanded(!servicesExpanded)}
+          <div className="app-sidebar__category">{t.services}</div>
+          <div
+            className={`app-sidebar__item ${location.pathname.startsWith('/services') ? 'app-sidebar__item--active' : ''}`}
+            onClick={() => setServicesExpanded((prev) => !prev)}
           >
-            <svg 
-              style={iconStyle}
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-              />
-            </svg>
+            <SidebarIcon path="M3 7h18M3 12h18M3 17h18" />
             {t.services}
-            <svg 
-              style={chevronStyle(servicesExpanded)}
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
+            <Chevron expanded={servicesExpanded} />
           </div>
-
           {servicesExpanded && (
-            <>
-              <Link 
-                to="/services/villas" 
-                style={subNavItemStyle(location.pathname === '/services/villas')}
+            <div>
+              <SidebarLink
+                to="/services/villas"
+                label={t.rentalVillas}
+                active={location.pathname === '/services/villas'}
                 onClick={handleLinkClick}
-              >
-                {t.rentalVillas}
-              </Link>
-              <Link 
-                to="/services/properties-for-sale" 
-                style={subNavItemStyle(location.pathname === '/services/properties-for-sale' || location.pathname.includes('/services/properties-for-sale/'))}
-                onClick={handleLinkClick}
-              >
-                {t.propertiesForSale}
-              </Link>
-              <Link 
-                to="/services/boats" 
-                style={subNavItemStyle(location.pathname === '/services/boats')}
-                onClick={handleLinkClick}
-              >
-                {t.boats}
-              </Link>
-              <Link 
-                to="/services/cars" 
-                style={subNavItemStyle(location.pathname === '/services/cars')}
-                onClick={handleLinkClick}
-              >
-                {t.cars}
-              </Link>
-              <Link 
-                to="/services/security" 
-                style={subNavItemStyle(location.pathname === '/services/security')}
-                onClick={handleLinkClick}
-              >
-                {t.security}
-              </Link>
-              <Link 
-                to="/services/chef" 
-                style={subNavItemStyle(location.pathname === '/services/chef')}
-                onClick={handleLinkClick}
-              >
-                {t.chef}
-              </Link>
-            </>
-          )}
-
-          {/* Finance Section - Only visible to admins */}
-          {isAdmin && (
-            <>
-              <div style={categoryStyle}>{t.finance}</div>
-              <Link 
-                to="/finance" 
-                style={navItemStyle(location.pathname === '/finance')}
-                onClick={handleLinkClick}
-              >
-                <svg 
-                  style={iconStyle}
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                {t.financeOverview}
-              </Link>
-            </>
-          )}
-
-          {/* System Section */}
-          <div style={categoryStyle}>{t.system}</div>
-          
-          <div 
-            style={navItemStyle(location.pathname.startsWith('/settings') || location.pathname.startsWith('/users'))}
-            onClick={() => setSystemExpanded(!systemExpanded)}
-          >
-            <svg 
-              style={iconStyle}
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
               />
-            </svg>
-            {t.settings}
-            <svg 
-              style={chevronStyle(systemExpanded)}
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </div>
-          
-          {systemExpanded && (
-            <>
-              <Link 
-                to="/settings" 
-                style={subNavItemStyle(location.pathname === '/settings')}
+              <SidebarLink
+                to="/services/properties-for-sale"
+                label={t.propertiesForSale}
+                active={location.pathname === '/services/properties-for-sale'}
                 onClick={handleLinkClick}
-              >
-                {t.generalSettings}
-              </Link>
-              
-              {/* Only show User Management for admins */}
+              />
+              <SidebarLink
+                to="/services/boats"
+                label={t.boats}
+                active={location.pathname === '/services/boats'}
+                onClick={handleLinkClick}
+              />
+              <SidebarLink
+                to="/services/cars"
+                label={t.cars}
+                active={location.pathname === '/services/cars'}
+                onClick={handleLinkClick}
+              />
+              <SidebarLink
+                to="/services/security"
+                label={t.security}
+                active={location.pathname === '/services/security'}
+                onClick={handleLinkClick}
+              />
+              <SidebarLink
+                to="/services/chef"
+                label={t.chef}
+                active={location.pathname === '/services/chef'}
+                onClick={handleLinkClick}
+              />
+            </div>
+          )}
+
+          <div className="app-sidebar__category">{t.finance}</div>
+          <Link
+            to="/finance"
+            className={`app-sidebar__item ${location.pathname.startsWith('/finance') ? 'app-sidebar__item--active' : ''}`}
+            onClick={handleLinkClick}
+          >
+            <SidebarIcon path="M11 11V5a1 1 0 112 0v6a4 4 0 11-2 0z" />
+            {t.financeOverview}
+          </Link>
+
+          <div className="app-sidebar__category">{t.system}</div>
+          <div
+            className={`app-sidebar__item ${
+              location.pathname.startsWith('/settings') || location.pathname.startsWith('/users')
+                ? 'app-sidebar__item--active'
+                : ''
+            }`}
+            onClick={() => setSystemExpanded((prev) => !prev)}
+          >
+            <SidebarIcon path="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            {t.system}
+            <Chevron expanded={systemExpanded} />
+          </div>
+          {systemExpanded && (
+            <div>
+              <SidebarLink
+                to="/settings"
+                label={t.generalSettings}
+                active={location.pathname === '/settings'}
+                onClick={handleLinkClick}
+              />
               {isAdmin && (
-                <Link 
-                  to="/users/manage" 
-                  style={subNavItemStyle(location.pathname === '/users/manage')}
+                <SidebarLink
+                  to="/users"
+                  label={t.userManagement}
+                  active={location.pathname === '/users'}
                   onClick={handleLinkClick}
-                >
-                  {t.userManagement}
-                </Link>
+                />
               )}
-            </>
+            </div>
           )}
         </div>
 
-        {/* Version info */}
-        <div style={{ 
-          padding: '1rem', 
-          fontSize: '0.75rem', 
-          color: 'rgba(255, 255, 255, 0.5)',
-          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-          textAlign: 'center'
-        }}>
-          {t.appName} v1.0
+        <div className="app-sidebar__footer">
+          <div>© {new Date().getFullYear()} ConciergeApp · Build 3.4.1</div>
         </div>
-      </div>
+      </nav>
     </>
   );
 }
+
+const SidebarIcon = ({ path }) => (
+  <svg className="app-sidebar__item-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={path} />
+  </svg>
+);
+
+const SidebarLink = ({ to, label, active, onClick }) => (
+  <Link
+    to={to}
+    className={`app-sidebar__item app-sidebar__subitem ${active ? 'app-sidebar__item--active' : ''}`}
+    onClick={onClick}
+  >
+    {label}
+  </Link>
+);
+
+const Chevron = ({ expanded }) => (
+  <svg
+    style={{
+      width: '1rem',
+      height: '1rem',
+      marginLeft: 'auto',
+      transition: 'transform 0.2s',
+      transform: expanded ? 'rotate(90deg)' : 'rotate(0)',
+      opacity: 0.7
+    }}
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+  </svg>
+);
 
 export default Sidebar;
