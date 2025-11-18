@@ -12,14 +12,14 @@
   "categories": ["business", "productivity", "lifestyle"],
   "icons": [
     {
-      "src": "src/assets/Luxury_app.jpeg",
+      "src": "/concierge-icon.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable any"
     },
     {
-      "src": "src/assets/Luxury_app.jpeg",
-      "sizes": "512x512", 
+      "src": "/concierge-icon.png",
+      "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable any"
     }
@@ -32,7 +32,7 @@
       "url": "/reservations",
       "icons": [
         {
-          "src": "src/assets/Luxury_app.jpeg",
+          "src": "/concierge-icon.png",
           "sizes": "96x96"
         }
       ]
@@ -44,7 +44,7 @@
       "url": "/clients",
       "icons": [
         {
-          "src": "src/assets/Luxury_app.jpeg",
+          "src": "/concierge-icon.png",
           "sizes": "96x96"
         }
       ]
@@ -56,7 +56,7 @@
       "url": "/services",
       "icons": [
         {
-          "src": "srcsrc/assets/Luxury_app.jpeg",
+          "src": "/concierge-icon.png",
           "sizes": "96x96"
         }
       ]
@@ -68,7 +68,7 @@
       "url": "/finance",
       "icons": [
         {
-          "src": "src/assets/Luxury_app.jpeg",
+          "src": "/concierge-icon.png",
           "sizes": "96x96"
         }
       ]
