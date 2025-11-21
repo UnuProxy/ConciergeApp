@@ -31,8 +31,6 @@ function Settings() {
       lightMode: 'Mod Luminos',
       notifications: 'Notificări',
       enableNotifications: 'Activează Notificările',
-      dataPrivacy: 'Confidențialitatea Datelor',
-      deleteData: 'Șterge Toate Datele',
       saveSuccess: 'Setările au fost salvate cu succes!'
     },
     en: {
@@ -48,8 +46,6 @@ function Settings() {
       lightMode: 'Light Mode',
       notifications: 'Notifications',
       enableNotifications: 'Enable Notifications',
-      dataPrivacy: 'Data Privacy',
-      deleteData: 'Delete All Data',
       saveSuccess: 'Settings saved successfully!'
     }
   };
@@ -192,12 +188,6 @@ function Settings() {
           </label>
         </div>
         
-        <div style={formGroupStyle}>
-          <h3 style={{...labelStyle, fontSize: '1.1rem'}}>{t.dataPrivacy}</h3>
-          <button style={{...buttonStyle, backgroundColor: '#EF4444'}}>
-            {t.deleteData}
-          </button>
-        </div>
       </section>
 
       <button 

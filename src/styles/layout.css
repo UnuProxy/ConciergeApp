@@ -414,6 +414,51 @@ body {
   gap: 1rem;
 }
 
+.booking-headline__titleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.booking-headline__title {
+  margin: 0;
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  color: #0f172a;
+}
+
+.booking-headline__muted {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--app-muted);
+  margin-top: 0.2rem;
+}
+
+.booking-headline__actions {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.booking-headline__cta {
+  background: #4f46e5;
+  color: #fff;
+  font-weight: 600;
+  border: none;
+  border-radius: 999px;
+  padding: 0.65rem 1.5rem;
+  box-shadow: 0 10px 25px rgba(79, 70, 229, 0.25);
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.booking-headline__cta:hover {
+  background: #4338ca;
+  transform: translateY(-1px);
+}
+
+
 .booking-filters {
   display: flex;
   flex-direction: column;

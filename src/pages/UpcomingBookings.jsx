@@ -19,6 +19,7 @@ import { db, auth } from '../firebase/config';
 import { useNavigate } from 'react-router-dom';
 import { useMediaQuery } from 'react-responsive';
 import React from 'react';
+import ReactDOM from 'react-dom';
 import { translations } from '../translations/bookingTranslations';
 import { useLanguage } from '../utils/languageHelper';
 
@@ -49,6 +50,21 @@ const paymentStatusColors = {
   paid: { cssClass: 'bg-green-100 text-green-800 border-green-200' },
   partiallyPaid: { cssClass: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
   notPaid: { cssClass: 'bg-red-100 text-red-800 border-red-200' }
+};
+
+const serviceTagStyles = {
+  villa: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  villas: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  cars: 'bg-red-50 text-red-700 border-red-200',
+  boats: 'bg-blue-50 text-blue-700 border-blue-200',
+  yacht: 'bg-blue-50 text-blue-700 border-blue-200',
+  chefs: 'bg-amber-50 text-amber-700 border-amber-200',
+  shopping: 'bg-pink-50 text-pink-700 border-pink-200'
+};
+
+const getServiceTagClasses = (type) => {
+  if (!type) return 'bg-gray-100 text-gray-700 border-gray-200';
+  return serviceTagStyles[type] || 'bg-gray-100 text-gray-700 border-gray-200';
 };
 
 // Enhanced category icon components
@@ -931,6 +947,9 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
   const earliestBooking = [...client.bookings].sort((a, b) => 
     new Date(a.checkIn || 0) - new Date(b.checkIn || 0)
   )[0] || {};
+  const villaName = earliestBooking?.accommodationType
+    ? safeRender(earliestBooking.accommodationType)
+    : '';
   
   // Helper functions
   const formatShortDate = (dateStr) => {
@@ -940,6 +959,55 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
       day: '2-digit',
       month: '2-digit'
     });
+  };
+  
+  // Helper function to get client name
+  const getClientName = (clientId) => {
+    if (!clientDetails[clientId]) return '';
+    return safeRender(clientDetails[clientId].name) || '';
+  };
+  
+  const formatBookingRange = (booking) => {
+    if (!booking) return '';
+    const start = formatShortDate(booking.checkIn);
+    const end = formatShortDate(booking.checkOut || booking.checkIn);
+    if (start && end && start !== end) {
+      return `${start} → ${end}`;
+    }
+    return start || end || '';
+  };
+  
+  const getQuickGuestSummary = (booking) => {
+    if (!booking) return '';
+    if (booking.guests) {
+      return `${booking.guests} ${t.guests}`;
+    }
+    if (booking.accommodationType) {
+      return safeRender(booking.accommodationType);
+    }
+    if (booking.category) {
+      return safeRender(booking.category);
+    }
+    return '';
+  };
+  
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'confirmed':
+        return t.confirmed;
+      case 'pending':
+        return t.pending;
+      case 'cancelled':
+        return t.cancelled;
+      case 'booked':
+        return t.booked;
+      default:
+        return safeRender(status);
+    }
+  };
+  
+  const getStatusBadgeClass = (status) => {
+    return statusColors[status]?.cssClass || 'bg-gray-100 text-gray-700 border-gray-200';
   };
   
   const getDaysLeft = (date) => {
@@ -1064,21 +1132,37 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
         )}
         
         {/* Services summary */}
-        {client.services.length > 0 && (
-          <div className="mt-3">
-            <div className="text-xs text-gray-600 mb-1">{t.servicesAndExtras}</div>
-            <div className="flex flex-wrap gap-2 text-xs">
-              {client.services.slice(0, 3).map((service, idx) => (
-                <div key={idx} className="px-2 py-1 bg-gray-100 rounded-md">
-                  {safeRender(service.name)}
-                </div>
-              ))}
-              {client.services.length > 3 && (
-                <div className="px-2 py-1 bg-gray-100 rounded-md text-gray-500">
-                  +{client.services.length - 3} {t.more}
-                </div>
-              )}
-            </div>
+        {(villaName || client.services.length > 0) && (
+          <div className="mt-3 space-y-2">
+            <div className="text-xs text-gray-600">{t.servicesAndExtras}</div>
+            {villaName && (
+              <div className="flex items-center gap-2 text-xs">
+                <span className={`px-3 py-1 rounded-full border font-semibold ${getServiceTagClasses('villa')}`}>
+                  {villaName}
+                </span>
+                <span className="uppercase tracking-wide text-[0.65rem] text-gray-500">
+                  {t.primaryResidence || 'Villa'}
+                </span>
+              </div>
+            )}
+            {client.services.length > 0 && (
+              <div className="flex flex-wrap gap-2 text-xs">
+                {client.services
+                  .filter(service => {
+                    const serviceName = safeRender(service.name || '');
+                    if (!serviceName || !villaName) return true;
+                    return serviceName.trim().toLowerCase() !== villaName.trim().toLowerCase();
+                  })
+                  .map((service, idx) => (
+                    <span
+                      key={`${service.name}-${idx}`}
+                      className={`px-2 py-1 rounded-full border ${getServiceTagClasses(service.type)}`}
+                    >
+                      {safeRender(service.name)}
+                    </span>
+                  ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1191,6 +1275,22 @@ const UpcomingBookings = () => {
   const [clientGroups, setClientGroups] = useState({});
   const [clientDetails, setClientDetails] = useState({});
   const clientList = useMemo(() => Object.values(clientGroups), [clientGroups]);
+  
+  // Simplified UI states (declare before dependent hooks)
+  const getStoredTimeFilter = () => {
+    if (typeof window === 'undefined') return 'all';
+    try {
+      return localStorage.getItem('reservationsTimeFilter') || 'all';
+    } catch (err) {
+      console.warn('Unable to read stored time filter', err);
+      return 'all';
+    }
+  };
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [timeFilter, setTimeFilter] = useState(getStoredTimeFilter); // Default to showing all
+  const [sortOption, setSortOption] = useState('date');
+  
   const summaryStats = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -1234,12 +1334,60 @@ const UpcomingBookings = () => {
       outstanding: totals.outstanding
     };
   }, [bookings, clientList]);
+  const { quickUpcoming, quickPast } = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const parseDate = (value) => {
+      if (!value) return null;
+      const date = value instanceof Date ? new Date(value) : new Date(value);
+      if (Number.isNaN(date.getTime())) return null;
+      date.setHours(0, 0, 0, 0);
+      return date;
+    };
+    
+    const upcomingList = bookings
+      .filter((booking) => {
+        const checkIn = parseDate(booking.checkIn);
+        return checkIn && checkIn >= today;
+      })
+      .sort((a, b) => {
+        const aDate = parseDate(a.checkIn);
+        const bDate = parseDate(b.checkIn);
+        return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
+      });
+    
+    const pastList = bookings
+      .filter((booking) => {
+        const checkOut = parseDate(booking.checkOut || booking.checkIn);
+        return checkOut && checkOut < today;
+      })
+      .sort((a, b) => {
+        const aDate = parseDate(a.checkOut || a.checkIn);
+        const bDate = parseDate(b.checkOut || b.checkIn);
+        return (bDate?.getTime() || 0) - (aDate?.getTime() || 0);
+      });
+    
+    return {
+      quickUpcoming: upcomingList.slice(0, 4),
+      quickPast: pastList.slice(0, 4)
+    };
+  }, [bookings]);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('reservationsTimeFilter', timeFilter);
+    } catch (err) {
+      console.warn('Unable to persist time filter', err);
+    }
+  }, [timeFilter]);
+
   const filterTabs = useMemo(
     () => [
+      { id: 'all', label: t.all, count: summaryStats.totalBookings, icon: 'list' },
       { id: 'upcoming', label: t.upcoming, count: summaryStats.upcoming, icon: 'calendar' },
       { id: 'active', label: t.activeNow, count: summaryStats.active, icon: 'clock' },
-      { id: 'past', label: t.past, count: summaryStats.past, icon: 'history' },
-      { id: 'all', label: t.all, count: summaryStats.totalClients, icon: 'list' }
+      { id: 'past', label: t.past, count: summaryStats.past, icon: 'history' }
     ],
     [t, summaryStats]
   );
@@ -1275,11 +1423,32 @@ const UpcomingBookings = () => {
     () => getFilteredClients(),
     [clientGroups, timeFilter, sortOption, searchQuery]
   );
+
+  const visibleBookingCount = useMemo(
+    () =>
+      filteredClients.reduce((total, client) => {
+        return total + (Array.isArray(client.bookings) ? client.bookings.length : 0);
+      }, 0),
+    [filteredClients]
+  );
   
-  // Simplified UI states
-  const [searchQuery, setSearchQuery] = useState('');
-  const [timeFilter, setTimeFilter] = useState('upcoming'); // Default to upcoming
-  const [sortOption, setSortOption] = useState('date');
+  const todayLabel = useMemo(() => {
+    try {
+      return new Intl.DateTimeFormat(language === 'en' ? 'en-GB' : 'ro-RO', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+      }).format(new Date());
+    } catch {
+      return '';
+    }
+  }, [language]);
+
+  const handleNewBookingClick = () => {
+    navigate('/clients/existing', {
+      state: { startBookingFlow: true }
+    });
+  };
   
   // Modal states
   const [showBottomSheet, setShowBottomSheet] = useState(false);
@@ -1288,6 +1457,7 @@ const UpcomingBookings = () => {
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [selectedService, setSelectedService] = useState(null);
   const bottomSheetRef = useRef(null);
+  const bookingListAnchorId = 'booking-results';
   
   // Payment form state
   const [paymentData, setPaymentData] = useState({
@@ -1303,6 +1473,85 @@ const UpcomingBookings = () => {
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
   const [notificationType, setNotificationType] = useState('success');
+  
+  const handleQuickFilterJump = (targetFilter) => {
+    setTimeFilter(targetFilter);
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        const anchor = document.getElementById(bookingListAnchorId);
+        if (anchor) {
+          anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    }
+  };
+  
+  const getPanelClientName = (clientId) => {
+    if (!clientId) return '';
+    const client = clientDetails[clientId];
+    return client ? safeRender(client.name) : '';
+  };
+  
+  const formatBookingRangeForPanel = (booking) => {
+    if (!booking) return '';
+    const start = formatShortDate(booking.checkIn);
+    const end = formatShortDate(booking.checkOut || booking.checkIn);
+    if (start && end && start !== end) {
+      return `${start} → ${end}`;
+    }
+    return start || end || '';
+  };
+  
+  const getQuickPanelGuestSummary = (booking) => {
+    if (!booking) return '';
+    if (booking.guests) return `${booking.guests} ${t.guests}`;
+    if (booking.accommodationType) return safeRender(booking.accommodationType);
+    if (booking.category) return safeRender(booking.category);
+    return '';
+  };
+
+  
+  function renderQuickBookingPanel(title, emptyText, list, filterKey) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm p-4 lg:p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-400">{t.heroSnapshot}</p>
+            <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleQuickFilterJump(filterKey)}
+            className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            {t.viewAll}
+          </button>
+        </div>
+        {list.length === 0 ? (
+          <p className="text-sm text-gray-500">{emptyText}</p>
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {list.map((booking) => (
+              <li key={booking.id} className="py-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">
+                    {safeRender(booking.clientName) || getPanelClientName(booking.clientId) || t.unknownClient}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {formatBookingRangeForPanel(booking)}
+                    {getQuickPanelGuestSummary(booking) && ` • ${getQuickPanelGuestSummary(booking)}`}
+                  </p>
+                </div>
+                <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${getStatusBadgeClass(booking.status)}`}>
+                  {getStatusText(booking.status)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
   
 
 useEffect(() => {
@@ -1682,12 +1931,6 @@ useEffect(() => {
     }
   };
   
-  // Helper function to get client name
-  const getClientName = (clientId) => {
-    if (!clientDetails[clientId]) return '';
-    return safeRender(clientDetails[clientId].name) || '';
-  };
-  
   // Helper function to generate avatar from client name
   const getClientInitials = (name) => {
     if (!name) return '';
@@ -1709,7 +1952,7 @@ useEffect(() => {
   };
   
   // Filter clients based on time and search filters
-  const getFilteredClients = () => {
+  function getFilteredClients() {
     return Object.values(clientGroups).filter(client => {
       // Time filter
       const today = new Date();
@@ -1792,10 +2035,16 @@ useEffect(() => {
       }
       return 0;
     });
-  };
+  }
   
   // Bottom sheet handling
-  const showBottomSheetWithContent = (content, item, secondaryItem = null) => {
+const showBottomSheetWithContent = (content, item, secondaryItem = null) => {
+  const allowedContent = ['client-details','quick-payment','edit-payment','add-service','edit-service','add-shopping'];
+  if (!allowedContent.includes(content)) {
+    console.warn('Attempted to open unsupported bottom sheet content:', content);
+    return;
+  }
+  document.body.style.overflow = 'hidden';
   console.log('showBottomSheetWithContent called with:', { 
     content, 
     item: item ? { clientId: item.clientId, clientName: item.clientName } : null, 
@@ -1854,6 +2103,7 @@ useEffect(() => {
 const closeBottomSheet = () => {
   console.log('Closing bottom sheet');
   setShowBottomSheet(false);
+  document.body.style.overflow = '';
   setTimeout(() => {
     setBottomSheetContent(null);
     setSelectedItem(null);
@@ -2691,7 +2941,7 @@ const renderMainContent = (filteredClients) => {
   };
   
   // Handle add service from selection panel
- const handleServiceSelectionAdd = async (service) => {
+ async function handleServiceSelectionAdd(service) {
   if (!selectedItem) {
     showNotificationMessage(t.noClientSelected || 'No client selected', 'error');
     return;
@@ -2709,11 +2959,11 @@ const renderMainContent = (filteredClients) => {
     console.error('Error adding service:', err);
     showNotificationMessage(err.message || t.failedAddService || 'Failed to add service', 'error');
   }
-};
+}
 
   
   // Handle add shopping expense from form
- const handleShoppingFormSubmit = async (shoppingExpense) => {
+async function handleShoppingFormSubmit(shoppingExpense) {
   if (!selectedItem) {
     showNotificationMessage(t.noClientSelected || 'No client selected', 'error');
     return;
@@ -2731,7 +2981,7 @@ const renderMainContent = (filteredClients) => {
     console.error('Error adding shopping expense:', err);
     showNotificationMessage(err.message || t.failedAddShopping || 'Failed to add shopping expense', 'error');
   }
-};
+}
 
   
   // PAYMENT HANDLING
@@ -2875,7 +3125,6 @@ const renderMainContent = (filteredClients) => {
         <section className="booking-hero page-surface">
           <div className="booking-hero__top">
             <div>
-              <p className="booking-hero__eyebrow">{t.viewingDataFor} <span>{safeRender(userCompanyId) || '—'}</span></p>
               <h1>{t.bookingManager}</h1>
               <p className="booking-hero__subtitle">{t.authError}</p>
             </div>
@@ -2900,7 +3149,6 @@ const renderMainContent = (filteredClients) => {
         <section className="booking-hero page-surface booking-hero--loading">
           <div className="booking-hero__top">
             <div>
-              <p className="booking-hero__eyebrow">{t.viewingDataFor} <span>{safeRender(userCompanyId) || '—'}</span></p>
               <h1>{t.bookingManager}</h1>
             </div>
           </div>
@@ -2919,7 +3167,6 @@ const renderMainContent = (filteredClients) => {
         <section className="booking-hero page-surface">
           <div className="booking-hero__top">
             <div>
-              <p className="booking-hero__eyebrow">{t.viewingDataFor} <span>{safeRender(userCompanyId) || '—'}</span></p>
               <h1>{t.bookingManager}</h1>
               <p className="booking-hero__subtitle">{t.error}</p>
             </div>
@@ -2935,94 +3182,96 @@ const renderMainContent = (filteredClients) => {
   // Main component render
   return (
     <div className="bookings-page">
-      <section className="booking-hero page-surface">
-        <div className="booking-hero__top">
+      <section className="page-surface booking-headline">
+        <div className="booking-headline__titleRow">
           <div>
-            <p className="booking-hero__eyebrow">{t.viewingDataFor} <span>{safeRender(userCompanyId) || '—'}</span></p>
-            <h1>{t.bookingManager}</h1>
-            <p className="booking-hero__subtitle">{t.heroSubtitle}</p>
-          </div>
-          <div className="pill booking-hero__summary">
-            <span className="status-dot" />
-            {summaryStats.totalClients} {t.clients}
+            <h1 className="booking-headline__title">{t.bookingManager}</h1>
+            {todayLabel && (
+              <span className="booking-headline__muted">{todayLabel}</span>
+            )}
           </div>
         </div>
-        <div className="booking-stats-grid">
-          <div className="booking-stat">
-            <p>{t.totalRevenueLabel}</p>
-            <h3>{formatCurrency(summaryStats.totalRevenue)}</h3>
-            <span>{t.outstandingBalanceLabel}: {formatCurrency(summaryStats.outstanding)}</span>
-          </div>
-          <div className="booking-stat">
-            <p>{t.totalBookingsLabel}</p>
-            <h3>{summaryStats.totalBookings}</h3>
-            <span>{t.upcomingTripsLabel}: {summaryStats.upcoming}</span>
-          </div>
-          <div className="booking-stat">
-            <p>{t.activeBookingsLabel}</p>
-            <h3>{summaryStats.active}</h3>
-            <span>{t.past}: {summaryStats.past}</span>
-          </div>
+        <div className="booking-headline__actions">
+          <button
+            type="button"
+            onClick={handleNewBookingClick}
+            className="booking-headline__cta"
+          >
+            {t.newBooking || 'Add Booking'}
+          </button>
         </div>
-      </section>
 
-      <section className="booking-panel">
-        <div className="booking-filters surface-card">
-          <div className="booking-filters__row">
-            <label className="booking-field">
-              <span>{t.search}</span>
-              <div className="booking-search">
-                <svg className="booking-search__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  placeholder={t.search}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+        <div className="booking-filters__row mt-6">
+          <label className="booking-field">
+            <span>{t.search}</span>
+            <div className="booking-search">
+              <svg className="booking-search__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                value={searchQuery}
+                placeholder={t.search}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </label>
+          <label className="booking-field booking-field--small">
+            <span>{t.sortBy}</span>
+            <select value={sortOption} onChange={(e) => setSortOption(e.target.value)}>
+              <option value="date">{t.sortByDate}</option>
+              <option value="client">{t.sortByClientName}</option>
+              <option value="lastActivity">{t.sortByRecentActivity}</option>
+              <option value="totalValue">{t.sortByValue}</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="booking-filter-tabs mt-4">
+          {filterTabs.map((tab) => (
+            <button
+              key={tab.id}
+              className={`booking-tab ${timeFilter === tab.id ? 'booking-tab--active' : ''}`}
+              onClick={() => setTimeFilter(tab.id)}
+            >
+              <span className="booking-tab__icon">{renderTabIcon(tab.icon)}</span>
+              <div>
+                <p>{tab.label}</p>
+                <small>{tab.count} {t.bookings}</small>
               </div>
-            </label>
-            <label className="booking-field booking-field--small">
-              <span>{t.sortBy}</span>
-              <select value={sortOption} onChange={(e) => setSortOption(e.target.value)}>
-                <option value="date">{t.sortByDate}</option>
-                <option value="client">{t.sortByClientName}</option>
-                <option value="lastActivity">{t.sortByRecentActivity}</option>
-                <option value="totalValue">{t.sortByValue}</option>
-              </select>
-            </label>
-          </div>
-
-          <div className="booking-filter-tabs">
-            {filterTabs.map((tab) => (
-              <button
-                key={tab.id}
-                className={`booking-tab ${timeFilter === tab.id ? 'booking-tab--active' : ''}`}
-                onClick={() => setTimeFilter(tab.id)}
-              >
-                <span className="booking-tab__icon">{renderTabIcon(tab.icon)}</span>
-                <div>
-                  <p>{tab.label}</p>
-                  <small>{tab.count} {tab.id === 'all' ? t.clients : t.bookings}</small>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <div className="booking-filters__info">
-            <span>{t.found} <strong>{filteredClients.length}</strong> {t.bookings}</span>
-            {searchQuery && <span>{t.matching} "{searchQuery}"</span>}
-          </div>
+            </button>
+          ))}
         </div>
 
-        <div className="booking-results page-surface">
-          {renderMainContent(filteredClients)}
+        <div className="booking-filters__info">
+          <span>{t.found} <strong>{visibleBookingCount}</strong> {t.bookings}</span>
+          <span className="text-sm text-gray-500">({filteredClients.length} {t.clients})</span>
+          {searchQuery && <span>{t.matching} "{searchQuery}"</span>}
         </div>
       </section>
+
+      <div id={bookingListAnchorId} className="booking-results page-surface">
+        {renderMainContent(filteredClients)}
+      </div>
+
+      {(quickUpcoming.length > 0 || quickPast.length > 0) && (
+        <section className="booking-hero page-surface" style={{ marginTop: '1.5rem' }}>
+          <div className="booking-hero__top">
+            <div>
+              <h2>{t.atAGlance || 'At a glance'}</h2>
+              <p className="booking-hero__subtitle">{t.quickInsights || 'Fast overview of arrivals and departures.'}</p>
+            </div>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {renderQuickBookingPanel(t.upcomingHighlight, t.noUpcomingBookings, quickUpcoming, 'upcoming')}
+            {renderQuickBookingPanel(t.pastHighlight, t.noPastBookings, quickPast, 'past')}
+          </div>
+        </section>
+      )}
 
       {/* Bottom Sheet with Enhanced Content */}
     {showBottomSheet && (
+  <BottomSheetPortal>
   <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end md:items-center md:justify-center">
     <div 
       className="bg-white rounded-t-2xl md:rounded-xl w-full md:max-w-lg max-h-[90vh] md:max-h-[90vh] overflow-hidden animate-slide-up flex flex-col"
@@ -3339,21 +3588,10 @@ const renderMainContent = (filteredClients) => {
           </div>
         )}
 
-        {/* Fallback for unknown content */}
-        {!['client-details', 'quick-payment', 'edit-payment', 'add-service', 'edit-service', 'add-shopping'].includes(bottomSheetContent) && (
-          <div className="p-4 bg-white text-center">
-            <p className="text-gray-500">Unknown content type: {bottomSheetContent}</p>
-            <button 
-              onClick={closeBottomSheet}
-              className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-            >
-              Close
-            </button>
-          </div>
-        )}
       </div>
     </div>
   </div>
+  </BottomSheetPortal>
 )}
       
       {/* Enhanced Toast Notification */}
@@ -3385,3 +3623,4 @@ const renderMainContent = (filteredClients) => {
   
 
 export default UpcomingBookings;
+const BottomSheetPortal = ({ children }) => ReactDOM.createPortal(children, document.body);
