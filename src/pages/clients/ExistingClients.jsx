@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   getFirestore, 
   collection, 
@@ -60,6 +61,122 @@ function getLocalizedText(value, language) {
   return safeRender(value, language);
 }
 
+const seasonalMonthOrder = ['may', 'june', 'july', 'august', 'september', 'october'];
+const seasonByMonth = {
+  may: 'extraSeason',
+  june: 'lowSeason',
+  july: 'peakSeason',
+  august: 'peakSeason',
+  september: 'lowSeason',
+  october: 'extraSeason'
+};
+
+const seasonalMonthSet = new Set(seasonalMonthOrder);
+
+const normalizeUnitType = (unit = '', fallback = 'week') => {
+  const normalized = unit.toString().toLowerCase();
+  if (normalized.includes('week')) return 'week';
+  if (normalized.includes('month')) return 'month';
+  if (normalized.includes('night')) return 'night';
+  if (normalized.includes('day')) return 'day';
+  return fallback;
+};
+
+const toNumericPrice = (value) => {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const cleaned = value.replace(/[^0-9.,-]/g, '').replace(',', '.');
+    const parsed = parseFloat(cleaned);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+  if (typeof value === 'object' && value !== null) {
+    if (value.price !== undefined) {
+      return toNumericPrice(value.price);
+    }
+  }
+  return 0;
+};
+
+const formatSeasonalMonthLabel = (monthKey, language, t) => {
+  try {
+    const monthDate = new Date(`${monthKey} 1, 2020`);
+    const locale = language === 'ro' ? 'ro-RO' : 'en-GB';
+    const monthName = monthDate.toLocaleString(locale, { month: 'long' });
+    const capitalized = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+    const seasonLabel = seasonByMonth[monthKey] ? t[seasonByMonth[monthKey]] || '' : '';
+    return seasonLabel ? `${capitalized} (${seasonLabel})` : capitalized;
+  } catch {
+    return monthKey;
+  }
+};
+
+const resolveMonthlyPrice = (entry) => {
+  const numeric = toNumericPrice(entry);
+  return numeric > 0 ? numeric : null;
+};
+
+const resolveMonthlyUnit = (entry, fallback = 'nightly') => {
+  if (entry && typeof entry === 'object' && entry.type) {
+    return normalizeUnitType(entry.type, fallback);
+  }
+  return normalizeUnitType(fallback, fallback);
+};
+
+const getUnitDisplayLabel = (unit, t) => {
+  const normalized = (unit || '').toLowerCase();
+  if (normalized.includes('week')) return t.perWeek;
+  if (normalized.includes('month')) return t.perMonth;
+  if (normalized.includes('night') || normalized.includes('day')) return t.perNight;
+  return t.perNight;
+};
+
+const getMonthlyOptionsForService = (service, language, t) => {
+  if (!service.originalPricing?.monthly) return [];
+  return Object.entries(service.originalPricing.monthly)
+    .map(([month, value]) => {
+      const normalized = month.toLowerCase();
+      if (!seasonalMonthSet.has(normalized)) return null;
+      const price = resolveMonthlyPrice(value);
+      if (price === null) return null;
+      const type = resolveMonthlyUnit(value, service.unit || 'nightly');
+      return {
+        month: normalized,
+        price,
+        type,
+        label: formatSeasonalMonthLabel(normalized, language, t)
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      const idxA = seasonalMonthOrder.indexOf(a.month);
+      const idxB = seasonalMonthOrder.indexOf(b.month);
+      if (idxA === -1 && idxB === -1) return a.month.localeCompare(b.month);
+      if (idxA === -1) return 1;
+      if (idxB === -1) return -1;
+      return idxA - idxB;
+    });
+};
+
+const removeUndefinedFields = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => removeUndefinedFields(item))
+      .filter((item) => item !== undefined);
+  }
+  if (value && typeof value === 'object') {
+    const sanitized = {};
+    Object.entries(value).forEach(([key, val]) => {
+      if (val === undefined) return;
+      const cleaned = removeUndefinedFields(val);
+      if (cleaned !== undefined) {
+        sanitized[key] = cleaned;
+      }
+    });
+    return sanitized;
+  }
+  return value === undefined ? undefined : value;
+};
+
 
 // Translation dictionary
 const translations = {
@@ -115,6 +232,7 @@ const translations = {
     offerStatus: 'Status',
     sendOffer: 'Send Offer',
     generatePdf: 'Generate PDF',
+    viewProperty: 'View property',
     villas: 'Villas & Accommodations',
     cars: 'Cars & Transportation',
     boats: 'Boats & Yachts',
@@ -136,6 +254,11 @@ const translations = {
     quantity: 'Quantity',
     total: 'Total',
     additionalNotes: 'Additional Notes',
+    selectMonthLabel: 'Select season',
+    useStandardRate: 'Use standard rate',
+    peakSeason: 'Peak Season',
+    lowSeason: 'Low Season',
+    extraSeason: 'Extra Season',
     cancel: 'Cancel',
     addNotesPlaceholder: 'Add any special instructions or details for this offer...',
     offerSentSuccess: 'Offer sent successfully to',
@@ -148,6 +271,8 @@ const translations = {
     additionalServices: 'Additional Services',
     submitReservation: 'Submit Reservation',
     reservationCreatedSuccess: 'Reservation created successfully for',
+    quickBookingMode: 'Instant booking mode',
+    quickBookingInstructions: 'Select a client to open the booking form and add services immediately.',
     price: 'Price',
     unit: 'Unit',
     selectAccommodation: 'Select Accommodation',
@@ -297,6 +422,7 @@ const translations = {
     offerStatus: 'Status',
     sendOffer: 'Trimite Oferta',
     generatePdf: 'Generează PDF',
+    viewProperty: 'Deschide proprietatea',
     villas: 'Vile și Cazări',
     cars: 'Mașini și Transport',
     boats: 'Bărci și Iahturi',
@@ -317,6 +443,11 @@ const translations = {
     rate: 'Tarif',
     quantity: 'Cantitate',
     total: 'Total',
+    selectMonthLabel: 'Selectează sezonul',
+    useStandardRate: 'Folosește tariful standard',
+    peakSeason: 'Sezon de vârf',
+    lowSeason: 'Sezon redus',
+    extraSeason: 'Sezon extra',
     additionalNotes: 'Note Suplimentare',
     cancel: 'Anulează',
     addNotesPlaceholder: 'Adaugă instrucțiuni speciale sau detalii pentru această ofertă...',
@@ -330,6 +461,8 @@ const translations = {
     additionalServices: 'Servicii Suplimentare',
     submitReservation: 'Trimite Rezervare',
     reservationCreatedSuccess: 'Rezervare creată cu succes pentru',
+    quickBookingMode: 'Mod rezervare rapidă',
+    quickBookingInstructions: 'Selectează un client pentru a deschide formularul de rezervare și a adăuga servicii imediat.',
     price: 'Preț',
     unit: 'Unitate',
     selectAccommodation: 'Selectează Cazare',
@@ -428,6 +561,8 @@ const translations = {
 };
 
 function ExistingClients() {
+  const location = useLocation();
+  const navigate = useNavigate();
   // Function to extract image URLs from service data
  // Function to extract image URLs from service data
 const extractImageUrl = (data) => {
@@ -518,13 +653,15 @@ const extractImageUrl = (data) => {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [currentView, setCurrentView] = useState('list'); 
   const [selectedItems, setSelectedItems] = useState([]);
+  const [bookingShortcutActive, setBookingShortcutActive] = useState(false);
+  const [autoReservationQueued, setAutoReservationQueued] = useState(false);
   
   // Modals and UI states
   const [showCreateOffer, setShowCreateOffer] = useState(false);
   const [showCreateReservation, setShowCreateReservation] = useState(false);
   const [showEditClient, setShowEditClient] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [selectedBoatMonths, setSelectedBoatMonths] = useState({});
+  const [selectedSeasonMonths, setSelectedSeasonMonths] = useState({});
   
   // Offer states
   const [selectedCategory, setSelectedCategory] = useState('villas');
@@ -676,6 +813,17 @@ const extractImageUrl = (data) => {
   }, []);
 
   useEffect(() => {
+    if (location.state?.startBookingFlow) {
+      setBookingShortcutActive(true);
+      setAutoReservationQueued(true);
+      if (isMobile) {
+        setCurrentView('list');
+      }
+      navigate(location.pathname + location.search, { replace: true });
+    }
+  }, [location, navigate, isMobile]);
+
+  useEffect(() => {
     if (selectedClient?.assignedTo) {
       const fetchUserName = async () => {
         const name = await getUserName(selectedClient.assignedTo);
@@ -821,6 +969,61 @@ useEffect(() => {
     let priceValue = 0;
     let unit = 'day';
     let selectedPriceSource = 'none';
+    const currentMonth = new Date().getMonth() + 1;
+    const monthNames = {
+      1: 'january',
+      2: 'february', 
+      3: 'march',
+      4: 'april',
+      5: 'may',
+      6: 'june',
+      7: 'july',
+      8: 'august',
+      9: 'september',
+      10: 'october',
+      11: 'november',
+      12: 'december'
+    };
+    
+    const monthlyFromConfigs = {};
+    if (Array.isArray(data.priceConfigurations)) {
+      data.priceConfigurations.forEach(cfg => {
+        if (!cfg?.month || !cfg?.price) return;
+        const normalized = cfg.month.toLowerCase();
+        if (!seasonalMonthSet.has(normalized)) return;
+        const numeric = toNumericPrice(cfg.price);
+        if (numeric > 0) {
+          monthlyFromConfigs[normalized] = {
+            price: numeric,
+            type: normalizeUnitType(cfg.type || 'week', 'week')
+          };
+        }
+      });
+    }
+
+    const monthlyFromPricing = {};
+    if (data.pricing?.monthly) {
+      Object.entries(data.pricing.monthly).forEach(([month, value]) => {
+        const normalized = month.toLowerCase();
+        if (!seasonalMonthSet.has(normalized)) return;
+        const numeric = toNumericPrice(value);
+        if (numeric > 0) {
+          const inferredType =
+            typeof value === 'object' && value?.type
+              ? value.type
+              : 'week';
+          monthlyFromPricing[normalized] = {
+            price: numeric,
+            type: normalizeUnitType(inferredType, 'week')
+          };
+        }
+      });
+    }
+
+    const combinedMonthlyPricing = {
+      ...monthlyFromPricing,
+      ...monthlyFromConfigs
+    };
     
     // Priority 1: Daily price from pricing.daily
     if (data.pricing?.daily && parseFloat(data.pricing.daily) > 0) {
@@ -828,20 +1031,41 @@ useEffect(() => {
       unit = 'day';
       selectedPriceSource = 'pricing.daily';
     }
-    // Priority 2: Check price configurations (your current structure)
+    // Priority 2: Monthly seasonal pricing
+    else if (Object.keys(combinedMonthlyPricing).length > 0) {
+      const currentMonthName = monthNames[currentMonth];
+      const monthlyPrice = combinedMonthlyPricing[currentMonthName];
+      if (monthlyPrice?.price > 0) {
+        priceValue = monthlyPrice.price;
+        unit = normalizeUnitType(monthlyPrice.type || 'week', 'week');
+        selectedPriceSource = `monthly.${currentMonthName}`;
+      } else {
+        const availableMonths = Object.keys(combinedMonthlyPricing);
+        for (const month of availableMonths) {
+          const monthPrice = combinedMonthlyPricing[month];
+          if (monthPrice?.price > 0) {
+            priceValue = monthPrice.price;
+            unit = normalizeUnitType(monthPrice.type || 'week', 'week');
+            selectedPriceSource = `monthly.${month}`;
+            break;
+          }
+        }
+      }
+    }
+    // Priority 3: Check price configurations (your current structure)
     else if (data.priceConfigurations && data.priceConfigurations.length > 0) {
       const priceConfig = data.priceConfigurations[0];
       priceValue = parseFloat(priceConfig.price) || 0;
       unit = priceConfig.type || 'day';
       selectedPriceSource = 'priceConfigurations';
     }
-    // Priority 3: Direct price field
+    // Priority 4: Direct price field
     else if (data.price && parseFloat(data.price) > 0) {
       priceValue = parseFloat(data.price);
       unit = 'day';
       selectedPriceSource = 'price';
     }
-    // Priority 4: Daily price field
+    // Priority 5: Daily price field
     else if (data.dailyPrice && parseFloat(data.dailyPrice) > 0) {
       priceValue = parseFloat(data.dailyPrice);
       unit = 'day';
@@ -866,8 +1090,12 @@ useEffect(() => {
       companyId: companyInfo.id,
       imageUrl: imageUrl,
       priceSource: selectedPriceSource,
+      propertyLink: data.propertyLink || data.property_link || '',
       // Store original pricing structures for month selector
-      originalPricing: data.pricing,
+      originalPricing: {
+        ...data.pricing,
+        monthly: combinedMonthlyPricing
+      },
       originalPriceConfigurations: data.priceConfigurations
     };
   });
@@ -1666,8 +1894,13 @@ const handleSelectClient = async (client) => {
     setShowCreateReservation(false);
     setShowEditClient(false);
     
-    // On mobile, switch to details view when a client is selected
-    if (isMobile) {
+    if (autoReservationQueued) {
+      setShowCreateReservation(true);
+      handleCancelQuickBooking();
+      if (isMobile) {
+        setCurrentView('reservation');
+      }
+    } else if (isMobile) {
       setCurrentView('details');
     }
   } catch (error) {
@@ -1816,22 +2049,63 @@ const handleSelectClient = async (client) => {
   
   // Add service to offer
   const handleAddToOffer = (service) => {
-    const existingItem = offerItems.find(item => item.id === service.id);
+    if (!service) return;
+    
+    const selectedMonthKey = selectedSeasonMonths[service.id] || 'daily';
+    const monthOptions = getMonthlyOptionsForService(service, language, t);
+    const selectedMonthOption = selectedMonthKey !== 'daily'
+      ? monthOptions.find(option => option.month === selectedMonthKey)
+      : null;
+    
+    const lineItemId = selectedMonthOption
+      ? `${service.id}-${selectedMonthOption.month}`
+      : service.id;
+    
+    const basePrice = selectedMonthOption
+      ? selectedMonthOption.price
+      : toNumericPrice(service.originalPricing?.daily || service.price);
+    
+    const priceToUse = basePrice > 0 ? basePrice : 0;
+    const unitForItem = selectedMonthOption
+      ? selectedMonthOption.type
+      : service.unit || 'day';
+    
+    const existingItem = offerItems.find(item => item.id === lineItemId);
     
     if (existingItem) {
       setOfferItems(prev => prev.map(item => 
-        item.id === service.id 
-          ? { ...item, quantity: item.quantity + 1 } 
+        item.id === lineItemId
+          ? { ...item, quantity: item.quantity + 1 }
           : item
       ));
-    } else {
-      setOfferItems(prev => [...prev, { 
-        ...service, 
-        quantity: 1, 
-        discountType: null,
-        discountValue: 0,
-        isSelected: false // For checkbox selection
-      }]);
+      return;
+    }
+    
+    const newItem = {
+      id: lineItemId,
+      serviceId: service.id,
+      name: service.name,
+      category: service.category,
+      price: priceToUse,
+      originalPrice: priceToUse,
+      unit: unitForItem,
+      quantity: 1,
+      discountType: 'percentage',
+      discountValue: 0,
+      hasCustomDiscount: false,
+      selectedMonth: selectedMonthOption ? selectedMonthOption.month : null,
+      selectedMonthLabel: selectedMonthOption ? selectedMonthOption.label : null,
+      propertyLink: service.propertyLink || '',
+      imageUrl: service.imageUrl,
+      model: service.model,
+      length: service.length,
+      capacity: service.capacity
+    };
+    
+    setOfferItems(prev => [...prev, newItem]);
+    
+    if (isMobile) {
+      setTimeout(() => setCurrentView('cart'), 300);
     }
   };
   
@@ -1890,7 +2164,7 @@ const handleSelectClient = async (client) => {
     }
     
     try {
-      const offerData = {
+      const rawOfferData = {
         clientId: selectedClient.id,
         companyId: companyInfo.id,
         clientName: selectedClient.name,
@@ -1903,6 +2177,7 @@ const handleSelectClient = async (client) => {
         createdAt: new Date(),
         createdBy: currentUser.uid
       };
+      const offerData = removeUndefinedFields(rawOfferData);
       
       let docRef;
       let offerWithId;
@@ -1985,6 +2260,14 @@ const handleSelectClient = async (client) => {
   // Generate PDF for offer with enhanced luxury design - UPDATED for generic company use
 const generateOfferPdf = async (offer) => {
   if (!offer || !companyInfo) return;
+  const pdfLocale = 'en-GB';
+  const pdfStrings = translations.en;
+  const currencyFormatter = new Intl.NumberFormat(pdfLocale, {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 2
+  });
+  const formatCurrency = (value = 0) => currencyFormatter.format(value || 0);
   
   setIsGeneratingPdf(true);
   
@@ -2176,6 +2459,9 @@ const generateOfferPdf = async (offer) => {
       if (item.imageUrl && imageCache[item.imageUrl]) {
         try {
           doc.addImage(imageCache[item.imageUrl], 'JPEG', 25, currentY + 5, 50, 35, undefined, 'FAST');
+          if (item.category === 'villas' && item.propertyLink) {
+            doc.link(25, currentY + 5, 50, 35, { url: item.propertyLink });
+          }
           imageDisplayed = true;
         } catch (imgError) {
           console.error(`Error adding image for item ${item.id || 'unknown'}:`, imgError);
@@ -2240,22 +2526,50 @@ const generateOfferPdf = async (offer) => {
         }
       }
       
+      let infoY = currentY + 17;
       if (detailsText) {
-        doc.text(detailsText, 80, currentY + 17);
+        doc.text(detailsText, 80, infoY);
+        infoY += 7;
+      }
+      
+      if (item.category === 'villas' && item.propertyLink) {
+        doc.setFontSize(8);
+        doc.setTextColor(59, 130, 246);
+        doc.setFont("helvetica", "normal");
+        doc.textWithLink('View property', 80, infoY, { url: item.propertyLink });
+        doc.setTextColor(100, 100, 110);
+        infoY += 8;
+      }
+      
+      const englishSeasonLabel = item.selectedMonth
+        ? formatSeasonalMonthLabel(item.selectedMonth, 'en', pdfStrings)
+        : (item.selectedMonthLabel || null);
+      
+      if (englishSeasonLabel) {
+        doc.setFontSize(8);
+        doc.setTextColor(79, 70, 229);
+        doc.setFont("helvetica", "normal");
+        doc.text(englishSeasonLabel, 80, infoY);
+        doc.setTextColor(100, 100, 110);
+        infoY += 7;
       }
       
       // Price and quantity
-      const unitInfo = item.unit ? `per ${item.unit}` : '';
+      const unitInfo = item.unit ? getUnitDisplayLabel(item.unit, pdfStrings) : '';
+      const priceLineY = infoY;
       doc.setFontSize(9);
-      doc.text(`€${item.price.toFixed(2)} ${unitInfo} × ${item.quantity}`, 80, currentY + 25);
+      doc.setTextColor(32, 32, 64);
+      const unitDescriptor = unitInfo ? ` ${unitInfo}` : '';
+      doc.text(`${formatCurrency(item.price)}${unitDescriptor} × ${item.quantity}`, 80, priceLineY);
       
       // Show if there's a discount
       if (item.discountValue > 0) {
-        doc.setTextColor(180, 70, 70);
         const discountText = item.discountType === 'percentage' 
           ? `${item.discountValue}% discount applied` 
-          : `€${item.discountValue} discount applied`;
-        doc.text(discountText, 80, currentY + 32);
+          : `${formatCurrency(item.discountValue)} discount applied`;
+        doc.setFontSize(8);
+        doc.setTextColor(180, 70, 70);
+        doc.text(discountText, 80, priceLineY + 7);
       }
       
       // Total for this item
@@ -2269,7 +2583,7 @@ const generateOfferPdf = async (offer) => {
             : (item.price * item.quantity) - item.discountValue)
         : (item.price * item.quantity);
         
-      doc.text(`€${itemTotal.toFixed(2)}`, 180, currentY + 25, { align: 'right' });
+      doc.text(formatCurrency(itemTotal), 180, priceLineY, { align: 'right' });
       
       // Move down for the next service
       currentY += 55;
@@ -2309,7 +2623,7 @@ const generateOfferPdf = async (offer) => {
     doc.text(`Subtotal:`, 150, currentY, { align: 'right' });
     
     doc.setFont("helvetica", "bold");
-    doc.text(`€${offer.subtotal.toFixed(2)}`, 190, currentY, { align: 'right' });
+    doc.text(formatCurrency(offer.subtotal), 190, currentY, { align: 'right' });
     
     // Discount if applicable
     let finalY = currentY;
@@ -2328,7 +2642,7 @@ const generateOfferPdf = async (offer) => {
       doc.text(discountText, 150, finalY, { align: 'right' });
       
       doc.setFont("helvetica", "bold");
-      doc.text(`-€${discountAmount.toFixed(2)}`, 190, finalY, { align: 'right' });
+      doc.text(`-${formatCurrency(discountAmount)}`, 190, finalY, { align: 'right' });
     }
     
     // Total
@@ -2343,7 +2657,7 @@ const generateOfferPdf = async (offer) => {
     doc.text(`TOTAL:`, 150, finalY + 5, { align: 'right' });
     
     doc.setFontSize(14);
-    doc.text(`€${offer.totalValue.toFixed(2)}`, 190, finalY + 5, { align: 'right' });
+    doc.text(formatCurrency(offer.totalValue), 190, finalY + 5, { align: 'right' });
     
     // Add notes with better styling
     if (offer.notes) {
@@ -2681,6 +2995,11 @@ const getUserName = async (userId) => {
     if (isMobile) {
       setCurrentView('reservation');
     }
+  };
+  
+  const handleCancelQuickBooking = () => {
+    setBookingShortcutActive(false);
+    setAutoReservationQueued(false);
   };
   
   // Render service card based on category
@@ -3106,10 +3425,26 @@ const getUserName = async (userId) => {
       {/* Company Information Banner */}
       {companyInfo && (
         <div className="bg-blue-50 p-3 rounded-md mb-6 flex items-center">
-          <span className="font-medium text-blue-800 mr-2">{t.companyLabel}</span>
-          <span className="font-bold text-blue-900">{companyInfo.name}</span>
-        </div>
-      )}
+      <span className="font-medium text-blue-800 mr-2">{t.companyLabel}</span>
+      <span className="font-bold text-blue-900">{companyInfo.name}</span>
+    </div>
+  )}
+  
+  {bookingShortcutActive && (
+    <div className="bg-indigo-50 border border-indigo-200 text-indigo-900 p-3 rounded-md mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <p className="font-semibold">{t.quickBookingMode}</p>
+        <p className="text-sm text-indigo-700">{t.quickBookingInstructions}</p>
+      </div>
+      <button
+        type="button"
+        onClick={handleCancelQuickBooking}
+        className="px-3 py-1 rounded-full border border-indigo-200 bg-white text-sm font-medium text-indigo-700"
+      >
+        {t.cancel}
+      </button>
+    </div>
+  )}
       
       {/* Error message */}
       {(error || contextError) && (
@@ -3539,6 +3874,11 @@ const getUserName = async (userId) => {
                         ✕
                       </button>
                     </div>
+                    {item.selectedMonthLabel && (
+                      <p className="text-xs text-gray-500 mb-2">
+                        {item.selectedMonthLabel}
+                      </p>
+                    )}
                     
                     {/* Quantity Controls */}
                     <div className="flex items-center justify-between mb-3">
@@ -3966,6 +4306,18 @@ const getUserName = async (userId) => {
                 ) : (
                   <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
                     {filteredServices.map(service => {
+                      const monthOptions = getMonthlyOptionsForService(service, language, t);
+                      const selectedMonthKey = selectedSeasonMonths[service.id] || 'daily';
+                      const selectedMonthOption = selectedMonthKey !== 'daily'
+                        ? monthOptions.find(option => option.month === selectedMonthKey)
+                        : null;
+                      const baseDailyRate = toNumericPrice(service.originalPricing?.daily || service.price || 0);
+                      const displayPrice = selectedMonthOption ? selectedMonthOption.price : baseDailyRate;
+                      const displayUnitLabel = selectedMonthOption
+                        ? getUnitDisplayLabel(selectedMonthOption.type, t)
+                        : getUnitDisplayLabel(service.unit || 'day', t);
+                      const selectSeasonLabel = t.selectMonthLabel || 'Select season';
+                      const useStandardLabel = t.useStandardRate || 'Use standard rate';
                       // Enhanced Service Card Component
                       return (
                         <div key={service.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300">
@@ -4036,30 +4388,29 @@ const getUserName = async (userId) => {
     </div>
     
     {/* ADD MONTH SELECTOR FOR VILLAS */}
-    {service.originalPricing?.monthly && (
+    {monthOptions.length > 0 && (
       <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
         <label className="block text-xs font-medium text-green-800 mb-1">
-          📅 Select Month:
+          📅 {selectSeasonLabel}
         </label>
         <select
-          value={selectedBoatMonths[service.id] || 'daily'}
+        value={selectedMonthKey}
           onChange={(e) => {
-            setSelectedBoatMonths(prev => ({
+            setSelectedSeasonMonths(prev => ({
               ...prev,
               [service.id]: e.target.value
             }));
           }}
           className="w-full p-1 text-xs border border-green-300 rounded bg-white"
         >
-          <option value="daily">Daily Rate (€{service.originalPricing?.daily || service.price || 0})</option>
-          {Object.entries(service.originalPricing.monthly)
-            .filter(([month, price]) => price && parseFloat(price) > 0)
-            .map(([month, price]) => (
-              <option key={month} value={month}>
-                {month.charAt(0).toUpperCase() + month.slice(1)} (€{price})
-              </option>
-            ))
-          }
+          <option value="daily">
+            {useStandardLabel} (€{baseDailyRate.toLocaleString(undefined, { minimumFractionDigits: 0 })})
+          </option>
+          {monthOptions.map(option => (
+            <option key={option.month} value={option.month}>
+              {option.label} (€{option.price.toLocaleString(undefined, { minimumFractionDigits: 0 })})
+            </option>
+          ))}
         </select>
       </div>
     )}
@@ -4072,30 +4423,29 @@ const getUserName = async (userId) => {
     {service.year && <div>📅 {service.year}</div>}
     
     {/* ADD MONTH SELECTOR FOR CARS */}
-    {service.originalPricing?.monthly && (
+    {monthOptions.length > 0 && (
       <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
         <label className="block text-xs font-medium text-orange-800 mb-1">
-          📅 Select Month:
+          📅 {selectSeasonLabel}
         </label>
         <select
-          value={selectedBoatMonths[service.id] || 'daily'}
+        value={selectedMonthKey}
           onChange={(e) => {
-            setSelectedBoatMonths(prev => ({
+            setSelectedSeasonMonths(prev => ({
               ...prev,
               [service.id]: e.target.value
             }));
           }}
           className="w-full p-1 text-xs border border-orange-300 rounded bg-white"
         >
-          <option value="daily">Daily Rate (€{service.originalPricing?.daily || service.price || 0})</option>
-          {Object.entries(service.originalPricing.monthly)
-            .filter(([month, price]) => price && parseFloat(price) > 0)
-            .map(([month, price]) => (
-              <option key={month} value={month}>
-                {month.charAt(0).toUpperCase() + month.slice(1)} (€{price})
-              </option>
-            ))
-          }
+          <option value="daily">
+            {useStandardLabel} (€{baseDailyRate.toLocaleString(undefined, { minimumFractionDigits: 0 })})
+          </option>
+          {monthOptions.map(option => (
+            <option key={option.month} value={option.month}>
+              {option.label} (€{option.price.toLocaleString(undefined, { minimumFractionDigits: 0 })})
+            </option>
+          ))}
         </select>
       </div>
     )}
@@ -4111,30 +4461,29 @@ const getUserName = async (userId) => {
     </div>
     
     {/* ADD MONTH SELECTOR HERE */}
-    {service.originalPricing?.monthly && (
+    {monthOptions.length > 0 && (
       <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
         <label className="block text-xs font-medium text-blue-800 mb-1">
-          📅 Select Month:
+          📅 {selectSeasonLabel}
         </label>
         <select
-          value={selectedBoatMonths[service.id] || 'daily'}
+        value={selectedMonthKey}
           onChange={(e) => {
-            setSelectedBoatMonths(prev => ({
+            setSelectedSeasonMonths(prev => ({
               ...prev,
               [service.id]: e.target.value
             }));
           }}
           className="w-full p-1 text-xs border border-blue-300 rounded bg-white"
         >
-          <option value="daily">Daily Rate (€{service.originalPricing?.daily || 0})</option>
-          {Object.entries(service.originalPricing.monthly)
-            .filter(([month, price]) => price && parseFloat(price) > 0)
-            .map(([month, price]) => (
-              <option key={month} value={month}>
-                {month.charAt(0).toUpperCase() + month.slice(1)} (€{price})
-              </option>
-            ))
-          }
+          <option value="daily">
+            {useStandardLabel} (€{baseDailyRate.toLocaleString(undefined, { minimumFractionDigits: 0 })})
+          </option>
+          {monthOptions.map(option => (
+            <option key={option.month} value={option.month}>
+              {option.label} (€{option.price.toLocaleString(undefined, { minimumFractionDigits: 0 })})
+            </option>
+          ))}
         </select>
       </div>
     )}
@@ -4146,94 +4495,20 @@ const getUserName = async (userId) => {
                             <div className="flex items-center justify-between">
   <div>
     <div className="text-lg font-bold text-indigo-600">
-      €{(() => {
-        const selectedMonth = selectedBoatMonths[service.id] || 'daily';
-        
-        // DEBUG: Log what we're working with
-        console.log(`Price calculation for ${service.name?.en || service.name}:`, {
-          serviceId: service.id,
-          selectedMonth: selectedMonth,
-          dailyPrice: service.originalPricing?.daily,
-          monthlyData: service.originalPricing?.monthly,
-          selectedMonthPrice: service.originalPricing?.monthly?.[selectedMonth]
-        });
-        
-        // If a specific month is selected (not 'daily')
-        if (selectedMonth !== 'daily' && service.originalPricing?.monthly?.[selectedMonth]) {
-          const monthPrice = parseFloat(service.originalPricing.monthly[selectedMonth]);
-          console.log(`Using ${selectedMonth} price: ${monthPrice}`);
-          return monthPrice;
-        }
-        
-        // Otherwise use daily price
-        const dailyPrice = parseFloat(service.originalPricing?.daily || service.price || 0);
-        console.log(`Using daily price: ${dailyPrice}`);
-        return dailyPrice;
-      })()}
+      €{displayPrice.toLocaleString(undefined, { minimumFractionDigits: 0 })}
     </div>
     <div className="text-xs text-gray-500">
-      /day {selectedBoatMonths[service.id] && selectedBoatMonths[service.id] !== 'daily' 
-        ? `(${selectedBoatMonths[service.id]})` 
-        : ''}
+      {displayUnitLabel}
+      {selectedMonthOption && (
+        <span className="ml-1 text-gray-600">
+          ({selectedMonthOption.label})
+        </span>
+      )}
     </div>
   </div>
   
   <button 
-    onClick={() => {
-      const selectedMonth = selectedBoatMonths[service.id] || 'daily';
-      let finalPrice = 0;
-      
-      // CORRECTED PRICE CALCULATION
-      if (selectedMonth !== 'daily' && service.originalPricing?.monthly?.[selectedMonth]) {
-        finalPrice = parseFloat(service.originalPricing.monthly[selectedMonth]);
-      } else {
-        finalPrice = parseFloat(service.originalPricing?.daily || service.price || 0);
-      }
-      
-      console.log(`Adding to cart: ${service.name?.en}, Month: ${selectedMonth}, Price: €${finalPrice}`);
-      
-      const existingItem = offerItems.find(item => item.id === service.id);
-      
-      if (existingItem) {
-        setOfferItems(prev => prev.map(item => 
-          item.id === service.id 
-            ? { 
-                ...item, 
-                quantity: item.quantity + 1,
-                price: finalPrice,
-                originalPrice: finalPrice,
-                selectedMonth: selectedMonth
-              } 
-            : item
-        ));
-      } else {
-        // CLEAN ITEM OBJECT - Remove undefined fields
-        const newItem = { 
-          id: service.id,
-          name: service.name,
-          category: service.category,
-          price: finalPrice,
-          originalPrice: finalPrice,
-          unit: service.unit || 'day',
-          quantity: 1,
-          discountType: 'percentage',
-          discountValue: 0,
-          hasCustomDiscount: false,
-          selectedMonth: selectedMonth,
-          // Only include defined fields
-          ...(service.imageUrl && { imageUrl: service.imageUrl }),
-          ...(service.model && { model: service.model }),
-          ...(service.length && { length: service.length }),
-          ...(service.capacity && { capacity: service.capacity })
-        };
-        
-        setOfferItems(prev => [...prev, newItem]);
-      }
-      
-      if (isMobile) {
-        setTimeout(() => setCurrentView('cart'), 300);
-      }
-    }}
+    onClick={() => handleAddToOffer(service)}
     className={`bg-indigo-600 hover:bg-indigo-700 text-white ${isMobile ? 'text-xs py-2 px-3' : 'text-sm py-2 px-4'} rounded-lg transition-colors font-medium`}
   >
     {t.addToOffer}
@@ -4285,6 +4560,11 @@ const getUserName = async (userId) => {
                             ✕
                           </button>
                         </div>
+                        {item.selectedMonthLabel && (
+                          <p className="text-xs text-gray-500 mb-2">
+                            {item.selectedMonthLabel}
+                          </p>
+                        )}
                         
                         {/* Quantity Controls */}
                         <div className="flex items-center justify-between mb-2">

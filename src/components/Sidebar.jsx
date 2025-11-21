@@ -1,14 +1,19 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useDatabase } from '../context/DatabaseContext';
 import { useLanguage } from '../utils/languageHelper';
+
+const getInitialMobileState = () => {
+  if (typeof window === 'undefined') return true;
+  return window.innerWidth < 768;
+};
 
 function Sidebar({ open, setOpen }) {
   const location = useLocation();
   const [clientsExpanded, setClientsExpanded] = useState(false);
   const [servicesExpanded, setServicesExpanded] = useState(false);
   const [systemExpanded, setSystemExpanded] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isMobile, setIsMobile] = useState(getInitialMobileState);
   const { userRole } = useDatabase();
   const { language: currentLanguage, setLanguage: updateAppLanguage } = useLanguage();
 
@@ -81,15 +86,44 @@ function Sidebar({ open, setOpen }) {
   const t = translations[language];
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-      if (window.innerWidth >= 768) {
+      const nextIsMobile = window.innerWidth < 768;
+      setIsMobile(nextIsMobile);
+      if (!nextIsMobile && !open) {
         setOpen(true);
       }
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [setOpen]);
+  }, [open, setOpen]);
+
+  const closeSidebar = useCallback(() => {
+    if (isMobile) {
+      setOpen(false);
+    }
+  }, [isMobile, setOpen]);
+
+  useEffect(() => {
+    if (!isMobile) {
+      document.body.style.overflow = '';
+      return;
+    }
+    document.body.style.overflow = open ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobile, open]);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && open && isMobile) {
+        closeSidebar();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [closeSidebar, open, isMobile]);
 
   useEffect(() => {
     if (location.pathname.startsWith('/clients')) {
@@ -113,7 +147,7 @@ function Sidebar({ open, setOpen }) {
 
   const handleLinkClick = () => {
     if (isMobile) {
-      setOpen(false);
+      closeSidebar();
     }
   };
 
@@ -127,7 +161,7 @@ function Sidebar({ open, setOpen }) {
             backgroundColor: 'rgba(0, 0, 0, 0.55)',
             zIndex: 30
           }}
-          onClick={() => setOpen(false)}
+          onClick={closeSidebar}
         />
       )}
 
@@ -135,6 +169,7 @@ function Sidebar({ open, setOpen }) {
         <div className="app-sidebar__header">
           <span>{t.appName}</span>
           <button
+            type="button"
             style={{
               color: 'white',
               background: 'none',
@@ -143,7 +178,8 @@ function Sidebar({ open, setOpen }) {
               fontSize: '1.5rem',
               cursor: 'pointer'
             }}
-            onClick={() => setOpen(false)}
+            aria-label="Close sidebar"
+            onClick={closeSidebar}
           >
             ×
           </button>
@@ -165,8 +201,8 @@ function Sidebar({ open, setOpen }) {
 
           <div className="app-sidebar__category">{t.reservations}</div>
           <Link
-            to="/"
-            className={`app-sidebar__item ${location.pathname === '/' ? 'app-sidebar__item--active' : ''}`}
+            to="/reservations"
+            className={`app-sidebar__item ${location.pathname.startsWith('/reservations') ? 'app-sidebar__item--active' : ''}`}
             onClick={handleLinkClick}
           >
             <SidebarIcon path="M9.75 17a2.25 2.25 0 104.5 0m-7.5-3h10.5A1.5 1.5 0 0018 12.5V9a6 6 0 00-6-6 6 6 0 00-6 6v3.5A1.5 1.5 0 006.75 14z" />

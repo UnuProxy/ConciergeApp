@@ -82,8 +82,10 @@ const translations = {
   }
 };
 
+const adminRoles = ['admin', 'owner', 'manager', 'superadmin'];
+
 function UserManagement() {
-  const [language, setLanguage] = useState('ro'); // Default language
+  const [language, setLanguage] = useState(() => localStorage.getItem('appLanguage') || 'ro');
   const t = translations[language]; // Translation function
   
   // States
@@ -114,8 +116,29 @@ function UserManagement() {
   // Get database context
   const { currentUser, companyInfo, userRole } = useDatabase();
   
-  // Check if current user is an admin
-  const isAdmin = userRole === 'admin';
+  useEffect(() => {
+    try {
+      localStorage.setItem('appLanguage', language);
+    } catch (err) {
+      console.warn('Unable to persist language preference', err);
+    }
+  }, [language]);
+  
+  useEffect(() => {
+    const handleStorage = () => {
+      const newLang = localStorage.getItem('appLanguage');
+      if (newLang && newLang !== language) {
+        setLanguage(newLang);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [language]);
+  
+  // Check if current user is allowed to manage staff
+  const roleLoading = userRole === null || userRole === undefined;
+  const normalizedRole = (userRole || '').toLowerCase();
+  const isAdmin = adminRoles.includes(normalizedRole);
   
   // Fetch users on component mount
   useEffect(() => {
@@ -348,16 +371,26 @@ function UserManagement() {
   };
   
   // If user is not an admin, show access denied message
+  if (roleLoading) {
+    return (
+      <div className="max-w-3xl mx-auto bg-white rounded-lg shadow p-6 text-center space-y-3">
+        <h2 className="text-xl font-semibold text-gray-800">{t.title}</h2>
+        <p className="text-gray-500">{t.loading}</p>
+      </div>
+    );
+  }
+
   if (!isAdmin) {
     return (
-      <div className="bg-yellow-50 p-6 rounded-lg text-yellow-700 text-center">
-        {t.noPermission}
+      <div className="max-w-3xl mx-auto bg-white rounded-lg shadow p-6 text-center space-y-3">
+        <h2 className="text-xl font-semibold text-gray-800">{t.title}</h2>
+        <p className="text-gray-600">{t.noPermission}</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
+    <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-md p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-3">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-800">{t.title}</h2>
         

@@ -8,6 +8,38 @@ import { useDatabase } from '../../context/DatabaseContext';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
+const monthKeys = [
+  'january', 'february', 'march', 'april',
+  'may', 'june', 'july', 'august',
+  'september', 'october', 'november', 'december'
+];
+
+const monthLabels = {
+  january: 'January',
+  february: 'February',
+  march: 'March',
+  april: 'April',
+  may: 'May',
+  june: 'June',
+  july: 'July',
+  august: 'August',
+  september: 'September',
+  october: 'October',
+  november: 'November',
+  december: 'December'
+};
+
+const seasonalMonthOrder = ['may', 'june', 'july', 'august', 'september', 'october'];
+
+const seasonByMonth = {
+  may: 'extraSeason',
+  june: 'lowSeason',
+  july: 'peakSeason',
+  august: 'peakSeason',
+  september: 'lowSeason',
+  october: 'extraSeason'
+};
+
 const ensureStorageDownloadUrl = (url = '') => {
   if (!url) return '';
   const trimmed = url.trim();
@@ -147,6 +179,11 @@ const loadImageAsBase64 = async (url) => {
   return null;
 };
 
+const amenitySuggestions = {
+  en: ['Pool', 'Sauna', 'Tennis court', 'Jacuzzi', 'Gym', 'Cinema room'],
+  ro: ['Piscină', 'Saună', 'Teren de tenis', 'Jacuzzi', 'Sală de fitness', 'Cameră de cinema']
+};
+
 function Villas() {
   const dbContext = useDatabase();
   const userCompanyId = dbContext?.companyId || dbContext?.companyInfo?.id || null;
@@ -176,6 +213,7 @@ function Villas() {
     bathrooms: '',
     description_en: '',
     description_ro: '',
+    propertyLink: '',
     amenities_en: '',
     amenities_ro: '',
     owner_name: '',
@@ -192,6 +230,7 @@ function Villas() {
     label_ro: 'Tarif Standard',
     price: '',
     type: 'nightly',
+    month: '',
     dateRange_start: '',
     dateRange_end: '',
     conditions_minStay: '',
@@ -310,36 +349,36 @@ function Villas() {
     const { name, value } = e.target;
     if (!name) return;
     
+    const isPriceAmountField = name.startsWith('priceConfig_') && name.endsWith('_price');
+    
     // For price fields, restrict to numbers and decimals
-    if (name.includes('price')) {
+    if (isPriceAmountField) {
       const numericValue = value.replace(/[^0-9.]/g, '');
       if (numericValue.split('.').length > 2) return; // Prevent multiple decimal points
       
       // Handle price config fields differently
-      if (name.startsWith('priceConfig_')) {
-        const parts = name.split('_');
-        if (parts.length >= 3) {
-          const index = parseInt(parts[1]);
-          // Make a copy of the price configs array
-          const newConfigs = [...priceConfigs];
-          // Ensure the index exists
-          while (newConfigs.length <= index) {
-            newConfigs.push({
-              id: Date.now() + newConfigs.length,
-              label_en: `Rate ${newConfigs.length + 1}`,
-              label_ro: `Tarif ${newConfigs.length + 1}`,
-              price: '',
-              type: 'nightly',
-              dateRange_start: '',
-              dateRange_end: '',
-              conditions_minStay: '',
-              conditions_minGuests: '',
-              conditions_maxGuests: ''
-            });
-          }
-          newConfigs[index].price = numericValue;
-          setPriceConfigs(newConfigs);
+      const parts = name.split('_');
+      if (parts.length >= 3) {
+        const index = parseInt(parts[1]);
+        // Make a copy of the price configs array
+        const newConfigs = [...priceConfigs];
+        // Ensure the index exists
+        while (newConfigs.length <= index) {
+          newConfigs.push({
+            id: Date.now() + newConfigs.length,
+            label_en: `Rate ${newConfigs.length + 1}`,
+            label_ro: `Tarif ${newConfigs.length + 1}`,
+            price: '',
+            type: 'nightly',
+            dateRange_start: '',
+            dateRange_end: '',
+            conditions_minStay: '',
+            conditions_minGuests: '',
+            conditions_maxGuests: ''
+          });
         }
+        newConfigs[index].price = numericValue;
+        setPriceConfigs(newConfigs);
       }
       return;
     }
@@ -383,6 +422,31 @@ function Villas() {
     }));
   };
   
+  const handleAmenitySuggestionClick = (amenity) => {
+    const fieldName = `amenities_${language}`;
+    
+    setFormData(prev => {
+      const currentValue = prev[fieldName] || '';
+      const existingAmenities = currentValue
+        .split(',')
+        .map(item => item.trim())
+        .filter(Boolean);
+      
+      if (existingAmenities.some(item => item.toLowerCase() === amenity.toLowerCase())) {
+        return prev;
+      }
+      
+      const updatedValue = currentValue.trim()
+        ? `${currentValue.trim()}, ${amenity}`
+        : amenity;
+      
+      return {
+        ...prev,
+        [fieldName]: updatedValue
+      };
+    });
+  };
+  
   // Add a new price configuration
   const addPriceConfiguration = () => {
     setPriceConfigs(prev => [
@@ -393,6 +457,7 @@ function Villas() {
         label_ro: `Tarif ${prev.length + 1}`,
         price: '',
         type: 'nightly',
+        month: '',
         dateRange_start: '',
         dateRange_end: '',
         conditions_minStay: '',
@@ -419,6 +484,7 @@ function Villas() {
       bathrooms: '',
       description_en: '',
       description_ro: '',
+      propertyLink: '',
       amenities_en: '',
       amenities_ro: '',
       owner_name: '',
@@ -433,6 +499,7 @@ function Villas() {
       label_ro: 'Tarif Standard',
       price: '',
       type: 'nightly',
+      month: '',
       dateRange_start: '',
       dateRange_end: '',
       conditions_minStay: '',
@@ -520,7 +587,7 @@ function Villas() {
                 path: filePath
               });
               
-              console.log("✅ Photo uploaded successfully:", fileName);
+              console.log("✅ Photo uploaded successfully:", file?.name || filePath);
               resolve();
             } catch (urlError) {
               console.error("❌ Error getting download URL:", urlError);
@@ -541,6 +608,27 @@ function Villas() {
   
   // Convert flattened form data to structured format for database
   const prepareFormDataForSave = () => {
+    const monthlyPayload = {};
+    priceConfigs.forEach(config => {
+      if (config.month) {
+        const normalized = config.month.toLowerCase();
+        const numericValue = parseFloat(String(config.price || '').replace(/[^0-9.,-]/g, '').replace(',', '.'));
+        if (!Number.isNaN(numericValue)) {
+          monthlyPayload[normalized] = {
+            price: numericValue,
+            type: config.type || 'nightly'
+          };
+        }
+      }
+    });
+    
+    const pricingPayload = currentVilla?.pricing ? { ...currentVilla.pricing } : {};
+    if (Object.keys(monthlyPayload).length > 0) {
+      pricingPayload.monthly = monthlyPayload;
+    } else if (pricingPayload.monthly) {
+      delete pricingPayload.monthly;
+    }
+    
     // Convert flat form data to nested structure
     return {
       name: {
@@ -557,6 +645,7 @@ function Villas() {
         en: formData.description_en || '',
         ro: formData.description_ro || ''
       },
+      propertyLink: (formData.propertyLink || '').trim(),
       amenities: {
         en: formData.amenities_en || '',
         ro: formData.amenities_ro || ''
@@ -579,6 +668,7 @@ function Villas() {
         },
         price: config.price || '',
         type: config.type || 'nightly',
+        month: config.month || '',
         dateRange: {
           start: config.dateRange_start || '',
           end: config.dateRange_end || ''
@@ -588,7 +678,8 @@ function Villas() {
           minGuests: config.conditions_minGuests || '',
           maxGuests: config.conditions_maxGuests || ''
         }
-      }))
+      })),
+      pricing: pricingPayload
     };
   };
   
@@ -741,6 +832,7 @@ function Villas() {
       bathrooms: villa.bathrooms || '',
       description_en: villa.description?.en || '',
       description_ro: villa.description?.ro || '',
+      propertyLink: villa.propertyLink || villa.property_link || '',
       amenities_en: villa.amenities?.en || '',
       amenities_ro: villa.amenities?.ro || '',
       owner_name: villa.owner?.name || '',
@@ -759,6 +851,7 @@ function Villas() {
           label_ro: config.label?.ro || '',
           price: config.price || '',
           type: config.type || 'nightly',
+          month: config.month || '',
           dateRange_start: config.dateRange?.start || '',
           dateRange_end: config.dateRange?.end || '',
           conditions_minStay: config.conditions?.minStay || '',
@@ -863,6 +956,18 @@ const createEnhancedCoverPage = async (doc, villa, villaName, designSystem) => {
   doc.text(location.toUpperCase(), spacing.page, currentY);
   currentY += 20;
   
+  if (villa.propertyLink) {
+    doc.setFontSize(fonts.body.size);
+    doc.setTextColor(...colors.lightText);
+    doc.setFont('helvetica', 'normal');
+    const linkLines = doc.splitTextToSize(villa.propertyLink, pageWidth - (spacing.page * 2));
+    linkLines.forEach((line, index) => {
+      const yPos = currentY + (index * 5);
+      doc.textWithLink(line, spacing.page, yPos, { url: villa.propertyLink });
+    });
+    currentY += (linkLines.length * 5) + spacing.text;
+  }
+  
   // Main image - simplified loading
   const coverPhoto = Array.isArray(villa.photos) ? villa.photos.find(photo => photo?.url) : null;
   if (coverPhoto?.url) {
@@ -879,6 +984,9 @@ const createEnhancedCoverPage = async (doc, villa, villaName, designSystem) => {
         doc.rect(spacing.page + 1, currentY + 1, imgWidth, imgHeight, 'F');
         
         doc.addImage(imgData, 'JPEG', spacing.page, currentY, imgWidth, imgHeight);
+        if (villa.propertyLink) {
+          doc.link(spacing.page, currentY, imgWidth, imgHeight, { url: villa.propertyLink });
+        }
         
         // Clean border
         doc.setDrawColor(...colors.line);
@@ -1017,6 +1125,27 @@ const createEnhancedDetailsPage = (doc, villa, designSystem) => {
   });
   
   currentY += (specs.length * 14) + spacing.section;
+  
+    if (villa.propertyLink) {
+      const availableWidth = pageWidth - (spacing.page * 2) - 8;
+      const linkLines = doc.splitTextToSize(villa.propertyLink, availableWidth);
+      
+      doc.setFontSize(fonts.heading.size);
+      doc.setTextColor(...colors.primary);
+      doc.setFont('helvetica', 'bold');
+      doc.text('WEBSITE LINK', spacing.page, currentY);
+      currentY += 10;
+      
+      doc.setFontSize(fonts.body.size);
+      doc.setTextColor(...colors.text);
+      doc.setFont('helvetica', 'normal');
+      linkLines.forEach((line, index) => {
+        const yPos = currentY + (index * 5);
+        doc.textWithLink(line, spacing.page + 4, yPos, { url: villa.propertyLink });
+      });
+      
+      currentY += (linkLines.length * 5) + spacing.section;
+    }
   
   // Full description - use the rich content from your data
   const description = getLocalizedContent(villa.description, 'en', '');
@@ -1465,6 +1594,10 @@ const getCleanDesignSystem = () => ({
       bathrooms: "Bathrooms",
       description: "Description",
       amenities: "Amenities",
+      propertyLink: "Property Link",
+      propertyLinkPlaceholder: "Paste the public URL of this villa",
+      propertyLinkInfo: "We will embed this link inside the generated PDF.",
+      commonAmenities: "Common amenities (tap to add)",
       owner: "Owner",
       email: "Email",
       phone: "Phone",
@@ -1484,6 +1617,11 @@ const getCleanDesignSystem = () => ({
       priceOptions: "Price Options",
       addPriceOption: "Add Price Option",
       priceLabel: "Price Label",
+      monthSelection: "Applicable Month",
+      selectMonth: "Select month",
+      peakSeason: "Peak Season",
+      lowSeason: "Low Season",
+      extraSeason: "Extra Season",
       perNight: "Per Night",
       perWeek: "Per Week",
       perMonth: "Per Month",
@@ -1524,6 +1662,10 @@ const getCleanDesignSystem = () => ({
       bathrooms: "Băi",
       description: "Descriere",
       amenities: "Facilități",
+      propertyLink: "Link Proprietate",
+      propertyLinkPlaceholder: "Inserează URL-ul public al vilei",
+      propertyLinkInfo: "Linkul va fi inclus în PDF-ul generat.",
+      commonAmenities: "Facilități comune (apasă pentru a le adăuga)",
       owner: "Proprietar",
       email: "Email",
       phone: "Telefon",
@@ -1543,6 +1685,11 @@ const getCleanDesignSystem = () => ({
       priceOptions: "Opțiuni de Preț",
       addPriceOption: "Adaugă Opțiune de Preț",
       priceLabel: "Etichetă Preț",
+      monthSelection: "Lună aplicabilă",
+      selectMonth: "Selectează luna",
+      peakSeason: "Sezon de vârf",
+      lowSeason: "Sezon redus",
+      extraSeason: "Sezon extra",
       perNight: "Pe Noapte", 
       perWeek: "Pe Săptămână",
       perMonth: "Pe Lună",
@@ -2078,20 +2225,32 @@ const getCleanDesignSystem = () => ({
               )}
               
               {/* Actions */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <button
                   onClick={() => {
-  setCurrentPdfVilla(villa);
-  setIsGeneratingPDF(true);
-  generateEnhancedVillaPDF(); // ← Keep this the same - the function exists
-}}
+                    setCurrentPdfVilla(villa);
+                    setIsGeneratingPDF(true);
+                    generateEnhancedVillaPDF();
+                  }}
+                  style={{
+                    padding: '0.35rem 0.9rem',
+                    borderRadius: '999px',
+                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 500,
+                    background: '#f8f9fb',
+                    color: '#1f2937',
+                    boxShadow: '0 8px 18px rgba(15, 23, 42, 0.08)',
+                    cursor: 'pointer'
+                  }}
                 >
                   {t.generatePDF}
                 </button>
                 <button
                   onClick={() => startEditingVilla(villa)}
                   style={{ 
-                    marginRight: '0.5rem',
                     padding: '0.375rem 0.75rem', 
                     backgroundColor: '#10B981', 
                     color: 'white',
@@ -2245,6 +2404,28 @@ const getCleanDesignSystem = () => ({
                   }}
                 ></textarea>
               </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem' }}>
+                  {t.propertyLink}
+                </label>
+                <input
+                  type="url"
+                  name="propertyLink"
+                  placeholder={t.propertyLinkPlaceholder}
+                  value={formData.propertyLink || ''}
+                  onChange={handleInputChange}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '0.375rem'
+                  }}
+                />
+                <p style={{ fontSize: '0.8rem', color: '#6B7280', marginTop: '0.25rem' }}>
+                  {t.propertyLinkInfo}
+                </p>
+              </div>
               
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem' }}>
@@ -2262,6 +2443,30 @@ const getCleanDesignSystem = () => ({
                     borderRadius: '0.375rem'
                   }}
                 />
+                <div style={{ marginTop: '0.5rem' }}>
+                  <p style={{ fontSize: '0.825rem', color: '#374151', marginBottom: '0.25rem' }}>
+                    {t.commonAmenities}
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    {(amenitySuggestions[language] || amenitySuggestions.en).map((amenity) => (
+                      <button
+                        key={amenity}
+                        type="button"
+                        onClick={() => handleAmenitySuggestionClick(amenity)}
+                        style={{
+                          border: '1px solid #D1D5DB',
+                          borderRadius: '9999px',
+                          padding: '0.25rem 0.75rem',
+                          backgroundColor: '#F9FAFB',
+                          fontSize: '0.75rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {amenity}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
               
               {/* Owner Section */}
@@ -2487,6 +2692,37 @@ const getCleanDesignSystem = () => ({
                         </select>
                       </div>
                     </div>
+
+                    {(config.type === 'monthly' || config.type === 'weekly') && (
+                      <div style={{ marginBottom: '1rem' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
+                          {t.monthSelection || 'Applicable Month'}
+                        </label>
+                        <select
+                          name={`priceConfig_${index}_month`}
+                          value={config.month || ''}
+                          onChange={handleInputChange}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem',
+                            border: '1px solid #D1D5DB',
+                            borderRadius: '0.375rem'
+                          }}
+                        >
+                          <option value="">{t.selectMonth || 'Select month'}</option>
+                          {seasonalMonthOrder.map((month) => {
+                            const monthDate = new Date(`${month} 1, 2020`);
+                            const monthName = monthDate.toLocaleString(language === 'ro' ? 'ro-RO' : 'en-GB', { month: 'long' });
+                            const capitalized = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+                            const seasonLabel = seasonByMonth[month] ? t[seasonByMonth[month]] : '';
+                            return (
+                            <option key={month} value={month}>
+                              {seasonLabel ? `${capitalized} (${seasonLabel})` : capitalized}
+                            </option>
+                          );})}
+                        </select>
+                      </div>
+                    )}
                     
                     {/* Date Range */}
                     <div style={{ marginBottom: '1rem' }}>
@@ -2599,7 +2835,7 @@ const getCleanDesignSystem = () => ({
                   </div>
                 ))}
               </div>
-              
+            
               {/* Photos */}
               <div style={{ marginBottom: '1.5rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem' }}>
@@ -2784,6 +3020,9 @@ const getCleanDesignSystem = () => ({
                     <p><strong>{t.address}:</strong> {getLocalizedContent(currentPdfVilla.address, language)}</p>
                     <p><strong>{t.bedrooms}:</strong> {currentPdfVilla.bedrooms || 0}</p>
                     <p><strong>{t.bathrooms}:</strong> {currentPdfVilla.bathrooms || 0}</p>
+                    {currentPdfVilla.propertyLink && (
+                      <p><strong>{t.propertyLink}:</strong> {currentPdfVilla.propertyLink}</p>
+                    )}
                   </div>
                   
                   {currentPdfVilla.photos && currentPdfVilla.photos.length > 0 && (
