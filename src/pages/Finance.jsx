@@ -16,6 +16,7 @@ const Finance = () => {
   const [activeSubView, setActiveSubView] = useState(null);
   const [companyId, setCompanyId] = useState(null);
   const [userEmail, setUserEmail] = useState(null);
+  const [userId, setUserId] = useState(null);
   const [toast, setToast] = useState({ show: false, message: '' });
   
   // Form states
@@ -215,6 +216,7 @@ const Finance = () => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUserEmail(user.email);
+        setUserId(user.uid);
         
         try {
           const companiesRef = collection(db, 'companies');
@@ -229,6 +231,7 @@ const Finance = () => {
         }
       } else {
         setUserEmail(null);
+        setUserId(null);
         setCompanyId(null);
       }
     });
@@ -240,6 +243,16 @@ const Finance = () => {
   useEffect(() => {
     const fetchData = async () => {
       if (!companyId) return;
+
+      const isOwnedByCurrentUser = (record) => {
+        const createdByMatch = record.createdBy && userId && record.createdBy === userId;
+        const createdByEmailMatch = record.createdByEmail && userEmail && record.createdByEmail === userEmail;
+        // Enforce ownership if metadata exists; allow legacy records without it
+        if (record.createdBy || record.createdByEmail) {
+          return createdByMatch || createdByEmailMatch;
+        }
+        return true;
+      };
       
       try {
         setLoading(true);
@@ -254,12 +267,14 @@ const Finance = () => {
           return {
             id: doc.id,
             ...data,
+            createdBy: data.createdBy,
+            createdByEmail: data.createdByEmail,
             clientIncome: data.paidAmount || 0,
             service: data.accommodationType || 'Unknown',
             date: data.createdAt ? new Date(data.createdAt.seconds * 1000).toISOString().split('T')[0] : '',
             description: `${data.accommodationType || 'Booking'} - ${data.checkIn || 'N/A'} to ${data.checkOut || 'N/A'}`
           };
-        });
+        }).filter(isOwnedByCurrentUser);
         
         setReservations(reservationsList);
         
@@ -273,12 +288,14 @@ const Finance = () => {
           return {
             id: doc.id,
             ...data,
+            createdBy: data.createdBy,
+            createdByEmail: data.createdByEmail,
             category: data.category || 'Unknown',
             amount: data.amount || 0,
             date: data.date ? new Date(data.date.seconds * 1000).toISOString().split('T')[0] : '',
             description: data.description || ''
           };
-        });
+        }).filter(isOwnedByCurrentUser);
         
         setCategoryPayments(paymentsList);
         
@@ -292,11 +309,13 @@ const Finance = () => {
           return {
             id: doc.id,
             ...data,
+            createdBy: data.createdBy,
+            createdByEmail: data.createdByEmail,
             amount: data.amount || 0,
             date: data.date ? new Date(data.date.seconds * 1000).toISOString().split('T')[0] : '',
             description: data.description || ''
           };
-        });
+        }).filter(isOwnedByCurrentUser);
         
         setExpenses(expensesList);
       } catch (error) {
@@ -307,7 +326,7 @@ const Finance = () => {
     };
 
     fetchData();
-  }, [db, companyId]);
+  }, [db, companyId, userEmail, userId]);
 
   // Calculate summary data
   const categoryIncomeData = reservations.reduce((acc, r) => {
@@ -379,6 +398,8 @@ const Finance = () => {
     try {
       await addDoc(collection(db, 'categoryPayments'), {
         companyId,
+        createdBy: userId || null,
+        createdByEmail: userEmail || null,
         category: newPayment.category,
         amount: parseFloat(newPayment.amount),
         date: new Date(newPayment.date),
@@ -389,6 +410,8 @@ const Finance = () => {
       const payment = {
         id: `payment-${Date.now()}`,
         companyId,
+        createdBy: userId || null,
+        createdByEmail: userEmail || null,
         ...newPayment,
         amount: parseFloat(newPayment.amount)
       };
@@ -425,6 +448,8 @@ const Finance = () => {
     try {
       await addDoc(collection(db, 'expenses'), {
         companyId,
+        createdBy: userId || null,
+        createdByEmail: userEmail || null,
         category: newExpense.category,
         amount: parseFloat(newExpense.amount),
         date: new Date(newExpense.date),
@@ -435,6 +460,8 @@ const Finance = () => {
       const expense = {
         id: `expense-${Date.now()}`,
         companyId,
+        createdBy: userId || null,
+        createdByEmail: userEmail || null,
         ...newExpense,
         amount: parseFloat(newExpense.amount)
       };
