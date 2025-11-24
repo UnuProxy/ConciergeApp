@@ -82,7 +82,8 @@ const translations = {
   }
 };
 
-const adminRoles = ['admin', 'owner', 'manager', 'superadmin'];
+// Allow common admin role variants to unlock the page
+const adminRoles = ['admin', 'administrator', 'owner', 'manager', 'superadmin'];
 
 function UserManagement() {
   const [language, setLanguage] = useState(() => localStorage.getItem('appLanguage') || 'ro');
@@ -137,15 +138,15 @@ function UserManagement() {
   
   // Check if current user is allowed to manage staff
   const roleLoading = userRole === null || userRole === undefined;
-  const normalizedRole = (userRole || '').toLowerCase();
+  const normalizedRole = (userRole || '').toString().trim().toLowerCase();
   const isAdmin = adminRoles.includes(normalizedRole);
   
   // Fetch users on component mount
   useEffect(() => {
-    if (companyInfo) {
+    if (companyInfo && currentUser) {
       fetchUsers();
     }
-  }, [companyInfo]);
+  }, [companyInfo, currentUser]);
   
   // Filter users when search term changes
   useEffect(() => {

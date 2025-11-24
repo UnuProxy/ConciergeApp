@@ -167,7 +167,14 @@ function Sidebar({ open, setOpen }) {
 
       <nav className={sidebarClass}>
         <div className="app-sidebar__header">
-          <span>{t.appName}</span>
+          <Link 
+            to="/" 
+            className="app-sidebar__brand" 
+            onClick={handleLinkClick}
+            style={{ color: 'inherit', textDecoration: 'none' }}
+          >
+            {t.appName}
+          </Link>
           <button
             type="button"
             style={{

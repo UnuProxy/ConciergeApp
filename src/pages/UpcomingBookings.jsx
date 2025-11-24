@@ -1734,8 +1734,20 @@ useEffect(() => {
             console.warn(`Booking ${doc.id} has wrong company ID: ${data.companyId} vs ${userCompanyId}`);
           }
         });
+
+        // Keep only current or future bookings; drop finished stays
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const activeOrUpcomingBookings = bookingsData.filter((booking) => {
+          const checkIn = booking.checkIn ? new Date(booking.checkIn) : null;
+          const checkOut = booking.checkOut ? new Date(booking.checkOut) : checkIn;
+          if (!checkIn) return false;
+          checkIn.setHours(0, 0, 0, 0);
+          if (checkOut) checkOut.setHours(0, 0, 0, 0);
+          return checkOut >= today;
+        });
         
-        setBookings(bookingsData);
+        setBookings(activeOrUpcomingBookings);
         
         // Fetch client details with company filtering
         const clientDetailsObj = {};
@@ -1760,7 +1772,7 @@ useEffect(() => {
         
         // Group bookings by client
         const groups = {};
-        bookingsData.forEach(booking => {
+        activeOrUpcomingBookings.forEach(booking => {
           const clientId = booking.clientId || 'unknown';
           const clientName =
             clientDetailsObj[clientId]?.name ||
