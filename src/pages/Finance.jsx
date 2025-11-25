@@ -126,7 +126,8 @@ const Finance = () => {
       expenseAdded: 'Cheltuială adăugată cu succes!',
       errorCompanyNotFound: 'Nu s-a găsit compania',
       errorValidation: 'Completează toate câmpurile',
-      errorSaving: 'Eroare la salvare. Încearcă din nou.'
+      errorSaving: 'Eroare la salvare. Încearcă din nou.',
+      noFinancialData: 'Nu există date financiare de afișat'
     },
     en: {
       // Page titles
@@ -202,7 +203,8 @@ const Finance = () => {
       expenseAdded: 'Expense added successfully!',
       errorCompanyNotFound: 'Company not found',
       errorValidation: 'Please fill all fields',
-      errorSaving: 'Error saving. Please try again.'
+      errorSaving: 'Error saving. Please try again.',
+      noFinancialData: 'No financial data to display'
     }
   };
 
@@ -646,6 +648,17 @@ const Finance = () => {
         <div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin mb-4"></div>
         <p className="text-gray-700 font-medium mb-2">{t.errorCompanyNotFound}</p>
         {error && <p className="text-gray-500 text-sm">{error}</p>}
+      </div>
+    );
+  }
+
+  const hasFinancialData = reservations.length > 0 || categoryPayments.length > 0 || expenses.length > 0;
+
+  if (!hasFinancialData) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-gray-100 p-6 text-center">
+        <div className="w-12 h-12 border-4 border-gray-300 border-t-transparent rounded-full animate-spin mb-4 opacity-60"></div>
+        <p className="text-gray-700 font-medium">{t.noFinancialData}</p>
       </div>
     );
   }
