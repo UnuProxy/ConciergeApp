@@ -12,6 +12,8 @@ const Finance = () => {
   const [categoryPayments, setCategoryPayments] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activeSubView, setActiveSubView] = useState(null);
   const [companyId, setCompanyId] = useState(null);
@@ -219,30 +221,62 @@ const Finance = () => {
         setUserId(user.uid);
         
         try {
-          const companiesRef = collection(db, 'companies');
-          const q = query(companiesRef, where("contactEmail", "==", user.email));
-          const querySnapshot = await getDocs(q);
-          
-          if (!querySnapshot.empty) {
-            setCompanyId(querySnapshot.docs[0].id);
+          let resolvedCompanyId = null;
+
+          // Prefer the centralized authorized_users mapping used across the app
+          const authorizedUsersRef = collection(db, 'authorized_users');
+          const authorizedQuery = query(authorizedUsersRef, where('email', '==', user.email));
+          const authorizedSnapshot = await getDocs(authorizedQuery);
+
+          if (!authorizedSnapshot.empty) {
+            const authorizedData = authorizedSnapshot.docs[0].data();
+            if (authorizedData.companyId) {
+              resolvedCompanyId = authorizedData.companyId;
+            }
+          }
+
+          // Fallback to companies collection using contactEmail (legacy behaviour)
+          if (!authorizedSnapshot || authorizedSnapshot.empty) {
+            const companiesRef = collection(db, 'companies');
+            const companiesQuery = query(companiesRef, where('contactEmail', '==', user.email));
+            const companySnapshot = await getDocs(companiesQuery);
+            if (!companySnapshot.empty) {
+              resolvedCompanyId = companySnapshot.docs[0].id;
+            }
+          }
+
+          if (resolvedCompanyId) {
+            setCompanyId(resolvedCompanyId);
+            setError(null);
+          } else {
+            setError(t.errorCompanyNotFound);
           }
         } catch (error) {
           console.error("Error finding company:", error);
+          setError(t.errorCompanyNotFound);
         }
       } else {
         setUserEmail(null);
         setUserId(null);
         setCompanyId(null);
       }
+
+      setAuthChecked(true);
+      setLoading(false);
     });
     
     return () => unsubscribe();
-  }, [auth, db]);
+  }, [auth, db, t.errorCompanyNotFound]);
 
   // Fetch data
   useEffect(() => {
     const fetchData = async () => {
-      if (!companyId) return;
+      if (!companyId) {
+        if (authChecked) {
+          setLoading(false);
+        }
+        return;
+      }
 
       const isOwnedByCurrentUser = (record) => {
         const createdByMatch = record.createdBy && userId && record.createdBy === userId;
@@ -326,7 +360,7 @@ const Finance = () => {
     };
 
     fetchData();
-  }, [db, companyId, userEmail, userId]);
+  }, [db, companyId, userEmail, userId, authChecked]);
 
   // Calculate summary data
   const categoryIncomeData = reservations.reduce((acc, r) => {
@@ -602,6 +636,16 @@ const Finance = () => {
       <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
         <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
         <p className="text-gray-600">{t.loading}</p>
+      </div>
+    );
+  }
+
+  if (authChecked && !companyId) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-gray-100 p-6 text-center">
+        <div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-gray-700 font-medium mb-2">{t.errorCompanyNotFound}</p>
+        {error && <p className="text-gray-500 text-sm">{error}</p>}
       </div>
     );
   }
