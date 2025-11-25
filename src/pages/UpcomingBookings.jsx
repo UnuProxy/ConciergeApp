@@ -1278,17 +1278,19 @@ const UpcomingBookings = () => {
   
   // Simplified UI states (declare before dependent hooks)
   const getStoredTimeFilter = () => {
-    if (typeof window === 'undefined') return 'all';
+    if (typeof window === 'undefined') return 'active';
+    const validFilters = ['active', 'upcoming', 'past'];
     try {
-      return localStorage.getItem('reservationsTimeFilter') || 'all';
+      const stored = localStorage.getItem('reservationsTimeFilter');
+      return validFilters.includes(stored) ? stored : 'active';
     } catch (err) {
       console.warn('Unable to read stored time filter', err);
-      return 'all';
+      return 'active';
     }
   };
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [timeFilter, setTimeFilter] = useState(getStoredTimeFilter); // Default to showing all
+  const [timeFilter, setTimeFilter] = useState(getStoredTimeFilter); // Default to showing active stays
   const [sortOption, setSortOption] = useState('date');
   
   const summaryStats = useMemo(() => {
@@ -1384,9 +1386,8 @@ const UpcomingBookings = () => {
 
   const filterTabs = useMemo(
     () => [
-      { id: 'all', label: t.all, count: summaryStats.totalBookings, icon: 'list' },
-      { id: 'upcoming', label: t.upcoming, count: summaryStats.upcoming, icon: 'calendar' },
       { id: 'active', label: t.activeNow, count: summaryStats.active, icon: 'clock' },
+      { id: 'upcoming', label: t.upcoming, count: summaryStats.upcoming, icon: 'calendar' },
       { id: 'past', label: t.past, count: summaryStats.past, icon: 'history' }
     ],
     [t, summaryStats]
@@ -2186,18 +2187,18 @@ const openAddShoppingModal = (client) => {
 // 4. FIXED: renderMainContent function (around line 1200)
 const renderMainContent = (filteredClients) => {
   if (filteredClients.length === 0) {
+    const emptyMessage =
+      timeFilter === 'upcoming' ? t.noUpcomingBookings :
+      timeFilter === 'active' ? t.noActiveBookings :
+      t.noPastBookings;
+
     return (
       <div className="bg-white rounded-lg shadow-sm p-8 text-center">
         <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3M3 11h18M3 21h18M5 21V5m14 0v16"></path>
         </svg>
         <h3 className="text-lg font-medium text-gray-700 mb-2">{t.noBookingsFound}</h3>
-        <p className="text-gray-500">
-          {timeFilter === 'upcoming' ? t.noUpcomingBookings :
-           timeFilter === 'active' ? t.noActiveBookings :
-           timeFilter === 'past' ? t.noPastBookings :
-           t.noMatchingBookings}
-        </p>
+        <p className="text-gray-500">{emptyMessage}</p>
         {searchQuery && (
           <p className="mt-2 text-sm text-gray-500">
             {t.tryChangingSearch}

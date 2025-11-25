@@ -11,9 +11,192 @@ import {
   limit
 } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
+import { useLanguage } from '../utils/languageHelper';
+
+const DASHBOARD_TRANSLATIONS = {
+  en: {
+    greetings: {
+      morning: 'Good Morning',
+      afternoon: 'Good Afternoon',
+      evening: 'Good Evening'
+    },
+    loading: 'Loading Elite Dashboard...',
+    labels: {
+      activeRequests: 'Active Requests',
+      currentWeek: 'Current week',
+      pending: 'Pending',
+      requiresAttention: 'Requires attention',
+      todayRevenue: 'Today Revenue',
+      revenueStatus: 'Revenue Status',
+      activeStatus: 'Active',
+      pendingStatus: 'Pending',
+      todayPerformance: "Today's performance",
+      vipClients: 'VIP Clients',
+      totalPortfolio: 'Total portfolio',
+      commandCenter: 'Command Center',
+      administrator: 'Administrator',
+      access: 'Access',
+      at: 'at'
+    },
+    roles: {
+      admin: 'Administrator',
+      manager: 'Manager',
+      user: 'User',
+      employee: 'Employee',
+      agent: 'Agent'
+    },
+    actions: {
+      reservations: 'Reservations',
+      luxuryBookings: 'Luxury Bookings',
+      vipClients: 'VIP Clients',
+      clientRelations: 'Client Relations',
+      conciergeServices: 'Concierge Services',
+      servicePortfolio: 'Service Portfolio',
+      propertyPortfolio: 'Property Portfolio',
+      villasEstates: 'Villas & Estates',
+      fleetManagement: 'Fleet Management',
+      yachtsVehicles: 'Yachts & Vehicles',
+      financialControl: 'Financial Control',
+      revenueAnalytics: 'Revenue Analytics',
+      currentBookings: 'Current Bookings',
+      clientDirectory: 'Client Directory',
+      serviceRequests: 'Service Requests',
+      availableProperties: 'Available Properties'
+    },
+    sections: {
+      executiveControl: 'Executive Control',
+      userManagement: 'User Management',
+      teamAccessControl: 'Team access control',
+      financialOverview: 'Financial Overview',
+      systemControl: 'System Control',
+      platformConfiguration: 'Platform configuration',
+      recentActivity: 'Recent Activity',
+      vipArrivals: 'VIP Arrivals'
+    },
+    empty: {
+      noRecentActivity: 'No recent activity',
+      noUpcomingArrivals: 'No upcoming arrivals'
+    },
+    timeAgo: {
+      justNow: 'Just now',
+      oneMinute: '1 min ago',
+      minutes: '{count}m ago',
+      oneHour: '1h ago',
+      hours: '{count}h ago',
+      oneDay: '1d ago',
+      days: '{count}d ago'
+    },
+    priorityLabels: {
+      urgent: 'Urgent',
+      high: 'High priority',
+      normal: 'Normal'
+    },
+    statusLabels: {
+      paid: 'Paid',
+      pending: 'Pending',
+      notPaid: 'Not paid',
+      cancelled: 'Cancelled',
+      confirmed: 'Confirmed'
+    },
+    misc: {
+      unknownClient: 'Unknown client'
+    }
+  },
+  ro: {
+    greetings: {
+      morning: 'Bună dimineața',
+      afternoon: 'Bună ziua',
+      evening: 'Bună seara'
+    },
+    loading: 'Se încarcă tabloul de bord...',
+    labels: {
+      activeRequests: 'Solicitări active',
+      currentWeek: 'Săptămâna curentă',
+      pending: 'În așteptare',
+      requiresAttention: 'Necesită atenție',
+      todayRevenue: 'Venituri azi',
+      revenueStatus: 'Stare venituri',
+      activeStatus: 'Activ',
+      pendingStatus: 'În așteptare',
+      todayPerformance: 'Performanța de azi',
+      vipClients: 'Clienți VIP',
+      totalPortfolio: 'Portofoliu total',
+      commandCenter: 'Centru de comandă',
+      administrator: 'Administrator',
+      access: 'Acces',
+      at: 'la'
+    },
+    roles: {
+      admin: 'Administrator',
+      manager: 'Manager',
+      user: 'Utilizator',
+      employee: 'Angajat',
+      agent: 'Agent'
+    },
+    actions: {
+      reservations: 'Rezervări',
+      luxuryBookings: 'Rezervări luxury',
+      vipClients: 'Clienți VIP',
+      clientRelations: 'Relații clienți',
+      conciergeServices: 'Servicii Concierge',
+      servicePortfolio: 'Portofoliu servicii',
+      propertyPortfolio: 'Portofoliu proprietăți',
+      villasEstates: 'Vile & Proprietăți',
+      fleetManagement: 'Administrare flotă',
+      yachtsVehicles: 'Iahturi & Vehicule',
+      financialControl: 'Control financiar',
+      revenueAnalytics: 'Analiză venituri',
+      currentBookings: 'Rezervări curente',
+      clientDirectory: 'Agenda clienților',
+      serviceRequests: 'Solicitări servicii',
+      availableProperties: 'Proprietăți disponibile'
+    },
+    sections: {
+      executiveControl: 'Control executiv',
+      userManagement: 'Administrare utilizatori',
+      teamAccessControl: 'Control acces echipă',
+      financialOverview: 'Prezentare financiară',
+      systemControl: 'Control sistem',
+      platformConfiguration: 'Configurare platformă',
+      recentActivity: 'Activitate recentă',
+      vipArrivals: 'Sosiri VIP'
+    },
+    empty: {
+      noRecentActivity: 'Nu există activitate recentă',
+      noUpcomingArrivals: 'Nu există sosiri viitoare'
+    },
+    timeAgo: {
+      justNow: 'Chiar acum',
+      oneMinute: 'Acum 1 minut',
+      minutes: 'Acum {count} minute',
+      oneHour: 'Acum 1 oră',
+      hours: 'Acum {count} ore',
+      oneDay: 'Acum 1 zi',
+      days: 'Acum {count} zile'
+    },
+    priorityLabels: {
+      urgent: 'Urgent',
+      high: 'Prioritar',
+      normal: 'Normal'
+    },
+    statusLabels: {
+      paid: 'Plătit',
+      pending: 'În așteptare',
+      notPaid: 'Neplătit',
+      cancelled: 'Anulat',
+      confirmed: 'Confirmat'
+    },
+    misc: {
+      unknownClient: 'Client necunoscut'
+    }
+  }
+};
 
 function Dashboard() {
   const navigate = useNavigate();
+  const { language } = useLanguage();
+  const locale = language === 'ro' ? 'ro-RO' : 'en-US';
+  const t = DASHBOARD_TRANSLATIONS[language] || DASHBOARD_TRANSLATIONS.en;
   const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [userCompanyId, setUserCompanyId] = useState(null);
@@ -79,11 +262,11 @@ function Dashboard() {
 
     const fetchDashboardData = async () => {
       try {
-        setLoading(true);
-        
-        const reservationsQuery = query(
-          collection(db, 'reservations'),
-          where('companyId', '==', userCompanyId)
+    setLoading(true);
+    
+    const reservationsQuery = query(
+      collection(db, 'reservations'),
+      where('companyId', '==', userCompanyId)
         );
         const reservationsSnapshot = await getDocs(reservationsQuery);
         const reservations = [];
@@ -123,12 +306,13 @@ function Dashboard() {
           .slice(0, 6)
           .map(item => {
             const createdAt = item.createdAt?.toDate?.() || new Date(item.createdAt || Date.now());
+            const bookingStatus = item.status || 'confirmed';
             return {
               id: item.id,
               type: 'booking',
-              client: item.clientName || 'Unknown Client',
-              action: `${item.accommodationType || 'Booking'} - ${item.status || 'confirmed'}`,
-              time: getTimeAgo(createdAt),
+              client: item.clientName || t.misc.unknownClient,
+              accommodationType: item.accommodationType || t.actions.reservations,
+              bookingStatus,
               status: item.paymentStatus || 'pending',
               value: item.totalValue || 0,
               createdAt
@@ -158,11 +342,7 @@ function Dashboard() {
             return {
               id: booking.id,
               title: `${booking.accommodationType || 'Check-in'} - ${booking.clientName}`,
-              time: checkInDate.toLocaleTimeString('en-US', { 
-                hour: '2-digit', 
-                minute: '2-digit' 
-              }),
-              date: checkInDate.toLocaleDateString(),
+              checkInDate,
               priority: isToday ? 'urgent' : isTomorrow ? 'high' : 'normal',
               value: booking.totalValue || 0,
               type: 'checkin'
@@ -196,23 +376,25 @@ function Dashboard() {
     };
 
     fetchDashboardData();
-  }, [userCompanyId]);
+  }, [userCompanyId, language]);
+
+  const formatRelative = (template, count) => template.replace('{count}', count);
 
   const getTimeAgo = (date) => {
     const now = new Date();
     const diffInMinutes = Math.floor((now - date) / (1000 * 60));
     
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes === 1) return '1 min ago';
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    if (diffInMinutes < 1) return t.timeAgo.justNow;
+    if (diffInMinutes === 1) return t.timeAgo.oneMinute;
+    if (diffInMinutes < 60) return formatRelative(t.timeAgo.minutes, diffInMinutes);
     
     const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours === 1) return '1h ago';
-    if (diffInHours < 24) return `${diffInHours}h ago`;
+    if (diffInHours === 1) return t.timeAgo.oneHour;
+    if (diffInHours < 24) return formatRelative(t.timeAgo.hours, diffInHours);
     
     const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays === 1) return '1d ago';
-    return `${diffInDays}d ago`;
+    if (diffInDays === 1) return t.timeAgo.oneDay;
+    return formatRelative(t.timeAgo.days, diffInDays);
   };
 
   // Premium Icons - Perfectly matched to functions
@@ -259,98 +441,104 @@ function Dashboard() {
   );
 
   // Premium action sets - mobile optimized
-  const adminActions = [
+  const buildAdminActions = () => [
     {
-      title: 'Reservations',
-      subtitle: 'Luxury Bookings',
+      title: t.actions.reservations,
+      subtitle: t.actions.luxuryBookings,
       action: () => navigate('/reservations'),
       icon: IconReservations,
       primary: true
     },
     {
-      title: 'VIP Clients',
-      subtitle: 'Client Relations',
+      title: t.actions.vipClients,
+      subtitle: t.actions.clientRelations,
       action: () => navigate('/clients/existing'),
       icon: IconVIPClients,
       primary: true
     },
     {
-      title: 'Concierge Services',
-      subtitle: 'Service Portfolio',
+      title: t.actions.conciergeServices,
+      subtitle: t.actions.servicePortfolio,
       action: () => navigate('/services/villas'),
       icon: IconConciergeServices,
       primary: false
     },
     {
-      title: 'Property Portfolio',
-      subtitle: 'Villas & Estates',
+      title: t.actions.propertyPortfolio,
+      subtitle: t.actions.villasEstates,
       action: () => navigate('/services/villas'),
       icon: IconPropertyPortfolio,
       primary: false
     },
     {
-      title: 'Fleet Management',
-      subtitle: 'Yachts & Vehicles',
+      title: t.actions.fleetManagement,
+      subtitle: t.actions.yachtsVehicles,
       action: () => navigate('/services/cars'),
       icon: IconFleetManagement,
       primary: false
     },
     {
-      title: 'Financial Control',
-      subtitle: 'Revenue Analytics',
+      title: t.actions.financialControl,
+      subtitle: t.actions.revenueAnalytics,
       action: () => navigate('/finance'),
       icon: IconFinancialControl,
       primary: true
     }
   ];
 
-  const employeeActions = [
+  const buildEmployeeActions = () => [
     {
-      title: 'Reservations',
-      subtitle: 'Current Bookings',
+      title: t.actions.reservations,
+      subtitle: t.actions.currentBookings,
       action: () => navigate('/reservations'),
       icon: IconReservations,
       primary: true
     },
     {
-      title: 'VIP Clients',
-      subtitle: 'Client Directory',
+      title: t.actions.vipClients,
+      subtitle: t.actions.clientDirectory,
       action: () => navigate('/clients/existing'),
       icon: IconVIPClients,
       primary: true
     },
     {
-      title: 'Concierge Services',
-      subtitle: 'Service Requests',
+      title: t.actions.conciergeServices,
+      subtitle: t.actions.serviceRequests,
       action: () => navigate('/services/villas'),
       icon: IconConciergeServices,
       primary: false
     },
     {
-      title: 'Property Portfolio',
-      subtitle: 'Available Properties',
+      title: t.actions.propertyPortfolio,
+      subtitle: t.actions.availableProperties,
       action: () => navigate('/services/villas'),
       icon: IconPropertyPortfolio,
       primary: false
     }
   ];
 
-  const quickActions = userInfo?.role === 'admin' ? adminActions : employeeActions;
+  const quickActions = userInfo?.role === 'admin' ? buildAdminActions() : buildEmployeeActions();
+
+  const roleLabel = t.roles[userInfo?.role] || (userInfo?.role ? userInfo.role : t.roles.user);
 
   const getGreeting = () => {
     const hour = currentTime.getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
+    if (hour < 12) return t.greetings.morning;
+    if (hour < 17) return t.greetings.afternoon;
+    return t.greetings.evening;
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'EUR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+  const formatCurrency = (amount = 0) => {
+    try {
+      return new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency: 'EUR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(amount);
+    } catch {
+      return `€${amount || 0}`;
+    }
   };
 
   if (loading) {
@@ -358,7 +546,7 @@ function Dashboard() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading Elite Dashboard...</p>
+          <p className="text-gray-600 font-medium">{t.loading}</p>
         </div>
       </div>
     );
@@ -391,7 +579,7 @@ function Dashboard() {
                     : 'bg-gray-100 border-gray-300 text-gray-700'
                 } backdrop-blur-sm`}>
                   <span className="text-sm font-medium tracking-wide uppercase">
-                    {userInfo?.role} Access
+                    {roleLabel} {t.labels.access}
                   </span>
                 </div>
               </div>
@@ -399,13 +587,13 @@ function Dashboard() {
             
             <div className="text-left lg:text-right">
               <div className="text-3xl lg:text-5xl font-extralight text-gray-900 mb-2">
-                {currentTime.toLocaleTimeString('en-US', { 
+                {currentTime.toLocaleTimeString(locale, { 
                   hour: '2-digit', 
                   minute: '2-digit' 
                 })}
               </div>
               <div className="text-gray-500 font-light text-sm lg:text-base">
-                {currentTime.toLocaleDateString('en-US', { 
+                {currentTime.toLocaleDateString(locale, { 
                   weekday: 'long',
                   month: 'long', 
                   day: 'numeric',
@@ -419,44 +607,44 @@ function Dashboard() {
         {/* Mobile-First Statistics Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8 lg:mb-16">
           <div className="bg-white rounded-2xl lg:rounded-3xl p-4 lg:p-8 shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300">
-            <div className="text-gray-500 text-xs lg:text-sm font-medium mb-2 lg:mb-3 tracking-wide uppercase">Active Requests</div>
+            <div className="text-gray-500 text-xs lg:text-sm font-medium mb-2 lg:mb-3 tracking-wide uppercase">{t.labels.activeRequests}</div>
             <div className="text-3xl lg:text-4xl font-extralight text-gray-900 mb-1 lg:mb-2">{dashboardData.quickStats.activeRequests}</div>
-            <div className="text-gray-400 text-xs lg:text-sm">Current week</div>
+            <div className="text-gray-400 text-xs lg:text-sm">{t.labels.currentWeek}</div>
           </div>
           
           <div className="bg-white rounded-2xl lg:rounded-3xl p-4 lg:p-8 shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300">
-            <div className="text-gray-500 text-xs lg:text-sm font-medium mb-2 lg:mb-3 tracking-wide uppercase">Pending</div>
+            <div className="text-gray-500 text-xs lg:text-sm font-medium mb-2 lg:mb-3 tracking-wide uppercase">{t.labels.pending}</div>
             <div className="text-3xl lg:text-4xl font-extralight text-gray-900 mb-1 lg:mb-2">{dashboardData.quickStats.pendingBookings}</div>
-            <div className="text-gray-400 text-xs lg:text-sm">Requires attention</div>
+            <div className="text-gray-400 text-xs lg:text-sm">{t.labels.requiresAttention}</div>
           </div>
           
           <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-2xl lg:rounded-3xl p-4 lg:p-8 shadow-sm border border-amber-200 hover:shadow-lg transition-all duration-300">
             <div className="text-amber-700 text-xs lg:text-sm font-medium mb-2 lg:mb-3 tracking-wide uppercase">
-              {userInfo?.role === 'admin' ? 'Today Revenue' : 'Revenue Status'}
+              {userInfo?.role === 'admin' ? t.labels.todayRevenue : t.labels.revenueStatus}
             </div>
             <div className="text-3xl lg:text-4xl font-extralight text-gray-900 mb-1 lg:mb-2">
               {userInfo?.role === 'admin' 
                 ? formatCurrency(dashboardData.quickStats.todayRevenue)
-                : dashboardData.quickStats.todayRevenue > 0 ? 'Active' : 'Pending'
+                : dashboardData.quickStats.todayRevenue > 0 ? t.labels.activeStatus : t.labels.pendingStatus
               }
             </div>
-            <div className="text-amber-600 text-xs lg:text-sm">Today's performance</div>
+            <div className="text-amber-600 text-xs lg:text-sm">{t.labels.todayPerformance}</div>
           </div>
           
           <div className="bg-white rounded-2xl lg:rounded-3xl p-4 lg:p-8 shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300">
-            <div className="text-gray-500 text-xs lg:text-sm font-medium mb-2 lg:mb-3 tracking-wide uppercase">VIP Clients</div>
+            <div className="text-gray-500 text-xs lg:text-sm font-medium mb-2 lg:mb-3 tracking-wide uppercase">{t.labels.vipClients}</div>
             <div className="text-3xl lg:text-4xl font-extralight text-gray-900 mb-1 lg:mb-2">{dashboardData.quickStats.totalClients}</div>
-            <div className="text-gray-400 text-xs lg:text-sm">Total portfolio</div>
+            <div className="text-gray-400 text-xs lg:text-sm">{t.labels.totalPortfolio}</div>
           </div>
         </div>
 
         {/* Mobile-Optimized Quick Actions */}
         <div className="mb-8 lg:mb-16">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 lg:mb-12">
-            <h2 className="text-2xl lg:text-3xl font-extralight text-gray-900 mb-2 sm:mb-0">Command Center</h2>
+            <h2 className="text-2xl lg:text-3xl font-extralight text-gray-900 mb-2 sm:mb-0">{t.labels.commandCenter}</h2>
             {userInfo?.role === 'admin' && (
               <div className="px-4 py-2 bg-amber-50 border border-amber-200 rounded-full">
-                <span className="text-amber-700 text-sm font-medium tracking-wide">Administrator</span>
+                <span className="text-amber-700 text-sm font-medium tracking-wide">{t.labels.administrator}</span>
               </div>
             )}
           </div>
@@ -497,7 +685,7 @@ function Dashboard() {
                 <div className="w-10 h-10 lg:w-12 lg:h-12 bg-white/20 rounded-2xl flex items-center justify-center mr-4 lg:mr-6 flex-shrink-0">
                   <IconSystemControl className="w-5 h-5 lg:w-7 lg:h-7 text-white" />
                 </div>
-                <h2 className="text-2xl lg:text-3xl font-extralight text-white">Executive Control</h2>
+                <h2 className="text-2xl lg:text-3xl font-extralight text-white">{t.sections.executiveControl}</h2>
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-8">
@@ -508,8 +696,8 @@ function Dashboard() {
                   <div className="w-8 h-8 lg:w-10 lg:h-10 bg-white/20 rounded-xl flex items-center justify-center mb-4 lg:mb-6 group-hover:scale-110 transition-transform duration-300">
                     <IconVIPClients className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
                   </div>
-                  <h3 className="text-base lg:text-lg font-light text-white mb-1 lg:mb-2">User Management</h3>
-                  <p className="text-white/60 text-sm font-light">Team access control</p>
+                  <h3 className="text-base lg:text-lg font-light text-white mb-1 lg:mb-2">{t.sections.userManagement}</h3>
+                  <p className="text-white/60 text-sm font-light">{t.sections.teamAccessControl}</p>
                 </button>
                 
                 <button 
@@ -519,8 +707,8 @@ function Dashboard() {
                   <div className="w-8 h-8 lg:w-10 lg:h-10 bg-white/20 rounded-xl flex items-center justify-center mb-4 lg:mb-6 group-hover:scale-110 transition-transform duration-300">
                     <IconFinancialControl className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
                   </div>
-                  <h3 className="text-base lg:text-lg font-light text-white mb-1 lg:mb-2">Financial Overview</h3>
-                  <p className="text-white/60 text-sm font-light">Revenue analytics</p>
+                  <h3 className="text-base lg:text-lg font-light text-white mb-1 lg:mb-2">{t.sections.financialOverview}</h3>
+                  <p className="text-white/60 text-sm font-light">{t.actions.revenueAnalytics}</p>
                 </button>
                 
                 <button 
@@ -530,8 +718,8 @@ function Dashboard() {
                   <div className="w-8 h-8 lg:w-10 lg:h-10 bg-white/20 rounded-xl flex items-center justify-center mb-4 lg:mb-6 group-hover:scale-110 transition-transform duration-300">
                     <IconSystemControl className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
                   </div>
-                  <h3 className="text-base lg:text-lg font-light text-white mb-1 lg:mb-2">System Control</h3>
-                  <p className="text-white/60 text-sm font-light">Platform configuration</p>
+                  <h3 className="text-base lg:text-lg font-light text-white mb-1 lg:mb-2">{t.sections.systemControl}</h3>
+                  <p className="text-white/60 text-sm font-light">{t.sections.platformConfiguration}</p>
                 </button>
               </div>
             </div>
@@ -542,7 +730,7 @@ function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-12">
           {/* Recent Activity */}
           <div className="bg-white rounded-3xl p-6 lg:p-10 shadow-sm border border-gray-200">
-            <h3 className="text-xl lg:text-2xl font-extralight text-gray-900 mb-6 lg:mb-8">Recent Activity</h3>
+            <h3 className="text-xl lg:text-2xl font-extralight text-gray-900 mb-6 lg:mb-8">{t.sections.recentActivity}</h3>
             
             <div className="space-y-4 lg:space-y-6">
               {dashboardData.recentActivity.length > 0 ? (
@@ -554,8 +742,15 @@ function Dashboard() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="text-gray-900 font-medium mb-1 truncate text-sm lg:text-base">{activity.client}</h4>
-                        <p className="text-gray-600 text-xs lg:text-sm truncate">{activity.action}</p>
-                        <p className="text-gray-400 text-xs mt-1">{activity.time}</p>
+                        <p className="text-gray-600 text-xs lg:text-sm truncate">
+                          {`${activity.accommodationType || t.actions.reservations} - ${
+                            t.statusLabels[activity.bookingStatus] ||
+                            t.statusLabels[activity.bookingStatus?.toLowerCase?.()] ||
+                            activity.bookingStatus ||
+                            ''
+                          }`}
+                        </p>
+                        <p className="text-gray-400 text-xs mt-1">{getTimeAgo(activity.createdAt)}</p>
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0 ml-4">
@@ -567,7 +762,7 @@ function Dashboard() {
                         activity.status === 'pending' ? 'bg-amber-100 text-amber-700' :
                         'bg-rose-100 text-rose-700'
                       }`}>
-                        {activity.status}
+                        {t.statusLabels[activity.status] || t.statusLabels[activity.status?.toLowerCase?.()] || activity.status}
                       </div>
                     </div>
                   </div>
@@ -577,7 +772,7 @@ function Dashboard() {
                   <div className="w-12 h-12 lg:w-16 lg:h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4 lg:mb-6">
                     <IconReservations className="w-6 h-6 lg:w-8 lg:h-8 text-gray-400" />
                   </div>
-                  <p className="text-gray-500 font-light">No recent activity</p>
+                  <p className="text-gray-500 font-light">{t.empty.noRecentActivity}</p>
                 </div>
               )}
             </div>
@@ -585,7 +780,7 @@ function Dashboard() {
 
           {/* Upcoming VIP Arrivals */}
           <div className="bg-white rounded-3xl p-6 lg:p-10 shadow-sm border border-gray-200">
-            <h3 className="text-xl lg:text-2xl font-extralight text-gray-900 mb-6 lg:mb-8">VIP Arrivals</h3>
+            <h3 className="text-xl lg:text-2xl font-extralight text-gray-900 mb-6 lg:mb-8">{t.sections.vipArrivals}</h3>
             
             <div className="space-y-4 lg:space-y-6">
               {dashboardData.upcomingBookings.length > 0 ? (
@@ -594,25 +789,36 @@ function Dashboard() {
                     booking.priority === 'urgent' ? 'bg-rose-50 border-rose-500' :
                     booking.priority === 'high' ? 'bg-amber-50 border-amber-500' :
                     'bg-gray-50 border-gray-400'
-                  } transition-all duration-300 hover:shadow-sm`}>
-                    <div className="flex justify-between items-start mb-3 lg:mb-4">
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-gray-900 font-medium mb-2 text-sm lg:text-base leading-tight">{booking.title}</h4>
-                        <p className="text-gray-600 text-xs lg:text-sm">{booking.date} at {booking.time}</p>
-                      </div>
-                      <div className="text-right flex-shrink-0 ml-4">
-                        <div className="text-amber-600 font-medium text-sm lg:text-lg">
-                          {formatCurrency(booking.value)}
+                    } transition-all duration-300 hover:shadow-sm`}>
+                    {(() => {
+                      const formattedDate = booking.checkInDate
+                        ? booking.checkInDate.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })
+                        : booking.date;
+                      const formattedTime = booking.checkInDate
+                        ? booking.checkInDate.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
+                        : booking.time;
+                      const priorityLabel = t.priorityLabels[booking.priority] || booking.priority;
+                      return (
+                      <div className="flex justify-between items-start mb-3 lg:mb-4">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-gray-900 font-medium mb-2 text-sm lg:text-base leading-tight">{booking.title}</h4>
+                          <p className="text-gray-600 text-xs lg:text-sm">{formattedDate} {t.labels.at} {formattedTime}</p>
                         </div>
-                        <div className={`text-xs px-2 py-1 rounded-full mt-2 ${
-                          booking.priority === 'urgent' ? 'bg-rose-100 text-rose-700' :
-                          booking.priority === 'high' ? 'bg-amber-100 text-amber-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {booking.priority}
+                        <div className="text-right flex-shrink-0 ml-4">
+                          <div className="text-amber-600 font-medium text-sm lg:text-lg">
+                            {formatCurrency(booking.value)}
+                          </div>
+                          <div className={`text-xs px-2 py-1 rounded-full mt-2 ${
+                            booking.priority === 'urgent' ? 'bg-rose-100 text-rose-700' :
+                            booking.priority === 'high' ? 'bg-amber-100 text-amber-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                          {priorityLabel}
+                          </div>
                         </div>
                       </div>
-                    </div>
+                      );
+                    })()}
                   </div>
                 ))
               ) : (
@@ -620,7 +826,7 @@ function Dashboard() {
                   <div className="w-12 h-12 lg:w-16 lg:h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4 lg:mb-6">
                     <IconPropertyPortfolio className="w-6 h-6 lg:w-8 lg:h-8 text-gray-400" />
                   </div>
-                  <p className="text-gray-500 font-light">No upcoming arrivals</p>
+                  <p className="text-gray-500 font-light">{t.empty.noUpcomingArrivals}</p>
                 </div>
               )}
             </div>
