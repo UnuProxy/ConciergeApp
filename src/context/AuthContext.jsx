@@ -179,13 +179,14 @@ export function AuthProvider({ children }) {
   // Check if a user is authorized
   async function isAuthorizedUser(email) {
     try {
-      console.log(`Checking if ${email} is authorized...`);
+      const normalizedEmail = email?.toLowerCase();
+      console.log(`Checking if ${normalizedEmail} is authorized...`);
       const authorizedUsersRef = collection(db, 'authorized_users');
-      const q = query(authorizedUsersRef, where("email", "==", email));
+      const q = query(authorizedUsersRef, where("email", "==", normalizedEmail));
       const snapshot = await getDocs(q);
       
       if (snapshot.empty) {
-        console.log(`User ${email} is not authorized`);
+        console.log(`User ${normalizedEmail} is not authorized`);
         return { authorized: false };
       } else {
         const userData = snapshot.docs[0].data();
@@ -207,20 +208,13 @@ export function AuthProvider({ children }) {
     try {
       setError(null);
       
-      // First, ensure companies and authorized users exist in database
-      await initializeCompanies();
-      await initializeAuthorizedUsers();
-      
-      // Check and fix any existing user roles
-      await updateExistingUserRoles();
-      
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
       
       console.log("Google authentication successful for:", user.email);
       
-      // Check if this email is authorized
+      // Check if this email is authorized (now that the user is authenticated)
       const { authorized, companyId, role } = await isAuthorizedUser(user.email);
       
       if (!authorized) {
@@ -254,8 +248,19 @@ export function AuthProvider({ children }) {
         // No need for company selection, already assigned
         return { newUser: false, user };
       }
+
+      // Existing user - make sure local state reflects the latest mapping
+      const existingData = userDoc.data();
+      const resolvedRole = role || existingData.role;
+      const resolvedCompanyId = companyId || existingData.companyId;
+
+      if (resolvedRole) {
+        setUserRole(resolvedRole);
+      }
+      if (resolvedCompanyId) {
+        setUserCompany(resolvedCompanyId);
+      }
       
-      // Existing user
       console.log("Existing user found");
       return { newUser: false, user };
     } catch (error) {

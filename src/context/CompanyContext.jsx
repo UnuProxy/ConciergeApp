@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { getAuth } from 'firebase/auth';
-import { collection, getDocs, getDoc, doc, query, where } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { onAuthStateChanged } from 'firebase/auth';
+import { collection, getDocs, getDoc, doc, query, where, setDoc } from 'firebase/firestore';
+import { auth, db } from '../firebase/config';
 
 // Create the context
 const CompanyContext = createContext();
@@ -16,84 +16,139 @@ export const CompanyProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const [userRole, setUserRole] = useState(null); // Initialize as null, not placeholder
+  const debugForceCompanyId = import.meta.env.VITE_DEBUG_FORCE_COMPANY_ID || null;
+  const debugForceCompanyName = import.meta.env.VITE_DEBUG_FORCE_COMPANY_NAME || debugForceCompanyId;
+  const debugForceRole = import.meta.env.VITE_DEBUG_FORCE_ROLE || 'admin';
 
   // Fetch companies and check if user is authorized
   useEffect(() => {
-    const fetchCompaniesAndAuthorization = async () => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setLoading(true);
+      setAuthorized(false);
+      setCompanies([]);
+      setCurrentCompany(null);
+
+      if (!user) {
+        console.log('No authenticated user');
+        setUserRole(null);
+        setLoading(false);
+        return;
+      }
+
+      console.log(`Authenticated user: ${user.email}`);
+
       try {
-        // Get current authenticated user
-        const auth = getAuth();
-        const user = auth.currentUser;
-        if (!user) {
-          console.log('No authenticated user');
-          setLoading(false);
-          return;
-        }
-        console.log(`Authenticated user: ${user.email}`);
-
-        // Fetch real companies from Firestore
-        const companiesRef = collection(db, 'companies');
-        const snapshot = await getDocs(companiesRef);
-        const fetchedCompanies = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        console.log('Fetched companies:', fetchedCompanies);
-        setCompanies(fetchedCompanies);
-
-        // Check authorization first in authorized_users collection
-        const authorizedUsersRef = collection(db, 'authorized_users');
-        const authQuery = query(authorizedUsersRef, where("email", "==", user.email));
-        const authSnapshot = await getDocs(authQuery);
-        
-        let foundRole = null;
-        let foundCompanyId = null;
-        
-        if (!authSnapshot.empty) {
-          const authData = authSnapshot.docs[0].data();
-          console.log("Found in authorized_users:", authData);
-          foundRole = authData.role;
-          foundCompanyId = authData.companyId;
-          console.log(`Found in authorized_users: Role=${foundRole}, Company=${foundCompanyId}`);
-        }
-
-        // Check user's company and role from users collection
+        // Step 1: Get primary user mapping from users/{uid} (allowed by rules for the signed-in user)
         const userDoc = await getDoc(doc(db, 'users', user.uid));
+        let resolvedRole = null;
+        let resolvedCompanyId = null;
+        let resolvedCompanyName = null;
+
         if (userDoc.exists()) {
           const userData = userDoc.data();
+          resolvedRole = userData.role || null;
+          resolvedCompanyId = userData.companyId || null;
+          resolvedCompanyName = userData.companyName || null;
           console.log('User data from users collection:', userData);
-          
-          // If we found a role in authorized_users or users collection, use it
-          const finalRole = foundRole || userData.role || null;
-          if (finalRole) {
-            setUserRole(finalRole);
-            console.log(`User role set to: ${finalRole}`);
-          }
-          
-          // Find the user's company in the fetched companies
-          const userCompanyId = foundCompanyId || userData.companyId;
-          const userCompany = fetchedCompanies.find(company => company.id === userCompanyId);
-          
-          if (userCompany) {
-            console.log('Setting current company:', userCompany);
-            setCurrentCompany(userCompany);
-            setAuthorized(true);
+        }
+
+        // Step 2: Fallback to authorized_users only if we still do not have role/company
+        if (!resolvedRole || !resolvedCompanyId) {
+          const authorizedUsersRef = collection(db, 'authorized_users');
+          const normalizedEmail = user.email?.toLowerCase();
+          const authQuery = query(authorizedUsersRef, where('email', '==', normalizedEmail));
+          const authSnapshot = await getDocs(authQuery);
+
+          if (!authSnapshot.empty) {
+            const authData = authSnapshot.docs[0].data();
+            resolvedRole = resolvedRole || authData.role || null;
+            resolvedCompanyId = resolvedCompanyId || authData.companyId || null;
+            resolvedCompanyName = resolvedCompanyName || authData.companyName || null;
+            console.log('Found in authorized_users:', authData);
+
+            // If user doc missing, create it so rules can allow future reads
+            if (!userDoc.exists() && resolvedCompanyId) {
+              try {
+                await setDoc(doc(db, 'users', user.uid), {
+                  email: normalizedEmail,
+                  companyId: resolvedCompanyId,
+                  companyName: resolvedCompanyName || resolvedCompanyId,
+                  role: resolvedRole || 'agent'
+                }, { merge: true });
+                console.log('Created users doc from authorized_users fallback');
+              } catch (writeErr) {
+                console.warn('Failed to create users doc from authorized_users:', writeErr);
+              }
+            }
           } else {
-            console.log('User company not found in fetched companies');
-            setAuthorized(false);
+            console.log('No authorized_users entry for user email');
+          }
+        }
+
+        // Step 3: Load only the user's company document (avoids full collection read if rules are restrictive)
+        const preferredCompanyId = resolvedCompanyId || localStorage.getItem('lastCompanyId');
+        if (preferredCompanyId) {
+          try {
+            const companyDocRef = doc(db, 'companies', preferredCompanyId);
+            const companySnapshot = await getDoc(companyDocRef);
+            if (companySnapshot.exists()) {
+              const companyData = { id: preferredCompanyId, ...companySnapshot.data() };
+              setCompanies([companyData]);
+              setCurrentCompany(companyData);
+              setAuthorized(true);
+              console.log('Setting current company:', companyData);
+            } else {
+              console.log('User company not found in Firestore');
+              setAuthorized(false);
+            }
+          } catch (companyError) {
+            if (companyError?.code === 'permission-denied') {
+              console.warn('Permission denied reading company doc, falling back to authorized_users data');
+              if (resolvedCompanyName || resolvedCompanyId) {
+                const fallbackCompany = {
+                  id: preferredCompanyId,
+                  name: resolvedCompanyName || preferredCompanyId
+                };
+                setCompanies([fallbackCompany]);
+                setCurrentCompany(fallbackCompany);
+                setAuthorized(true);
+              } else {
+                setAuthorized(false);
+              }
+            } else {
+              throw companyError;
+            }
           }
         } else {
-          console.log('User document not found in Firestore');
+          console.log('No companyId resolved for user');
           setAuthorized(false);
         }
-        setLoading(false);
+
+        if (resolvedRole) {
+          setUserRole(resolvedRole);
+          console.log(`User role set to: ${resolvedRole}`);
+        }
       } catch (error) {
-        console.error('Error fetching companies:', error);
+        if (error?.code === 'permission-denied') {
+          console.error('Permission denied while fetching company data. Ensure Firestore rules allow the signed-in user to read companies and users.', error);
+          // Dev escape hatch to continue testing UI when rules are too strict
+          if (debugForceCompanyId) {
+            const fallbackCompany = { id: debugForceCompanyId, name: debugForceCompanyName || debugForceCompanyId };
+            setCompanies([fallbackCompany]);
+            setCurrentCompany(fallbackCompany);
+            setAuthorized(true);
+            setUserRole(debugForceRole);
+            console.warn('DEBUG: Forced company/role applied from env vars.');
+          }
+        } else {
+          console.error('Error fetching companies:', error);
+        }
+      } finally {
         setLoading(false);
       }
-    };
+    });
 
-    fetchCompaniesAndAuthorization();
+    return () => unsubscribe();
   }, []);
 
   const switchCompany = (companyId) => {

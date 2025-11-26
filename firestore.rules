@@ -1,0 +1,107 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    // Helper to compare company ownership using users/{uid}
+    function matchesCompany(companyId) {
+      return isAuthed()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == companyId;
+    }
+
+    // Companies (metadata) + all nested per-company collections
+    match /companies/{companyId} {
+      // Allow any signed-in user to list/select companies. Tighten to matchesCompany(companyId) if desired.
+      allow read: if isAuthed();
+      allow write: if false;
+
+      match /{sub=**}/{docId} {
+        allow read, write: if isAuthed() && matchesCompany(companyId);
+      }
+    }
+
+    // authorized_users: allow signed-in user to read their own mapping (by uid or matching email)
+    match /authorized_users/{uid} {
+      allow read: if isAuthed()
+        && (
+          request.auth.uid == uid ||
+          (
+            resource.data.email != null &&
+            request.auth.token.email != null &&
+            lower(resource.data.email) == lower(request.auth.token.email)
+          )
+        );
+      allow write: if false;
+    }
+
+    // users: self-access only
+    match /users/{uid} {
+      allow read, write: if isAuthed() && request.auth.uid == uid;
+    }
+
+    // Shared catalogs (global, read-only)
+    match /cars/{id} { allow read: if isAuthed(); allow write: if false; }
+    match /villas/{id} { allow read: if isAuthed(); allow write: if false; }
+    match /boats/{id} { allow read: if isAuthed(); allow write: if false; }
+    match /security/{id} { allow read: if isAuthed(); allow write: if false; }
+    match /chefs/{id} { allow read: if isAuthed(); allow write: if false; }
+
+    // Generic services (used for excursions, nannies, etc. with category filters)
+    match /services/{id} { allow read: if isAuthed(); allow write: if false; }
+
+    // Company-scoped operational data
+    match /reservations/{id} {
+      allow read: if isAuthed() && matchesCompany(resource.data.companyId);
+      allow write: if isAuthed() && matchesCompany(request.resource.data.companyId);
+    }
+
+    match /clients/{id} {
+      allow read: if isAuthed() && matchesCompany(resource.data.companyId);
+      allow write: if isAuthed() && matchesCompany(request.resource.data.companyId);
+    }
+
+    match /collaborators/{id} {
+      allow read: if isAuthed() && matchesCompany(resource.data.companyId);
+      allow write: if isAuthed() && matchesCompany(request.resource.data.companyId);
+    }
+
+    match /offers/{id} {
+      allow read: if isAuthed() && matchesCompany(resource.data.companyId);
+      allow write: if isAuthed() && matchesCompany(request.resource.data.companyId);
+    }
+
+    match /expenses/{id} {
+      allow read: if isAuthed() && matchesCompany(resource.data.companyId);
+      allow write: if isAuthed() && matchesCompany(request.resource.data.companyId);
+    }
+
+    // Company-scoped operational data
+    match /reservations/{id} {
+      allow read: if isAuthed() && matchesCompany(resource.data.companyId);
+      allow write: if isAuthed() && matchesCompany(request.resource.data.companyId);
+    }
+
+    match /clients/{id} {
+      allow read: if isAuthed() && matchesCompany(resource.data.companyId);
+      allow write: if isAuthed() && matchesCompany(request.resource.data.companyId);
+    }
+
+    match /collaborators/{id} {
+      allow read: if isAuthed() && matchesCompany(resource.data.companyId);
+      allow write: if isAuthed() && matchesCompany(request.resource.data.companyId);
+    }
+
+    match /offers/{id} {
+      allow read: if isAuthed() && matchesCompany(resource.data.companyId);
+      allow write: if isAuthed() && matchesCompany(request.resource.data.companyId);
+    }
+
+    match /expenses/{id} {
+      allow read: if isAuthed() && matchesCompany(resource.data.companyId);
+      allow write: if isAuthed() && matchesCompany(request.resource.data.companyId);
+    }
+  }
+}
