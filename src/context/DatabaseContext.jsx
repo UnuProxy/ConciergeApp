@@ -1,11 +1,12 @@
 // src/context/DatabaseContext.js
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  getFirestore, collection, doc, getDoc, query, where, getDocs,
-  serverTimestamp, addDoc, updateDoc, deleteDoc 
+import {
+  collection, doc, getDoc, query, where, getDocs, setDoc,
+  serverTimestamp, addDoc, updateDoc, deleteDoc
 } from 'firebase/firestore';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { onAuthStateChanged } from 'firebase/auth';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { auth, db, storage } from '../firebase/config';
 
 // Create the context
 const DatabaseContext = createContext();
@@ -20,57 +21,9 @@ export const DatabaseProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [userRole, setUserRole] = useState(null);
-  
-  // Initialize Firebase services
-  const db = getFirestore();
-  const auth = getAuth();
-  const storage = getStorage();
-
-  // Function to fetch user data and set role
-  const fetchUserData = async (user) => {
-    try {
-      // First, check if user is an authorized user
-      const usersRef = collection(db, "authorized_users");
-      
-      // Debug the email we're searching for
-      console.log("Current user email:", user.email);
-      
-      // Make sure we're using lowercase for consistent matching
-      const q = query(usersRef, where("email", "==", user.email.toLowerCase()));
-      
-      const querySnapshot = await getDocs(q);
-      
-      // Debug the query results
-      console.log("Query results size:", querySnapshot.size);
-      
-      if (querySnapshot.empty) {
-        console.error("User not found in authorized_users collection");
-        setError("User not authorized for any company");
-        setLoading(false);
-        return;
-      }
-      
-      // Get the first user document (there should only be one)
-      const userData = querySnapshot.docs[0].data();
-      
-      // Debug the user data
-      console.log("User data:", JSON.stringify(userData, null, 2));
-      console.log("User role from database:", userData.role);
-      
-      // Set user role directly from database
-      setUserRole(userData.role || "employee");
-      
-      console.log("Setting userRole state to:", userData.role || "employee");
-      
-      return userData;
-    }
-    catch (error) {
-      console.error("Error fetching user data:", error);
-      setError("Error fetching user information");
-      setLoading(false);
-      return null;
-    }
-  };
+  const debugForceCompanyId = import.meta.env.VITE_DEBUG_FORCE_COMPANY_ID || null;
+  const debugForceCompanyName = import.meta.env.VITE_DEBUG_FORCE_COMPANY_NAME || debugForceCompanyId;
+  const debugForceRole = import.meta.env.VITE_DEBUG_FORCE_ROLE || 'admin';
 
   // Get authentication and company info
   useEffect(() => {
@@ -81,39 +34,55 @@ export const DatabaseProvider = ({ children }) => {
         
         try {
           console.log("Current user:", user.email);
-          
-          // First try to get user from authorized_users collection using UID
-          const userDocRef = doc(db, "authorized_users", user.uid);
-          let userSnapshot = await getDoc(userDocRef);
-          let userData;
-          
-          // If not found by UID, try finding by email
-          if (!userSnapshot.exists()) {
-            console.log("User not found by UID, trying email...");
+          // Always try the signed-in user's document first (rules allow self-reads)
+          const userDocRef = doc(db, "users", user.uid);
+          const userSnapshot = await getDoc(userDocRef);
+          let userData = userSnapshot.exists() ? userSnapshot.data() : null;
+          let fallbackCompanyName = userData?.companyName || null;
+
+          // Fallback to authorized_users if no user doc or missing required fields
+          if (!userData?.companyId || !userData?.role) {
             const usersRef = collection(db, "authorized_users");
             const emailQuery = query(usersRef, where("email", "==", user.email.toLowerCase()));
             const emailSnapshot = await getDocs(emailQuery);
-            
+
             if (!emailSnapshot.empty) {
-              userSnapshot = emailSnapshot.docs[0];
-              userData = userSnapshot.data();
-              console.log("User found by email:", userSnapshot.id);
+              const fallbackData = emailSnapshot.docs[0].data();
+              userData = {
+                ...userData,
+                companyId: userData?.companyId || fallbackData.companyId,
+                role: userData?.role || fallbackData.role,
+                companyName: userData?.companyName || fallbackData.companyName
+              };
+              fallbackCompanyName = fallbackCompanyName || fallbackData.companyName || null;
+              console.log("User found via authorized_users:", emailSnapshot.docs[0].id);
+
+              // If user doc missing, create/merge it so future reads succeed
+              if (!userSnapshot.exists() && userData.companyId) {
+                try {
+                  await setDoc(doc(db, "users", user.uid), {
+                    email: user.email.toLowerCase(),
+                    companyId: userData.companyId,
+                    companyName: userData.companyName || userData.companyId,
+                    role: userData.role || "agent"
+                  }, { merge: true });
+                  console.log("Created users doc from authorized_users fallback");
+                } catch (writeErr) {
+                  console.warn("Failed to create users doc from authorized_users:", writeErr);
+                }
+              }
             }
-          } else {
-            userData = userSnapshot.data();
           }
-          
-          if (userData) {
+
+          if (userData?.companyId && userData?.role) {
             console.log("User data:", userData);
-            
-            // Set the user role
-            setUserRole(userData.role || "employee");
-            console.log("Setting userRole state to:", userData.role || "employee");
+
+            const resolvedRole = userData.role || "employee";
+            setUserRole(resolvedRole);
+            console.log("Setting userRole state to:", resolvedRole);
             
             const companyId = userData.companyId;
-            
-            if (companyId) {
-              // Get company information
+            try {
               const companyDocRef = doc(db, "companies", companyId);
               const companySnapshot = await getDoc(companyDocRef);
               
@@ -127,17 +96,40 @@ export const DatabaseProvider = ({ children }) => {
                 console.error("Company not found:", companyId);
                 setError("Company not found. Please contact your administrator.");
               }
-            } else {
-              console.error("No companyId found for user");
-              setError("No company association found for your account.");
+            } catch (companyError) {
+              if (companyError?.code === "permission-denied") {
+                console.warn("Permission denied reading company doc, falling back to authorized_users data");
+                if (companyId) {
+                  setCompanyInfo({
+                    id: companyId,
+                    name: fallbackCompanyName || companyId
+                  });
+                }
+              } else {
+                throw companyError;
+              }
             }
           } else {
-            console.error("User not found in authorized_users");
+            console.error("User not found in users or authorized_users");
             setError("Your account is not authorized. Please contact your administrator.");
           }
         } catch (error) {
-          console.error("Error fetching user or company data:", error);
-          setError("Error loading your data. Please try again.");
+          if (error?.code === "permission-denied") {
+            console.error("Permission denied when fetching user/company data:", error);
+            setError("You do not have permission to access your data. Please ensure your account is whitelisted.");
+            // Dev escape hatch to continue testing UI when rules are too strict
+            if (debugForceCompanyId) {
+              setUserRole(debugForceRole);
+              setCompanyInfo({
+                id: debugForceCompanyId,
+                name: debugForceCompanyName || debugForceCompanyId
+              });
+              console.warn("DEBUG: Forced company/role applied from env vars.");
+            }
+          } else {
+            console.error("Error fetching user or company data:", error);
+            setError("Error loading your data. Please try again.");
+          }
         } finally {
           setLoading(false);
         }

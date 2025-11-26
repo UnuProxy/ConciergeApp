@@ -1650,25 +1650,33 @@ useEffect(() => {
           throw new Error('User not authenticated');
         }
         
-        // Check if the user exists in the authorized_users collection
-        const authorizedUsersRef = collection(db, 'authorized_users');
-        const authorizedQuery = query(
-          authorizedUsersRef,
-          where('email', '==', user.email)
-        );
-        
-        const authorizedSnapshot = await getDocs(authorizedQuery);
-        
-        if (authorizedSnapshot.empty) {
-          throw new Error(t.userNotAuthorized);
+        // Prefer users/{uid} first (allowed by rules)
+        let companyId = null;
+        let role = null;
+
+        const userDocSnap = await getDoc(doc(db, 'users', user.uid));
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          companyId = userData.companyId || null;
+          role = userData.role || null;
         }
-        
-        const authorizedUserDoc = authorizedSnapshot.docs[0];
-        const authorizedUserData = authorizedUserDoc.data();
-        
-        // Set the company ID and role from authorized_users
-        const companyId = authorizedUserData.companyId;
-        const role = authorizedUserData.role;
+
+        // Fallback to authorized_users by lowercase email
+        if (!companyId || !role) {
+          const authorizedUsersRef = collection(db, 'authorized_users');
+          const authorizedQuery = query(
+            authorizedUsersRef,
+            where('email', '==', user.email.toLowerCase())
+          );
+          
+          const authorizedSnapshot = await getDocs(authorizedQuery);
+          
+          if (!authorizedSnapshot.empty) {
+            const authorizedUserData = authorizedSnapshot.docs[0].data();
+            companyId = companyId || authorizedUserData.companyId || null;
+            role = role || authorizedUserData.role || null;
+          }
+        }
         
         if (!companyId) {
           throw new Error(t.noCompanyAssociation);

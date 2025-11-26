@@ -228,23 +228,37 @@ function Dashboard() {
           return;
         }
 
-        const authorizedUsersRef = collection(db, 'authorized_users');
-        const authorizedQuery = query(
-          authorizedUsersRef,
-          where('email', '==', user.email)
-        );
-        
-        const authorizedSnapshot = await getDocs(authorizedQuery);
-        
-        if (authorizedSnapshot.empty) {
-          console.error('User not authorized');
+        // Prefer users/{uid} (allowed by rules); fallback to authorized_users with lowercase email
+        let userData = null;
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          userData = userDocSnap.data();
+        } else {
+          const authorizedUsersRef = collection(db, 'authorized_users');
+          const authorizedQuery = query(
+            authorizedUsersRef,
+            where('email', '==', user.email.toLowerCase())
+          );
+          
+          const authorizedSnapshot = await getDocs(authorizedQuery);
+          
+          if (authorizedSnapshot.empty) {
+            console.error('User not authorized');
+            navigate('/login');
+            return;
+          }
+  
+          const authorizedUserDoc = authorizedSnapshot.docs[0];
+          userData = authorizedUserDoc.data();
+        }
+
+        if (!userData?.companyId) {
+          console.error('No company assigned to user');
           navigate('/login');
           return;
         }
 
-        const authorizedUserDoc = authorizedSnapshot.docs[0];
-        const userData = authorizedUserDoc.data();
-        
         setUserInfo(userData);
         setUserCompanyId(userData.companyId);
         
