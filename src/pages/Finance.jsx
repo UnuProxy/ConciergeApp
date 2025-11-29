@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, getFirestore, addDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, getFirestore, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
 /**
@@ -9,6 +9,7 @@ import { getAuth, onAuthStateChanged } from 'firebase/auth';
 const Finance = () => {
   // State management
   const [reservations, setReservations] = useState([]);
+  const [financeRecords, setFinanceRecords] = useState([]);
   const [categoryPayments, setCategoryPayments] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,6 +20,12 @@ const Finance = () => {
   const [companyId, setCompanyId] = useState(null);
   const [userEmail, setUserEmail] = useState(null);
   const [userId, setUserId] = useState(null);
+  const [syncingFinance, setSyncingFinance] = useState(false);
+  const [filters, setFilters] = useState({ service: 'all', startDate: '', endDate: '' });
+  const [updatingRecord, setUpdatingRecord] = useState(null);
+  const [costDrafts, setCostDrafts] = useState({});
+  const [showAllPending, setShowAllPending] = useState(false);
+  const [deletingExpenseId, setDeletingExpenseId] = useState(null);
   const [toast, setToast] = useState({ show: false, message: '' });
   
   // Form states
@@ -68,6 +75,7 @@ const Finance = () => {
       addExpense: 'Adaugă Cheltuială',
       addPayment: 'Adaugă Plată',
       back: 'Înapoi',
+      deleteExpense: 'Șterge cheltuiala',
       
       // Dashboard
       summary: 'Sumar',
@@ -76,8 +84,18 @@ const Finance = () => {
       revenue: 'Profit',
       expensesTotal: 'Cheltuieli',
       netProfit: 'Profit Net',
+      grossProfit: 'Profit Brut',
+      trueProfit: 'Profit Real',
+      providerPayout: 'Plată Furnizor',
+      pendingPayments: 'Plăți în așteptare',
+      pendingRecords: 'Înregistrări în așteptare',
+      pendingDotLabel: 'Necesită cost furnizor',
+      paymentsToProvider: 'Plăți către furnizori',
+      clientRevenue: 'Încasări clienți',
+      providerCosts: 'Costuri furnizor',
       recentTransactions: 'Tranzacții Recente',
       viewAll: 'Vezi Toate',
+      records: 'Înregistrări',
       
       // Transactions
       noTransactions: 'Nu există tranzacții',
@@ -119,6 +137,9 @@ const Finance = () => {
       noMonthlyData: 'Nu există date lunare',
       month: 'Luna',
       profit: 'Profit',
+      serviceProfit: 'Profit pe serviciu',
+      profitByService: 'Profit pe servicii',
+      profitPerService: 'Profit pe serviciu',
       
       // Messages
       loading: 'Se încarcă...',
@@ -127,7 +148,24 @@ const Finance = () => {
       errorCompanyNotFound: 'Nu s-a găsit compania',
       errorValidation: 'Completează toate câmpurile',
       errorSaving: 'Eroare la salvare. Încearcă din nou.',
-      noFinancialData: 'Nu există date financiare de afișat'
+      noFinancialData: 'Nu există date financiare de afișat',
+      
+      // Provider costs / filters
+      providerCost: 'Cost furnizor',
+      clientAmount: 'Încasare client',
+      addCost: 'Adaugă cost',
+      confirmPayment: 'Confirmă plata',
+      enterProviderCost: 'Introdu costul furnizorului',
+      providerCostPlaceholder: 'ex. 300',
+      pending: 'În așteptare',
+      settled: 'Confirmat',
+      serviceType: 'Tip serviciu',
+      dateFilters: 'Filtrează după dată',
+      startDate: 'Data început',
+      endDate: 'Data sfârșit',
+      applyFilters: 'Aplică filtre',
+      clearFilters: 'Resetează',
+      noPending: 'Nu există plăți în așteptare'
     },
     en: {
       // Page titles
@@ -145,6 +183,7 @@ const Finance = () => {
       addExpense: 'Add Expense',
       addPayment: 'Add Payment',
       back: 'Back',
+      deleteExpense: 'Delete expense',
       
       // Dashboard
       summary: 'Summary',
@@ -153,8 +192,18 @@ const Finance = () => {
       revenue: 'Revenue',
       expensesTotal: 'Expenses',
       netProfit: 'Net Profit',
+      grossProfit: 'Gross Profit',
+      trueProfit: 'True Profit',
+      providerPayout: 'Provider Payout',
+      pendingPayments: 'Pending payments',
+      pendingRecords: 'Pending records',
+      pendingDotLabel: 'Provider cost required',
+      paymentsToProvider: 'Provider payments',
+      clientRevenue: 'Client revenue',
+      providerCosts: 'Provider costs',
       recentTransactions: 'Recent Transactions',
       viewAll: 'View All',
+      records: 'Records',
       
       // Transactions
       noTransactions: 'No transactions found',
@@ -196,6 +245,9 @@ const Finance = () => {
       noMonthlyData: 'No monthly data available',
       month: 'Month',
       profit: 'Profit',
+      serviceProfit: 'Service profit',
+      profitByService: 'Profit by service',
+      profitPerService: 'Profit per service',
       
       // Messages
       loading: 'Loading...',
@@ -204,7 +256,24 @@ const Finance = () => {
       errorCompanyNotFound: 'Company not found',
       errorValidation: 'Please fill all fields',
       errorSaving: 'Error saving. Please try again.',
-      noFinancialData: 'No financial data to display'
+      noFinancialData: 'No financial data to display',
+      
+      // Provider costs / filters
+      providerCost: 'Provider cost',
+      clientAmount: 'Client charge',
+      addCost: 'Add cost',
+      confirmPayment: 'Confirm payment',
+      enterProviderCost: 'Enter provider cost',
+      providerCostPlaceholder: 'e.g. 300',
+      pending: 'Pending',
+      settled: 'Settled',
+      serviceType: 'Service type',
+      dateFilters: 'Filter by date',
+      startDate: 'Start date',
+      endDate: 'End date',
+      applyFilters: 'Apply filters',
+      clearFilters: 'Reset',
+      noPending: 'No pending payments'
     }
   };
 
@@ -214,6 +283,107 @@ const Finance = () => {
   // Firebase
   const db = getFirestore();
   const auth = getAuth();
+  const formatCurrency = (value = 0) => `€${Number(value || 0).toLocaleString()}`;
+  const getServiceLabel = (value, fallback = 'Unknown') => {
+    if (!value) return fallback;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object') {
+      return value[language] || value.en || value.ro || Object.values(value)[0] || fallback;
+    }
+    return fallback;
+  };
+
+  // Remove finance records whose booking no longer exists
+  const pruneOrphanFinanceRecords = async (reservationsList, financeList) => {
+    const reservationIds = new Set(reservationsList.map(r => r.id));
+    const orphans = financeList.filter(r => r.bookingId && !reservationIds.has(r.bookingId));
+    if (orphans.length === 0) return financeList;
+    try {
+      await Promise.all(orphans.map(record => deleteDoc(doc(db, 'financeRecords', record.id))));
+    } catch (error) {
+      console.error('Error pruning orphan finance records:', error);
+    }
+    return financeList.filter(r => !r.bookingId || reservationIds.has(r.bookingId));
+  };
+
+  // Ensure each booking has a finance record with a pending provider cost
+  const syncFinanceRecords = async (reservationsList, existingFinanceRecords = []) => {
+    if (!companyId || reservationsList.length === 0) return existingFinanceRecords;
+    const existingKeys = new Set(
+      existingFinanceRecords.map(r => `${r.bookingId || 'none'}::${r.serviceKey || r.service || 'Unknown'}`)
+    );
+    const toCreate = [];
+
+    reservationsList.forEach(booking => {
+      const servicesArray = Array.isArray(booking.services) && booking.services.length > 0
+        ? booking.services
+        : [null];
+
+      servicesArray.forEach((serviceItem, index) => {
+        const serviceKey = serviceItem?.id || serviceItem?.serviceId || serviceItem?.type || serviceItem?.name || serviceItem?.title || `service-${index}`;
+        const recordKey = `${booking.id || 'none'}::${serviceKey}`;
+        if (existingKeys.has(recordKey)) return;
+
+        const serviceLabel = getServiceLabel(
+          serviceItem?.name || serviceItem?.title || serviceItem?.type || serviceItem?.serviceType || serviceItem?.service || booking.service || booking.accommodationType,
+          'Unknown'
+        );
+        const rawAmount = [
+          serviceItem?.price,
+          serviceItem?.total,
+          serviceItem?.amount,
+          serviceItem?.clientPrice,
+          serviceItem?.clientAmount,
+          serviceItem?.rate,
+          booking.clientIncome
+        ].find(v => typeof v === 'number' && !Number.isNaN(v));
+
+        const clientAmount = rawAmount ?? 0;
+
+        toCreate.push({
+          bookingId: booking.id,
+          bookingServiceKey: serviceKey,
+          serviceKey,
+          service: serviceLabel,
+          clientAmount,
+          providerCost: serviceItem?.providerCost ?? null,
+          status: serviceItem?.providerCost ? 'settled' : 'pending',
+          date: booking.date || new Date().toISOString().split('T')[0],
+          description: serviceItem?.description || booking.description || '',
+        });
+      });
+    });
+
+    if (toCreate.length === 0 || syncingFinance) return existingFinanceRecords;
+    
+    setSyncingFinance(true);
+    try {
+      const createdRecords = [];
+      for (const payloadPartial of toCreate) {
+        const payload = {
+          companyId,
+          createdBy: userId || null,
+          createdByEmail: userEmail || null,
+          createdAt: new Date(),
+          ...payloadPartial
+        };
+        const ref = await addDoc(collection(db, 'financeRecords'), payload);
+        createdRecords.push({
+          id: ref.id,
+          ...payload,
+          profit: (payload.clientAmount || 0) - (payload.providerCost || 0)
+        });
+      }
+      const updated = [...existingFinanceRecords, ...createdRecords];
+      setFinanceRecords(updated);
+      return updated;
+    } catch (error) {
+      console.error('Error syncing finance records:', error);
+      return existingFinanceRecords;
+    } finally {
+      setSyncingFinance(false);
+    }
+  };
   
   // Get user and company
   useEffect(() => {
@@ -300,21 +470,55 @@ const Finance = () => {
         
         const reservationsList = reservationsSnapshot.docs.map(doc => {
           const data = doc.data();
+          const createdAtDate = data.createdAt ? new Date(data.createdAt.seconds * 1000) : null;
+          const dateString = createdAtDate ? createdAtDate.toISOString().split('T')[0] : '';
+        const serviceLabel = getServiceLabel(data.accommodationType || data.serviceType || 'Booking');
           return {
             id: doc.id,
             ...data,
             createdBy: data.createdBy,
             createdByEmail: data.createdByEmail,
-            clientIncome: data.paidAmount || 0,
-            service: data.accommodationType || 'Unknown',
-            date: data.createdAt ? new Date(data.createdAt.seconds * 1000).toISOString().split('T')[0] : '',
-            description: `${data.accommodationType || 'Booking'} - ${data.checkIn || 'N/A'} to ${data.checkOut || 'N/A'}`
+            clientIncome: data.paidAmount ?? data.totalValue ?? data.totalAmount ?? 0,
+            service: serviceLabel,
+            services: data.services || data.selectedServices || data.bookingServices || [],
+            date: dateString,
+            description: `${serviceLabel} - ${data.checkIn || data.startDate || 'N/A'} to ${data.checkOut || data.endDate || 'N/A'}`
           };
         }).filter(isOwnedByCurrentUser);
         
         setReservations(reservationsList);
         
-        // Fetch category payments
+        // Fetch finance records for provider costs and profit tracking
+        const financeRef = collection(db, 'financeRecords');
+        const financeQuery = query(financeRef, where("companyId", "==", companyId));
+        const financeSnapshot = await getDocs(financeQuery);
+        const financeList = financeSnapshot.docs.map(doc => {
+          const data = doc.data();
+          const parsedDate = data.date
+            ? (data.date.seconds ? new Date(data.date.seconds * 1000).toISOString().split('T')[0] : data.date)
+            : '';
+          const clientAmount = data.clientAmount ?? data.clientIncome ?? data.amount ?? 0;
+          const providerCost = data.providerCost ?? null;
+          const status = data.status || (providerCost !== null ? 'settled' : 'pending');
+          return {
+            id: doc.id,
+            ...data,
+            createdBy: data.createdBy,
+            createdByEmail: data.createdByEmail,
+            serviceKey: data.serviceKey || data.bookingServiceKey || data.service || data.category,
+            service: getServiceLabel(data.service || data.category, 'Unknown'),
+            clientAmount,
+            providerCost,
+            profit: data.profit ?? (clientAmount - (providerCost || 0)),
+            status,
+            date: parsedDate
+          };
+        }).filter(isOwnedByCurrentUser);
+        
+        const cleanedFinance = await pruneOrphanFinanceRecords(reservationsList, financeList);
+        setFinanceRecords(cleanedFinance);
+
+        // Fetch category payments (legacy support)
         const paymentsRef = collection(db, 'categoryPayments');
         const paymentsQuery = query(paymentsRef, where("companyId", "==", companyId));
         const paymentsSnapshot = await getDocs(paymentsQuery);
@@ -354,6 +558,9 @@ const Finance = () => {
         }).filter(isOwnedByCurrentUser);
         
         setExpenses(expensesList);
+
+        // Backfill finance records for bookings that do not have one yet
+        await syncFinanceRecords(reservationsList, financeList);
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -364,47 +571,50 @@ const Finance = () => {
     fetchData();
   }, [db, companyId, userEmail, userId, authChecked]);
 
-  // Calculate summary data
-  const categoryIncomeData = reservations.reduce((acc, r) => {
-    const category = r.service;
-    if (!acc[category]) {
-      acc[category] = { income: 0, count: 0 };
-    }
-    acc[category].income += r.clientIncome;
-    acc[category].count += 1;
-    return acc;
-  }, {});
-  
-  const categoryPaymentData = categoryPayments.reduce((acc, p) => {
-    const category = p.category;
-    if (!acc[category]) {
-      acc[category] = 0;
-    }
-    acc[category] += p.amount;
-    return acc;
-  }, {});
-  
-  const categoryRevenueData = Object.keys(categoryIncomeData).map(category => {
-    const income = categoryIncomeData[category].income;
-    const payment = categoryPaymentData[category] || 0;
-    const revenue = income - payment;
-    const count = categoryIncomeData[category].count;
-    
-    return {
-      category,
-      income,
-      payment,
-      revenue,
-      count,
-      margin: income > 0 ? (revenue / income * 100) : 0
-    };
+  // Calculate summary data based on finance records
+  const serviceOptions = Array.from(new Set([
+    ...financeRecords.map(r => getServiceLabel(r.service)),
+    ...reservations.map(r => getServiceLabel(r.service))
+  ].filter(Boolean)));
+
+  const filteredFinanceRecords = financeRecords.filter(record => {
+    const matchesService = filters.service === 'all' || record.service === filters.service;
+    const recordDate = record.date ? new Date(record.date) : null;
+    const startOk = !filters.startDate || (recordDate && recordDate >= new Date(filters.startDate));
+    const endOk = !filters.endDate || (recordDate && recordDate <= new Date(filters.endDate));
+    return matchesService && startOk && endOk;
   });
-  
-  const totalIncome = Object.values(categoryIncomeData).reduce((sum, data) => sum + data.income, 0);
-  const totalPayments = Object.values(categoryPaymentData).reduce((sum, amount) => sum + amount, 0);
-  const totalRevenue = totalIncome - totalPayments;
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+
+  const filteredExpenses = expenses.filter(expense => {
+    const expenseDate = expense.date ? new Date(expense.date) : null;
+    const startOk = !filters.startDate || (expenseDate && expenseDate >= new Date(filters.startDate));
+    const endOk = !filters.endDate || (expenseDate && expenseDate <= new Date(filters.endDate));
+    return startOk && endOk;
+  });
+
+  const pendingFinance = filteredFinanceRecords.filter(r => (r.status === 'pending') || r.providerCost === null);
+  const totalClientRevenue = filteredFinanceRecords.reduce((sum, r) => sum + (r.clientAmount || 0), 0);
+  const totalProviderCosts = filteredFinanceRecords.reduce((sum, r) => sum + (r.providerCost || 0), 0);
+  const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const grossProfit = totalClientRevenue - totalProviderCosts;
+  const totalRevenue = grossProfit;
   const netProfit = totalRevenue - totalExpenses;
+  const totalIncome = totalClientRevenue;
+  const totalPayments = totalProviderCosts;
+  const trueProfit = netProfit;
+
+  const serviceBreakdown = Object.values(filteredFinanceRecords.reduce((acc, r) => {
+    const key = r.service || 'Unknown';
+    if (!acc[key]) {
+      acc[key] = { service: key, revenue: 0, cost: 0, count: 0 };
+    }
+    acc[key].revenue += (r.clientAmount || 0);
+    acc[key].cost += (r.providerCost || 0);
+    acc[key].count += 1;
+    acc[key].profit = acc[key].revenue - acc[key].cost;
+    acc[key].margin = acc[key].revenue > 0 ? (acc[key].profit / acc[key].revenue * 100) : 0;
+    return acc;
+  }, {}));
   
   // Format date for display
   const formatDate = (dateString) => {
@@ -519,8 +729,69 @@ const Finance = () => {
     }
   };
 
-  // Monthly data for reports
-  const monthlyData = reservations.reduce((acc, r) => {
+  // Delete expense
+  const handleDeleteExpense = async (expenseId) => {
+    if (!companyId || !expenseId) return;
+    if (!window.confirm(language === 'en' ? 'Delete this expense?' : 'Ștergi această cheltuială?')) return;
+    setDeletingExpenseId(expenseId);
+    try {
+      await deleteDoc(doc(db, 'expenses', expenseId));
+      setExpenses(prev => prev.filter(e => e.id !== expenseId));
+      showToast(t.deleteExpense);
+    } catch (error) {
+      console.error("Error deleting expense:", error);
+      alert(t.errorSaving);
+    } finally {
+      setDeletingExpenseId(null);
+    }
+  };
+
+  // Add or confirm provider cost for a booking
+  const handleProviderCostUpdate = async (recordId, costValue) => {
+    if (!companyId) {
+      alert(t.errorCompanyNotFound);
+      return;
+    }
+    const numericCost = parseFloat(costValue);
+    if (Number.isNaN(numericCost)) {
+      alert(t.errorValidation);
+      return;
+    }
+    const record = financeRecords.find(r => r.id === recordId);
+    if (!record) return;
+    
+    setUpdatingRecord(recordId);
+    try {
+      const profitValue = (record.clientAmount || 0) - numericCost;
+      const recordRef = doc(db, 'financeRecords', recordId);
+      await updateDoc(recordRef, {
+        providerCost: numericCost,
+        status: 'settled',
+        profit: profitValue,
+        updatedAt: new Date()
+      });
+      
+      setFinanceRecords(prev => prev.map(r => {
+        if (r.id !== recordId) return r;
+        return {
+          ...r,
+          providerCost: numericCost,
+          status: 'settled',
+          profit: profitValue
+        };
+      }));
+      
+      showToast(t.confirmPayment);
+    } catch (error) {
+      console.error("Error updating provider cost:", error);
+      alert(t.errorSaving);
+    } finally {
+      setUpdatingRecord(null);
+    }
+  };
+
+  // Monthly data for reports based on finance records + provider costs
+  const monthlyData = filteredFinanceRecords.reduce((acc, r) => {
     if (!r.date) return acc;
     
     const month = r.date.substring(0, 7);
@@ -534,32 +805,21 @@ const Finance = () => {
         profit: 0
       };
     }
-    acc[month].income += (r.clientIncome || 0);
+    acc[month].income += (r.clientAmount || 0);
+    acc[month].payments += (r.providerCost || 0);
     return acc;
   }, {});
-  
-  // Add payments to monthly data
-  categoryPayments.forEach(payment => {
-    if (!payment.date) return;
-    
-    const month = payment.date.substring(0, 7);
-    if (monthlyData[month]) {
-      monthlyData[month].payments += (payment.amount || 0);
-    }
-  });
   
   // Add expenses and calculate profits
   Object.keys(monthlyData).forEach(month => {
     monthlyData[month].revenue = monthlyData[month].income - monthlyData[month].payments;
     
-    // Add expenses
-    expenses.forEach(expense => {
+    filteredExpenses.forEach(expense => {
       if (expense.date && expense.date.substring(0, 7) === month) {
         monthlyData[month].expenses += (expense.amount || 0);
       }
     });
     
-    // Calculate profit
     monthlyData[month].profit = monthlyData[month].revenue - monthlyData[month].expenses;
   });
   
@@ -652,7 +912,7 @@ const Finance = () => {
     );
   }
 
-  const hasFinancialData = reservations.length > 0 || categoryPayments.length > 0 || expenses.length > 0;
+  const hasFinancialData = financeRecords.length > 0 || reservations.length > 0 || categoryPayments.length > 0 || expenses.length > 0;
 
   if (!hasFinancialData) {
     return (
@@ -665,140 +925,226 @@ const Finance = () => {
 
   // Render dashboard view
   const renderDashboard = () => (
-    <div className="space-y-5 pb-20">
-      {/* Summary Cards */}
-      <div>
-        <h2 className="text-lg font-bold mb-3">{t.summary}</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white rounded-xl p-4 shadow-sm">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-gray-500 text-sm">{t.income}</span>
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-              </div>
+    <div className="space-y-6 pb-24">
+      {/* Header and filters */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-500">{t.companyDashboard}</p>
+            <h2 className="text-2xl font-semibold text-gray-900">{t.financeTitle}</h2>
+            <div className="flex items-center gap-2 text-sm text-gray-600 mt-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+              </span>
+              <span>{pendingFinance.length} {t.pendingPayments}</span>
             </div>
-            <p className="text-xl font-bold">€{totalIncome.toLocaleString()}</p>
           </div>
-          
-          <div className="bg-white rounded-xl p-4 shadow-sm">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-gray-500 text-sm">{t.revenue}</span>
-              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                </svg>
-              </div>
-            </div>
-            <p className="text-xl font-bold">€{totalRevenue.toLocaleString()}</p>
-          </div>
-          
-          <div className="bg-white rounded-xl p-4 shadow-sm">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-gray-500 text-sm">{t.expensesTotal}</span>
-              <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
-                <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                </svg>
-              </div>
-            </div>
-            <p className="text-xl font-bold">€{totalExpenses.toLocaleString()}</p>
-          </div>
-          
-          <div className="bg-white rounded-xl p-4 shadow-sm">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-gray-500 text-sm">{t.netProfit}</span>
-              <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
-                <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-              </div>
-            </div>
-            <p className={`text-xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              €{netProfit.toLocaleString()}
-            </p>
+          <div className="flex flex-wrap gap-3 items-center">
+            <select
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              value={filters.service}
+              onChange={(e) => setFilters({...filters, service: e.target.value})}
+            >
+              <option value="all">{t.serviceType}</option>
+              {serviceOptions.map(option => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+            <input
+              type="date"
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              value={filters.startDate}
+              onChange={(e) => setFilters({...filters, startDate: e.target.value})}
+              placeholder={t.startDate}
+            />
+            <input
+              type="date"
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              value={filters.endDate}
+              onChange={(e) => setFilters({...filters, endDate: e.target.value})}
+              placeholder={t.endDate}
+            />
+            <button
+              className="px-3 py-2 bg-gray-100 text-sm rounded-lg"
+              onClick={() => setFilters({ service: 'all', startDate: '', endDate: '' })}
+            >
+              {t.clearFilters}
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Recent Transactions */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="flex justify-between items-center px-4 py-3 border-b border-gray-100">
-          <h2 className="font-bold">{t.recentTransactions}</h2>
-          <button 
-            onClick={() => navigate('transactions')}
-            className="text-blue-600 text-sm font-medium"
-          >
-            {t.viewAll}
-          </button>
+      {/* Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-xs text-gray-500">{t.clientRevenue}</p>
+              <p className="text-2xl font-semibold mt-1">{formatCurrency(totalClientRevenue)}</p>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-semibold">€</div>
+          </div>
         </div>
-        
-        <div className="p-4">
-          {reservations.length === 0 ? (
-            <div className="py-8 text-center text-gray-500">
-              {t.noTransactions}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-xs text-gray-500">{t.providerPayout}</p>
+              <p className="text-2xl font-semibold mt-1">{formatCurrency(totalProviderCosts)}</p>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {reservations.slice(0, 3).map(item => (
-                <div key={item.id} className="flex justify-between p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <div className="font-medium text-sm capitalize">{item.service}</div>
-                    <div className="text-xs text-gray-500 mt-1">{formatDate(item.date)}</div>
-                  </div>
-                  <div className="text-right font-bold">
-                    €{item.clientIncome.toLocaleString()}
-                  </div>
-                </div>
-              ))}
+            <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-600 font-semibold">↧</div>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-xs text-gray-500">{t.grossProfit}</p>
+              <p className="text-2xl font-semibold mt-1">{formatCurrency(grossProfit)}</p>
             </div>
-          )}
+            <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-600 font-semibold">➕</div>
+          </div>
         </div>
       </div>
-      
-      {/* Category Summary */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="flex justify-between items-center px-4 py-3 border-b border-gray-100">
-          <h2 className="font-bold">{t.categoryOverview}</h2>
-          <button 
-            onClick={() => navigate('categories')}
-            className="text-blue-600 text-sm font-medium"
-          >
-            {t.viewAll}
-          </button>
-        </div>
-        
-        <div className="p-4">
-          {categoryRevenueData.length === 0 ? (
-            <div className="py-8 text-center text-gray-500">
-              {t.noTransactions}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-xs text-gray-500">{t.expensesTotal}</p>
+              <p className="text-2xl font-semibold mt-1">{formatCurrency(totalExpenses)}</p>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {categoryRevenueData.slice(0, 3).map((item, index) => (
-                <div key={index} className="p-3 bg-gray-50 rounded-lg">
-                  <div className="flex justify-between items-center">
-                    <div className="font-medium text-sm capitalize">{item.category}</div>
-                    <div className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                      {item.count}
-                    </div>
+            <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-600 font-semibold">-</div>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-xs text-gray-500">{t.trueProfit}</p>
+              <p className={`text-2xl font-semibold mt-1 ${trueProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {formatCurrency(trueProfit)}
+              </p>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 font-semibold">✓</div>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-xs text-gray-500">{t.pendingPayments}</p>
+              <p className="text-2xl font-semibold mt-1">{pendingFinance.length}</p>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Pending payments */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">{t.pendingPayments}</h3>
+            <p className="text-sm text-gray-500">{t.pendingDotLabel}</p>
+          </div>
+          <div className="text-sm bg-red-50 text-red-600 px-3 py-1 rounded-full">{pendingFinance.length} {t.pending}</div>
+        </div>
+        {pendingFinance.length === 0 ? (
+          <div className="text-center text-gray-500 py-6">{t.noPending}</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {(showAllPending ? pendingFinance : pendingFinance.slice(0, 6)).map(item => (
+              <div key={item.id} className="border border-gray-100 rounded-xl p-4 bg-gray-50">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm font-semibold capitalize text-gray-900">{item.service}</p>
+                    <p className="text-xs text-gray-500 mt-1">{formatDate(item.date)}</p>
                   </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    <div>
-                      <div className="text-xs text-gray-500">{t.income}</div>
-                      <div className="font-medium">€{item.income.toLocaleString()}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-500">{t.margin}</div>
-                      <div className="font-medium">{item.margin.toFixed(1)}%</div>
-                    </div>
+                  <span className="h-3 w-3 rounded-full bg-red-500 mt-1"></span>
+                </div>
+                <div className="flex items-center justify-between mt-3">
+                  <div>
+                    <p className="text-xs text-gray-500">{t.clientAmount}</p>
+                    <p className="font-semibold">{formatCurrency(item.clientAmount)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">{t.providerCost}</p>
+                    <p className="font-semibold text-gray-900">{item.providerCost ? formatCurrency(item.providerCost) : '-'}</p>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+                <div className="mt-3 flex gap-2">
+                  <input
+                    type="number"
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    placeholder={t.providerCostPlaceholder}
+                    value={costDrafts[item.id] ?? ''}
+                    onChange={(e) => setCostDrafts({...costDrafts, [item.id]: e.target.value})}
+                  />
+                  <button
+                    className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg"
+                    onClick={() => handleProviderCostUpdate(item.id, costDrafts[item.id])}
+                    disabled={updatingRecord === item.id}
+                  >
+                    {updatingRecord === item.id ? '...' : t.confirmPayment}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {pendingFinance.length > 6 && (
+          <div className="text-center mt-4">
+            <button
+              className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg"
+              onClick={() => setShowAllPending(!showAllPending)}
+            >
+              {showAllPending ? t.hideFilters || 'Show less' : t.viewAll}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Profit by service */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">{t.profitByService}</h3>
+          <div className="text-sm text-gray-500">{serviceBreakdown.length} {t.transactions}</div>
         </div>
+        {serviceBreakdown.length === 0 ? (
+          <div className="text-center text-gray-500 py-6">{t.noTransactions}</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {serviceBreakdown.map((item, index) => (
+              <div key={index} className="border border-gray-100 rounded-xl p-4 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold capitalize text-gray-900">{item.service}</p>
+                  <span className={`text-xs px-2 py-1 rounded-full ${item.margin >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    {item.margin.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="mt-2 space-y-1 text-sm text-gray-700">
+                  <div className="flex justify-between">
+                    <span>{t.income}</span>
+                    <span className="font-semibold">{formatCurrency(item.revenue)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>{t.providerCost}</span>
+                    <span className="font-semibold">{formatCurrency(item.cost)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>{t.profitPerService}</span>
+                    <span className={`font-semibold ${item.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatCurrency(item.profit)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -812,11 +1158,11 @@ const Finance = () => {
         </div>
         
         <div className="p-4">
-          {reservations.length === 0 ? (
+          {filteredFinanceRecords.length === 0 ? (
             <div className="py-8 text-center text-gray-500">{t.noTransactions}</div>
           ) : (
             <div className="space-y-3">
-              {reservations.map(item => (
+              {filteredFinanceRecords.map(item => (
                 <div key={item.id} className="p-3 bg-gray-50 rounded-lg">
                   <div className="flex justify-between">
                     <div className="font-medium text-sm capitalize">{item.service}</div>
@@ -824,7 +1170,7 @@ const Finance = () => {
                   </div>
                   <div className="text-xs text-gray-500 mt-1 mb-2 line-clamp-1">{item.description}</div>
                   <div className="text-right font-bold text-lg">
-                    €{item.clientIncome.toLocaleString()}
+                    {formatCurrency(item.clientAmount)}
                   </div>
                 </div>
               ))}
@@ -832,7 +1178,7 @@ const Finance = () => {
               <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                 <div className="flex justify-between items-center">
                   <div className="font-medium">{t.total}</div>
-                  <div className="font-bold text-lg">€{totalIncome.toLocaleString()}</div>
+                  <div className="font-bold text-lg">{formatCurrency(totalClientRevenue)}</div>
                 </div>
               </div>
             </div>
@@ -842,180 +1188,7 @@ const Finance = () => {
     </div>
   );
 
-  // Render categories view
-  const renderCategories = () => {
-    if (activeSubView === 'add') {
-      return (
-        <div className="pb-20">
-          <div className="bg-white rounded-xl shadow-sm">
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center">
-              <button 
-                onClick={() => setActiveSubView(null)}
-                className="mr-2"
-              >
-                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
-                </svg>
-              </button>
-              <h2 className="font-bold">{t.addPayment}</h2>
-            </div>
-            
-            <div className="p-4">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.category}</label>
-                  <select
-                    className="w-full p-3 border border-gray-300 rounded-lg text-sm"
-                    value={newPayment.category}
-                    onChange={(e) => setNewPayment({...newPayment, category: e.target.value})}
-                  >
-                    <option value="">{t.selectCategory}</option>
-                    {Object.keys(categoryIncomeData).map(category => (
-                      <option key={category} value={category}>{category}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.amount}</label>
-                  <input
-                    type="number"
-                    className="w-full p-3 border border-gray-300 rounded-lg text-sm"
-                    value={newPayment.amount}
-                    onChange={(e) => setNewPayment({...newPayment, amount: e.target.value})}
-                    placeholder="0.00"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.date}</label>
-                  <input
-                    type="date"
-                    className="w-full p-3 border border-gray-300 rounded-lg text-sm"
-                    value={newPayment.date}
-                    onChange={(e) => setNewPayment({...newPayment, date: e.target.value})}
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.description}</label>
-                  <input
-                    type="text"
-                    className="w-full p-3 border border-gray-300 rounded-lg text-sm"
-                    value={newPayment.description}
-                    onChange={(e) => setNewPayment({...newPayment, description: e.target.value})}
-                    placeholder={t.paymentPlaceholder}
-                  />
-                </div>
-                
-                <button
-                  className="w-full mt-4 py-3 bg-blue-600 text-white font-medium rounded-lg"
-                  onClick={handleAddPayment}
-                >
-                  {t.savePayment}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="space-y-4 pb-20">
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100">
-            <h2 className="font-bold">{t.categories}</h2>
-          </div>
-          
-          <div className="p-4">
-            {categoryRevenueData.length === 0 ? (
-              <div className="py-8 text-center text-gray-500">
-                {t.noTransactions}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {categoryRevenueData.map((item, index) => (
-                  <div key={index} className="p-3 bg-gray-50 rounded-lg">
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="font-medium capitalize">{item.category}</div>
-                      <div className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                        {item.count}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <div className="text-xs text-gray-500">{t.income}</div>
-                        <div className="font-medium">€{item.income.toLocaleString()}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-gray-500">{t.payments}</div>
-                        <div className="font-medium">€{item.payment.toLocaleString()}</div>
-                      </div>
-                    </div>
-                    <div className="mt-2 pt-2 border-t border-gray-200">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-500">{t.margin}</span>
-                        <span className="font-medium">{item.margin.toFixed(1)}%</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                  <div className="flex justify-between items-center mb-2">
-                    <div className="font-medium">{t.total}</div>
-                    <div className="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded-full">
-                      {reservations.length}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <div className="text-xs text-gray-500">{t.income}</div>
-                      <div className="font-medium">€{totalIncome.toLocaleString()}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-500">{t.payments}</div>
-                      <div className="font-medium">€{totalPayments.toLocaleString()}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100">
-            <h2 className="font-bold">{t.paymentHistory}</h2>
-          </div>
-          
-          <div className="p-4">
-            {categoryPayments.length === 0 ? (
-              <div className="py-8 text-center text-gray-500">
-                {t.noPayments}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {categoryPayments.map(item => (
-                  <div key={item.id} className="p-3 bg-gray-50 rounded-lg">
-                    <div className="flex justify-between">
-                      <div className="font-medium text-sm capitalize">{item.category}</div>
-                      <div className="text-xs text-gray-500">{formatDate(item.date)}</div>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1 mb-2 line-clamp-1">{item.description}</div>
-                    <div className="text-right font-bold">
-                      €{item.amount.toLocaleString()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
+  // Categories view removed (profit moved to transactions)
 
   // Render expenses view
   const renderExpenses = () => {
@@ -1106,21 +1279,30 @@ const Finance = () => {
           </div>
           
           <div className="p-4">
-            {expenses.length === 0 ? (
+            {filteredExpenses.length === 0 ? (
               <div className="py-8 text-center text-gray-500">
                 {t.noExpenses}
               </div>
             ) : (
               <div className="space-y-3">
-                {expenses.map(item => (
+                {filteredExpenses.map(item => (
                   <div key={item.id} className="p-3 bg-gray-50 rounded-lg">
                     <div className="flex justify-between">
                       <div className="font-medium text-sm capitalize">{getExpenseCategoryName(item.category)}</div>
                       <div className="text-xs text-gray-500">{formatDate(item.date)}</div>
                     </div>
                     <div className="text-xs text-gray-500 mt-1 mb-2 line-clamp-1">{item.description}</div>
-                    <div className="text-right font-bold">
-                      €{item.amount.toLocaleString()}
+                    <div className="flex items-center justify-between mt-1">
+                      <div className="text-right font-bold">
+                        €{item.amount.toLocaleString()}
+                      </div>
+                      <button
+                        className="text-xs text-red-600 hover:text-red-700 px-2 py-1 rounded"
+                        onClick={() => handleDeleteExpense(item.id)}
+                        disabled={deletingExpenseId === item.id}
+                      >
+                        {deletingExpenseId === item.id ? '...' : t.deleteExpense}
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -1142,13 +1324,13 @@ const Finance = () => {
           </div>
           
           <div className="p-4">
-            {expenses.length === 0 ? (
+            {filteredExpenses.length === 0 ? (
               <div className="py-8 text-center text-gray-500">
                 {t.noExpenses}
               </div>
             ) : (
               <div className="space-y-3">
-                {Object.keys(expenses.reduce((acc, expense) => {
+                {Object.keys(filteredExpenses.reduce((acc, expense) => {
                   const key = expense.category;
                   if (!acc[key]) {
                     acc[key] = 0;
@@ -1156,7 +1338,7 @@ const Finance = () => {
                   acc[key] += expense.amount;
                   return acc;
                 }, {})).map((category, index) => {
-                  const amount = expenses
+                  const amount = filteredExpenses
                     .filter(e => e.category === category)
                     .reduce((sum, e) => sum + e.amount, 0);
                   const percentage = totalExpenses > 0 ? amount / totalExpenses * 100 : 0;
@@ -1314,8 +1496,6 @@ const Finance = () => {
     switch (activeTab) {
       case 'transactions':
         return renderTransactions();
-      case 'categories':
-        return renderCategories();
       case 'expenses':
         return renderExpenses();
       case 'reports':
@@ -1327,12 +1507,6 @@ const Finance = () => {
 
   return (
     <div className="bg-gray-100 min-h-screen">
-      {/* Header */}
-      <div className="bg-white px-4 py-3 shadow sticky top-0 z-20">
-        <h1 className="text-lg font-bold">{t.financeTitle}</h1>
-        <p className="text-xs text-gray-500 mb-1">{t.companyDashboard}</p>
-      </div>
-      
       {/* Main content area */}
       <div className="px-4 py-4">
         {getActiveView()}
@@ -1340,7 +1514,7 @@ const Finance = () => {
       
       {/* Bottom Tab Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-30">
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-4">
           <button 
             onClick={() => navigate('dashboard')}
             className={`flex flex-col items-center justify-center py-2 ${activeTab === 'dashboard' ? 'text-blue-600' : 'text-gray-500'}`}
@@ -1359,16 +1533,6 @@ const Finance = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
             </svg>
             <span className="text-xs mt-1">{t.transactions}</span>
-          </button>
-          
-          <button 
-            onClick={() => navigate('categories')}
-            className={`flex flex-col items-center justify-center py-2 ${activeTab === 'categories' ? 'text-blue-600' : 'text-gray-500'}`}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-            </svg>
-            <span className="text-xs mt-1">{t.categories}</span>
           </button>
           
           <button 
@@ -1392,9 +1556,6 @@ const Finance = () => {
           </button>
         </div>
       </div>
-      
-      {/* Floating Action Button */}
-      {renderFloatingActionButton()}
       
       {/* Toast notification */}
       <div className={`fixed bottom-20 left-4 right-4 bg-green-600 text-white rounded-lg px-4 py-3 shadow-lg transition-opacity duration-300 flex items-center z-20 ${toast.show ? 'opacity-100' : 'opacity-0'}`}>

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Firebase Access Test</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #00ff00; }
+        .test { margin: 10px 0; padding: 10px; background: #2d2d2d; }
+        .success { color: #00ff00; }
+        .error { color: #ff0000; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Firebase Access Test</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
+        import { getFirestore, collection, getDocs, addDoc } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js';
+        import { getStorage, ref, listAll } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-storage.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyC7tM5PZaGXm4YMQyHCMAzAqFCELJJy6CU",
+            authDomain: "conciergeapp-513ca.firebaseapp.com",
+            projectId: "conciergeapp-513ca",
+            storageBucket: "conciergeapp-513ca.firebasestorage.app",
+            messagingSenderId: "845445283531",
+            appId: "1:845445283531:web:8619efa0ebf8971d21654e"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+
+        const results = document.getElementById('results');
+
+        function log(msg, success = true) {
+            const div = document.createElement('div');
+            div.className = 'test ' + (success ? 'success' : 'error');
+            div.textContent = msg;
+            results.appendChild(div);
+        }
+
+        onAuthStateChanged(auth, async (user) => {
+            if (!user) {
+                log('❌ NOT LOGGED IN - Open your app first and log in!', false);
+                return;
+            }
+
+            log(`✅ Logged in as: ${user.email}`);
+            log(`   UID: ${user.uid}`);
+
+            // Get user doc
+            try {
+                const userDoc = await getDocs(collection(db, 'users'));
+                const myUser = userDoc.docs.find(d => d.id === user.uid);
+                if (myUser) {
+                    const data = myUser.data();
+                    log(`✅ User data: companyId=${data.companyId}, role=${data.role}`);
+                } else {
+                    log('⚠️  No user document found', false);
+                }
+            } catch (err) {
+                log(`❌ Cannot read users: ${err.message}`, false);
+            }
+
+            // Test collections
+            const collections = ['villas', 'cars', 'boats', 'clients', 'reservations', 'offers'];
+
+            for (const collName of collections) {
+                try {
+                    const snap = await getDocs(collection(db, collName));
+                    log(`✅ ${collName}: ${snap.size} documents`);
+                } catch (err) {
+                    log(`❌ ${collName}: ${err.message}`, false);
+                }
+            }
+
+            // Test write
+            log('\n--- WRITE TEST ---');
+            try {
+                const testDoc = await addDoc(collection(db, 'clients'), {
+                    name: 'TEST CLIENT',
+                    companyId: 'company1',
+                    createdAt: new Date()
+                });
+                log(`✅ Can CREATE client: ${testDoc.id}`);
+
+                // Clean up
+                await testDoc.delete();
+                log(`✅ Can DELETE client`);
+            } catch (err) {
+                log(`❌ Cannot write: ${err.message}`, false);
+            }
+
+            // Test storage
+            log('\n--- STORAGE TEST ---');
+            try {
+                const listRef = ref(storage, 'villas/shared');
+                const result = await listAll(listRef);
+                log(`✅ Storage accessible: ${result.items.length} files in villas/shared`);
+            } catch (err) {
+                log(`❌ Storage error: ${err.message}`, false);
+            }
+        });
+    </script>
+</body>
+</html>

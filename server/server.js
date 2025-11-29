@@ -9,6 +9,7 @@ try {
   const serviceAccount = require('./serviceAccountKey.json');
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
+    // Use the actual bucket name so signed URLs match Firebase config
     storageBucket: 'conciergeapp-513ca.firebasestorage.app'
   });
   console.log('✅ Firebase admin initialized');
@@ -112,5 +113,3 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`🚀 Proxy listening on http://localhost:${PORT}`);
 });
-
-

@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Villa Photo Paths</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4285f4;
+            padding-bottom: 10px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            font-family: monospace;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .info { background: #e3f2fd; border-left: 4px solid #2196f3; }
+        .success { background: #e8f5e9; border-left: 4px solid #4caf50; }
+        .warning { background: #fff3e0; border-left: 4px solid #ff9800; }
+        .error { background: #ffebee; border-left: 4px solid #f44336; }
+        button {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover { background: #357ae8; }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 5px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+        .progress {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #4285f4, #34a853);
+            width: 0%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Fix Villa Photo Paths</h1>
+
+        <div class="status info">
+            <strong>Problem:</strong> Villa photos are stored in <code>villas/shared/</code> but Firestore references point to <code>company2/villas/</code><br>
+            <strong>Solution:</strong> This tool will automatically fix all broken photo references
+        </div>
+
+        <div>
+            <button id="startBtn" onclick="startFix()">Start Fix</button>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+
+        <div class="progress" id="progressContainer" style="display:none;">
+            <div class="progress-bar" id="progressBar">0%</div>
+        </div>
+
+        <div id="log"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js';
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
+        import { getFirestore, collection, getDocs, doc, updateDoc } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js';
+        import { getStorage, ref, listAll, getDownloadURL } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-storage.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyC7tM5PZaGXm4YMQyHCMAzAqFCELJJy6CU",
+            authDomain: "conciergeapp-513ca.firebaseapp.com",
+            projectId: "conciergeapp-513ca",
+            storageBucket: "conciergeapp-513ca.firebasestorage.app",
+            messagingSenderId: "845445283531",
+            appId: "1:845445283531:web:8619efa0ebf8971d21654e"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+
+        let currentUser = null;
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                log(`✅ Authenticated as: ${user.email}`, 'success');
+                document.getElementById('startBtn').disabled = false;
+            } else {
+                log('❌ Not authenticated. Please log in to your app first!', 'error');
+                document.getElementById('startBtn').disabled = true;
+            }
+        });
+
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logEl.textContent += `[${timestamp}] ${message}\n`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        window.clearLog = function() {
+            document.getElementById('log').textContent = '';
+        }
+
+        function updateProgress(current, total) {
+            const percent = Math.round((current / total) * 100);
+            const progressBar = document.getElementById('progressBar');
+            const progressContainer = document.getElementById('progressContainer');
+
+            progressContainer.style.display = 'block';
+            progressBar.style.width = percent + '%';
+            progressBar.textContent = `${current}/${total} (${percent}%)`;
+        }
+
+        function extractFilenameFromPath(path) {
+            if (!path) return null;
+            const parts = path.split('/');
+            return parts[parts.length - 1];
+        }
+
+        function extractPathFromUrl(url) {
+            if (!url) return null;
+            if (!url.startsWith('http')) return url;
+            const parts = url.split('/o/');
+            if (parts.length < 2) return null;
+            const pathAndQuery = parts[1];
+            return decodeURIComponent(pathAndQuery.split('?')[0] || '');
+        }
+
+        async function buildStorageMap() {
+            log('\n📂 Building map of all files in Storage...');
+            const fileMap = new Map();
+
+            const pathsToCheck = [
+                'villas/shared',
+                'company1/villas',
+                'company2/villas',
+                'villas',
+                'public/villas'
+            ];
+
+            for (const basePath of pathsToCheck) {
+                try {
+                    const listRef = ref(storage, basePath);
+                    const result = await listAll(listRef);
+
+                    log(`  ✓ Found ${result.items.length} files in ${basePath}/`);
+
+                    for (const itemRef of result.items) {
+                        const filename = itemRef.name;
+                        fileMap.set(filename, itemRef.fullPath);
+                    }
+                } catch (error) {
+                    if (error.code !== 'storage/object-not-found') {
+                        log(`  ⚠️  Could not access ${basePath}: ${error.message}`);
+                    }
+                }
+            }
+
+            log(`\n📊 Total unique files found: ${fileMap.size}\n`);
+            return fileMap;
+        }
+
+        window.startFix = async function() {
+            if (!currentUser) {
+                alert('Please log in to your app first!');
+                return;
+            }
+
+            const startBtn = document.getElementById('startBtn');
+            startBtn.disabled = true;
+            startBtn.textContent = 'Running...';
+
+            try {
+                log('🚀 Starting photo path fix...\n');
+
+                // Build storage map
+                const storageFileMap = await buildStorageMap();
+
+                if (storageFileMap.size === 0) {
+                    log('❌ No files found in Storage. Nothing to fix.', 'error');
+                    return;
+                }
+
+                // Fetch all villas
+                log('📊 Fetching villas from Firestore...');
+                const villasSnapshot = await getDocs(collection(db, 'villas'));
+                log(`Found ${villasSnapshot.size} villas to check\n`);
+
+                let villasUpdated = 0;
+                let photosFixed = 0;
+                let photosRemoved = 0;
+                let villaIndex = 0;
+
+                for (const villaDoc of villasSnapshot.docs) {
+                    villaIndex++;
+                    updateProgress(villaIndex, villasSnapshot.size);
+
+                    const villaData = villaDoc.data();
+                    const villaName = villaData.name || villaDoc.id;
+                    const photos = villaData.photos || [];
+
+                    if (!Array.isArray(photos) || photos.length === 0) {
+                        continue;
+                    }
+
+                    log(`\n📝 [${villaIndex}/${villasSnapshot.size}] Checking: ${villaName} (${photos.length} photos)`);
+
+                    const fixedPhotos = [];
+                    let villaHasChanges = false;
+
+                    for (const photo of photos) {
+                        const currentPath = typeof photo === 'string'
+                            ? extractPathFromUrl(photo)
+                            : extractPathFromUrl(photo?.url) || photo?.path;
+
+                        if (!currentPath) {
+                            log(`  ⚠️  Skipping photo with no valid path`);
+                            continue;
+                        }
+
+                        const filename = extractFilenameFromPath(currentPath);
+
+                        if (!filename) {
+                            log(`  ⚠️  Could not extract filename from: ${currentPath}`);
+                            continue;
+                        }
+
+                        // Check if file exists at current path
+                        try {
+                            await getDownloadURL(ref(storage, currentPath));
+                            log(`  ✅ ${currentPath}`);
+                            fixedPhotos.push(photo);
+                        } catch (error) {
+                            // File not found at current path, try to find it
+                            if (storageFileMap.has(filename)) {
+                                const correctPath = storageFileMap.get(filename);
+                                log(`  🔧 Fixing: ${filename}`);
+                                log(`      From: ${currentPath}`);
+                                log(`      To:   ${correctPath}`);
+
+                                try {
+                                    const newUrl = await getDownloadURL(ref(storage, correctPath));
+
+                                    if (typeof photo === 'string') {
+                                        fixedPhotos.push(newUrl);
+                                    } else {
+                                        fixedPhotos.push({
+                                            ...photo,
+                                            url: newUrl,
+                                            path: correctPath
+                                        });
+                                    }
+
+                                    photosFixed++;
+                                    villaHasChanges = true;
+                                } catch (urlError) {
+                                    log(`  ❌ Failed to get URL for ${correctPath}: ${urlError.message}`);
+                                    photosRemoved++;
+                                    villaHasChanges = true;
+                                }
+                            } else {
+                                log(`  ❌ File not found anywhere: ${filename}`);
+                                photosRemoved++;
+                                villaHasChanges = true;
+                            }
+                        }
+                    }
+
+                    // Update the villa if any photos were fixed
+                    if (villaHasChanges) {
+                        try {
+                            await updateDoc(doc(db, 'villas', villaDoc.id), {
+                                photos: fixedPhotos
+                            });
+                            villasUpdated++;
+                            log(`  💾 Updated villa in Firestore`);
+                        } catch (updateError) {
+                            log(`  ❌ Failed to update villa: ${updateError.message}`, 'error');
+                        }
+                    } else {
+                        log(`  ✨ All photos are valid`);
+                    }
+                }
+
+                log('\n' + '='.repeat(60));
+                log('✅ FIX COMPLETE', 'success');
+                log('='.repeat(60));
+                log(`📊 Villas checked: ${villasSnapshot.size}`);
+                log(`🔧 Photos fixed: ${photosFixed}`);
+                log(`🗑️  Photos removed: ${photosRemoved}`);
+                log(`💾 Villas updated: ${villasUpdated}`);
+                log('='.repeat(60));
+                log('\n🎉 Done! Refresh your app to see the changes.', 'success');
+
+            } catch (error) {
+                log(`\n❌ Error: ${error.message}`, 'error');
+                console.error(error);
+            } finally {
+                startBtn.disabled = false;
+                startBtn.textContent = 'Start Fix';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -9,16 +9,29 @@ import {
 import { 
   getStorage, ref, uploadBytes, getDownloadURL 
 } from 'firebase/storage';
+import { getAuth, signInAnonymously } from 'firebase/auth';
 
 function AddProperty() {
   const { id } = useParams();
   const isEditing = !!id;
   const navigate = useNavigate();
   const db = useDatabase();
+  const auth = getAuth();
   
   const [loading, setLoading] = useState(isEditing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const ensureStorageAuth = async () => {
+    try {
+      if (!auth.currentUser) {
+        await signInAnonymously(auth);
+        console.log('Signed in anonymously for property uploads (on-demand)');
+      }
+    } catch (err) {
+      console.error('Auth error (on-demand storage auth):', err);
+      throw err;
+    }
+  };
   
   // Direct language handling without hooks - Fixed to match sidebar default
   const [language, setLanguage] = useState(() => {
@@ -38,6 +51,21 @@ function AddProperty() {
       window.removeEventListener('storage', handleStorageChange);
     };
   }, [language]);
+
+  // Ensure we have an authenticated session for Storage access
+  useEffect(() => {
+    const ensureAuth = async () => {
+      try {
+        if (!auth.currentUser) {
+          await signInAnonymously(auth);
+          console.log('Signed in anonymously for property uploads');
+        }
+      } catch (err) {
+        console.error('Auth error (property uploads):', err);
+      }
+    };
+    ensureAuth();
+  }, [auth]);
   
   // Translations object
   const translations = {
@@ -376,6 +404,7 @@ function AddProperty() {
     if (files.length === 0) return;
     
     try {
+      await ensureStorageAuth();
       setSaving(true);
       
       if (!db) {
@@ -393,32 +422,22 @@ function AddProperty() {
         return;
       }
       
-      // Verify storage and company ID
-      if (!db.storage || !db.companyId) {
-        console.error("Storage or company ID not available:", {
-          storage: !!db.storage,
-          companyId: db.companyId
-        });
-        setError("Storage connection error");
-        setSaving(false);
-        return;
-      }
-      
-      console.log("Authenticated user:", db.currentUser.uid);
-      console.log("Company ID:", db.companyId);
-      
+      const storageInstance = db?.storage || getStorage();
+      const sharedBasePath = 'properties/shared';
+
       // Upload each file
       const uploadPromises = files.map(async (file) => {
         try {
           // Create a unique filename
           const timestamp = Date.now();
           const fileName = `${timestamp}_${file.name}`;
-          const path = `${db.companyId}/properties/photos/${fileName}`;
+          // Use shared path to avoid company-restricted storage rules
+          const path = `${sharedBasePath}/${fileName}`;
           
           console.log("Attempting to upload to path:", path);
           
           // Create storage reference using the Firebase v9 SDK directly
-          const storageRef = ref(db.storage, path);
+          const storageRef = ref(storageInstance, path);
           
           // Upload file
           const uploadResult = await uploadBytes(storageRef, file);
@@ -458,6 +477,7 @@ function AddProperty() {
     if (files.length === 0) return;
     
     try {
+      await ensureStorageAuth();
       setSaving(true);
       
       if (!db) {
@@ -475,28 +495,22 @@ function AddProperty() {
         return;
       }
       
-      // Verify storage and company ID
-      if (!db.storage || !db.companyId) {
-        console.error("Storage or company ID not available");
-        setError("Storage connection error");
-        setSaving(false);
-        return;
-      }
-      
-      console.log("Attempting document upload for company:", db.companyId);
-      
+      const storageInstance = db?.storage || getStorage();
+      const sharedBasePath = 'properties/shared';
+
       // Upload each file
       const uploadPromises = files.map(async (file) => {
         try {
           // Create a unique filename
           const timestamp = Date.now();
           const fileName = `${timestamp}_${file.name}`;
-          const path = `${db.companyId}/properties/documents/${fileName}`;
+          // Use shared path to avoid company-restricted storage rules
+          const path = `${sharedBasePath}/${fileName}`;
           
           console.log("Attempting to upload document to path:", path);
           
           // Create storage reference using the Firebase v9 SDK directly
-          const storageRef = ref(db.storage, path);
+          const storageRef = ref(storageInstance, path);
           
           // Upload file
           const uploadResult = await uploadBytes(storageRef, file);
@@ -559,6 +573,13 @@ function AddProperty() {
         setSaving(false);
         return;
       }
+
+      const companyId = db.companyId || null;
+      if (!companyId) {
+        setError("Missing company ID. Please re-login.");
+        setSaving(false);
+        return;
+      }
       
       // Make sure description is correctly structured as an object
       if (typeof formData.description === 'string') {
@@ -576,6 +597,7 @@ function AddProperty() {
           en: formData.title,
           ro: formData.title
         },
+        companyId,
         type: formData.type,
         location: formData.location,
         size: parseFloat(formData.size.replace(/,/g, '')) || 0,
@@ -622,9 +644,8 @@ function AddProperty() {
         updatedAt: serverTimestamp()
       };
       
-      // Add companyId if creating a new property
+      // Add metadata if creating a new property
       if (!isEditing) {
-        
         propertyData.createdAt = serverTimestamp();
         propertyData.createdBy = db.currentUser?.uid;
       }

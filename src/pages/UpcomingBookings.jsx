@@ -22,6 +22,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { translations } from '../translations/bookingTranslations';
 import { useLanguage } from '../utils/languageHelper';
+import { v4 as uuidv4 } from 'uuid';
 
 // Helper function to safely render text from language objects
 function safeRender(value) {
@@ -52,9 +53,13 @@ const paymentStatusColors = {
   notPaid: { cssClass: 'bg-red-100 text-red-800 border-red-200' }
 };
 
+// Inline receipt strings must stay under Firestore doc size (~1MB).
+const MAX_INLINE_RECEIPT_LENGTH = 900000; // ~900 KB buffer for other fields
+
 const serviceTagStyles = {
   villa: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   villas: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  'concierge-core': 'bg-amber-50 text-amber-700 border-amber-200',
   cars: 'bg-red-50 text-red-700 border-red-200',
   boats: 'bg-blue-50 text-blue-700 border-blue-200',
   yacht: 'bg-blue-50 text-blue-700 border-blue-200',
@@ -67,11 +72,40 @@ const getServiceTagClasses = (type) => {
   return serviceTagStyles[type] || 'bg-gray-100 text-gray-700 border-gray-200';
 };
 
+// Core concierge services available even without database records
+const CORE_CONCIERGE_SERVICES = [
+  { id: 'core-villa-rentals', name: { en: 'Luxury villa rentals', ro: 'Închirieri de vile de lux' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-yachts', name: { en: 'Yacht & boat charters', ro: 'Închirieri de iahturi & bărci' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-cars', name: { en: 'Premium car rentals', ro: 'Închirieri de mașini premium' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-club-bookings', name: { en: 'VIP club reservations', ro: 'Rezervări VIP în cluburi' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-restaurants', name: { en: 'Exclusive restaurant bookings', ro: 'Rezervări în restaurante exclusiviste' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-parties', name: { en: 'Private party planning', ro: 'Organizare petreceri private' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-chef', name: { en: 'Private chef & gourmet catering', ro: 'Chef privat & catering gourmet' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-transfers', name: { en: 'Private transfers', ro: 'Transferuri private' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-security', name: { en: 'Bodyguard & private security', ro: 'Bodyguard & securitate privată' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-housekeeping', name: { en: 'Housekeeping & cleaning', ro: 'Servicii de menaj & housekeeping' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-babysitting', name: { en: 'Babysitting & nanny', ro: 'Servicii de babysitting & nanny' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-spa', name: { en: 'In-villa massage & spa', ro: 'Masaj & spa la vilă' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-excursions', name: { en: 'Excursions & activities', ro: 'Organizare de excursii & activități' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-shopping', name: { en: 'Personal shopping assistance', ro: 'Asistență personală pentru cumpărături' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-photo-video', name: { en: 'Professional photo & video', ro: 'Servicii foto & video profesionale' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-romantic', name: { en: 'Romantic event planning', ro: 'Planificare evenimente romantice' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-medical', name: { en: 'Private medical & doctor at home', ro: 'Servicii medicale private & doctor la domiciliu' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-groups', name: { en: 'Group logistics coordination', ro: 'Organizare logistică pentru grupuri mari' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-property-mgmt', name: { en: 'Property management', ro: 'Management de proprietăți' }, price: 0, unit: 'service', category: 'concierge-core' },
+];
+
 // Enhanced category icon components
 const CategoryIcon = ({ type, size = "small" }) => {
   const sizeClass = size === "large" ? "w-8 h-8" : "w-5 h-5";
   
   switch(type) {
+    case 'concierge-core':
+      return (
+        <svg className={`${sizeClass} text-amber-500`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 17l-5.878 3.09 1.122-6.545L2 8.91l6.561-.954L12 2.5l3.439 5.456L22 8.91l-5.244 4.635 1.122 6.545z" />
+        </svg>
+      );
     case 'villas':
       return (
         <svg className={`${sizeClass} text-blue-500`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -153,6 +187,41 @@ const PaymentIcon = ({ type, size = "small" }) => {
   }
 };
 
+// Compute per-service payment summary based on recorded payments
+const getServicePaymentInfo = (service, payments = [], safeRenderFn = (v) => v) => {
+  const total = ((service?.price || 0) * (service?.quantity || 1)) || 0;
+  let paid = 0;
+  const serviceId = service?.id || service?.templateId || null;
+  const serviceName = typeof service?.name === 'object' ? safeRenderFn(service?.name) : (service?.name || '').toString();
+  
+  payments.forEach((payment) => {
+    const paymentServiceId = payment.serviceId || null;
+    const paymentServiceName = (payment.serviceName || '').toString();
+    const matchesId = paymentServiceId && serviceId && paymentServiceId === serviceId;
+    const matchesName = paymentServiceName && serviceName && paymentServiceName === serviceName;
+    
+    if (matchesId || matchesName) {
+      paid += payment.amount || 0;
+    }
+  });
+  
+  const due = Math.max(0, total - paid);
+  return { total, paid, due };
+};
+
+// Helper to derive payment context (overall or per service)
+const getPaymentContext = (client, service, paymentHistory = [], safeRenderFn = (v) => v) => {
+  if (service) {
+    const { total, paid, due } = getServicePaymentInfo(service, paymentHistory, safeRenderFn);
+    return { total, paid, due };
+  }
+  return {
+    total: client?.totalValue || 0,
+    paid: client?.paidAmount || 0,
+    due: client?.dueAmount || 0
+  };
+};
+
 // IMPROVED SERVICE SELECTION COMPONENT
 const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) => {
   const [step, setStep] = useState('category');
@@ -183,6 +252,7 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
         
         // Define standard categories
         const standardCategories = [
+          { id: 'concierge-core', name: t.conciergeCore || 'Concierge Essentials', icon: 'concierge-core' },
           { id: 'villas', name: t.villas || 'Villas', icon: 'villas' },
           { id: 'cars', name: t.cars || 'Cars', icon: 'cars' },
           { id: 'boats', name: t.boats || 'Boats & Yachts', icon: 'boats' },
@@ -210,6 +280,12 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
   useEffect(() => {
     const fetchServices = async () => {
       if (!selectedCategory || selectedCategory.id === 'custom') return;
+
+      if (selectedCategory.id === 'concierge-core') {
+        setServices(CORE_CONCIERGE_SERVICES);
+        setLoading(false);
+        return;
+      }
       
       try {
         setLoading(true);
@@ -225,6 +301,24 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
           
         const serviceSnapshot = await getDocs(serviceQuery);
         const servicesData = [];
+
+        const resolveName = (data, fallbackId) => {
+          return data?.name?.en
+            || data?.name_en
+            || (typeof data?.name === 'string' ? data.name : '')
+            || data?.name_ro
+            || data?.title
+            || data?.label
+            || fallbackId;
+        };
+
+        const resolveDescription = (data) => {
+          return data?.description?.en
+            || data?.description_en
+            || (typeof data?.description === 'string' ? data.description : '')
+            || data?.description_ro
+            || '';
+        };
         
         serviceSnapshot.forEach(doc => {
           servicesData.push({
@@ -252,12 +346,28 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
             dedicatedSnapshot.forEach(doc => {
               const data = doc.data();
               
+              const priceConfig = Array.isArray(data.priceConfigurations) && data.priceConfigurations.length > 0
+                ? data.priceConfigurations[0]
+                : null;
               let price = 0;
-              if (selectedCategory.id === 'villas' && data.priceConfigurations && data.priceConfigurations.length > 0) {
-                price = parseFloat(data.priceConfigurations[0].price || 0);
+              if (selectedCategory.id === 'villas' && priceConfig) {
+                price = parseFloat(priceConfig.price || 0);
               } else {
                 price = parseFloat(data.price || 0);
               }
+              const resolvedUnit = (() => {
+                if (selectedCategory.id === 'villas' && priceConfig?.type) {
+                  const type = priceConfig.type.toString().toLowerCase();
+                  if (type.includes('week')) return 'weekly';
+                  if (type.includes('night')) return 'nightly';
+                  if (type.includes('day')) return 'daily';
+                }
+                if (data.unit) {
+                  return data.unit;
+                }
+                return selectedCategory.id === 'villas' ? 'weekly'
+                  : (selectedCategory.id === 'cars' || selectedCategory.id === 'boats' ? 'daily' : 'service');
+              })();
               
               console.log(`Processing item: ${doc.id}`, {
                 name: data.name?.en || data.name || doc.id,
@@ -266,12 +376,12 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
               
               servicesData.push({
                 id: doc.id,
-                name: data.name?.en || data.name || doc.id,
-                description: data.description?.en || data.description || '',
+                name: resolveName(data, doc.id),
+                displayName: data.name_en || data.name?.en || data.name_ro || data.name || resolveName(data, doc.id),
+                description: resolveDescription(data),
                 category: selectedCategory.id,
                 price: price,
-                unit: selectedCategory.id === 'villas' ? 'nightly' : 
-                      selectedCategory.id === 'cars' || selectedCategory.id === 'boats' ? 'daily' : 'service',
+                unit: resolvedUnit,
                 brand: data.brand || '',
                 model: data.model || '',
                 bedrooms: data.bedrooms || '',
@@ -284,14 +394,33 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
           }
         }
         
-        servicesData.sort((a, b) => {
+        const asPlainText = (value, fallback = '') => {
+          if (!value) return fallback;
+          if (typeof value === 'string') return value;
+          if (typeof value === 'object') {
+            return value.en || value.ro || Object.values(value)[0] || fallback;
+          }
+          return `${value}` || fallback;
+        };
+
+        const normalizedServices = servicesData.map(svc => {
+          const resolvedName = asPlainText(svc.displayName, '') || asPlainText(svc.name, '') || resolveName(svc, svc.id);
+          return {
+            ...svc,
+            name: resolvedName,
+            displayName: resolvedName,
+            description: asPlainText(svc.description, '') || resolveDescription(svc)
+          };
+        });
+
+        normalizedServices.sort((a, b) => {
           const nameA = (typeof a.name === 'object' ? a.name.en : a.name) || '';
           const nameB = (typeof b.name === 'object' ? b.name.en : b.name) || '';
           return nameA.localeCompare(nameB);
         });
         
         console.log(`Total services after merging collections: ${servicesData.length}`);
-        setServices(servicesData);
+        setServices(normalizedServices);
         setLoading(false);
       } catch (err) {
         console.error(`Error fetching ${selectedCategory?.id} services:`, err);
@@ -416,22 +545,39 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
                   onClick={() => handleServiceSelect(service)}
                   className="w-full p-3 border border-gray-300 rounded-lg text-left hover:bg-blue-50 hover:border-blue-300 transition-colors bg-white"
                 >
-                  <div className="font-medium text-gray-900">
-                    {typeof service.name === 'object' ? service.name.en : service.name}
-                  </div>
-                  
-                  {(service.description || service.brand || service.model) && (
-                    <div className="text-sm text-gray-600 mt-1">
-                      {service.brand && service.model ? `${service.brand} ${service.model}` :
-                       service.brand ? service.brand :
-                       service.model ? service.model :
-                       typeof service.description === 'object' ? service.description.en : service.description}
-                    </div>
-                  )}
-                  
-                  <div className="mt-2 text-blue-600 font-medium">
-                    {service.price?.toLocaleString() || 0} € / {service.unit || 'item'}
-                  </div>
+                  {(() => {
+                    const displayName = (() => {
+                      if (service.displayName) return service.displayName;
+                      if (typeof service.name === 'object') {
+                        return service.name.en || service.name.ro || Object.values(service.name)[0] || t.unnamedService || 'Unnamed';
+                      }
+                      return service.name || t.unnamedService || 'Unnamed';
+                    })();
+                    const displayDesc = service.brand && service.model
+                      ? `${service.brand} ${service.model}`
+                      : service.brand
+                        ? service.brand
+                        : service.model
+                          ? service.model
+                          : (typeof service.description === 'object' ? (service.description.en || service.description.ro) : service.description);
+                    const hasPrice = service.price && Number(service.price) > 0;
+                    const displayPrice = hasPrice
+                      ? `${Number(service.price).toLocaleString()} € / ${service.unit || 'item'}`
+                      : (t.priceOnRequest || 'Price on request');
+                    return (
+                      <>
+                        <div className="font-medium text-gray-900">{displayName}</div>
+                        {displayDesc && (
+                          <div className="text-sm text-gray-600 mt-1">
+                            {displayDesc}
+                          </div>
+                        )}
+                        <div className="mt-2 text-blue-600 font-medium">
+                          {displayPrice}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </button>
               ))}
             </div>
@@ -500,9 +646,16 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
             <div className="relative">
               <input
                 type="number"
-                value={serviceData.price}
-                className="w-full pl-8 p-2 bg-gray-50 border border-gray-300 rounded-md"
-                readOnly
+                min="0"
+                step="0.01"
+                value={serviceData.price === 0 ? '' : serviceData.price}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const numeric = raw === '' ? 0 : parseFloat(raw);
+                  setServiceData({...serviceData, price: Number.isNaN(numeric) ? 0 : numeric});
+                }}
+                className="w-full pl-8 p-2 bg-white border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                placeholder="0"
               />
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <span className="text-gray-500">€</span>
@@ -511,12 +664,12 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
           </div>
         </div>
         
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">{t.totalAmount || 'Total Amount'}</label>
-          <div className="w-full p-3 bg-blue-50 border border-blue-200 rounded-md font-medium text-blue-700">
-            {(serviceData.price * serviceData.quantity).toLocaleString()} €
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t.totalAmount || 'Total Amount'}</label>
+            <div className="w-full p-3 bg-blue-50 border border-blue-200 rounded-md font-medium text-blue-700">
+            {(serviceData.price * serviceData.quantity || 0).toLocaleString()} €
+            </div>
           </div>
-        </div>
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">{t.notes || 'Notes (optional)'}</label>
@@ -539,7 +692,7 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
           <button
             onClick={handleSubmit}
             className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
-            disabled={serviceData.price <= 0}
+            disabled={!serviceData.name || serviceData.price <= 0}
           >
             {t.addToBooking || 'Add to Booking'}
           </button>
@@ -717,13 +870,54 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
     store: '',
     items: '',
     date: new Date().toISOString().split('T')[0],
-    price: 0,
+    price: '',
     receipt: false,
-    notes: ''
+    notes: '',
+    receiptFile: null,
+    receiptPreview: ''
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
+
+  const handleReceiptChange = async (file) => {
+    if (!file) {
+      setShoppingData(prev => ({ ...prev, receiptFile: null, receiptPreview: '' }));
+      return;
+    }
+
+    const isSupported = file.type.startsWith('image/') || file.type === 'application/pdf';
+    if (!isSupported) {
+      setError(t.unsupportedFileType || 'Please upload an image or PDF');
+      return;
+    }
+
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(file);
+      });
+      setError(null);
+      setShoppingData(prev => ({
+        ...prev,
+        receiptFile: file,
+        receiptPreview: typeof dataUrl === 'string' ? dataUrl : '',
+        receipt: true // mark receipt available when a file is attached
+      }));
+    } catch (err) {
+      console.error('Receipt preview error:', err);
+      setError(t.failedToLoadReceipt || 'Unable to load receipt preview');
+    }
+  };
+
+  const applyMarkup = (percentage) => {
+    const base = parseFloat(shoppingData.price);
+    if (Number.isNaN(base)) return;
+    const updated = parseFloat((base * (1 + percentage / 100)).toFixed(2));
+    setShoppingData(prev => ({ ...prev, price: updated.toString() }));
+  };
   
   const handleSubmit = async () => {
     if (!shoppingData.store.trim()) {
@@ -736,7 +930,8 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
       return;
     }
     
-    if (shoppingData.price <= 0) {
+    const numericPrice = parseFloat(shoppingData.price);
+    if (Number.isNaN(numericPrice) || numericPrice <= 0) {
       setError(t.pleaseEnterValidAmount || "Please enter a valid amount");
       return;
     }
@@ -745,24 +940,50 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
       setIsSubmitting(true);
       setError(null);
       
+      const buildReceiptAttachment = () => {
+        if (!shoppingData.receiptFile || !shoppingData.receiptPreview) return null;
+        const tooLarge = shoppingData.receiptPreview.length > MAX_INLINE_RECEIPT_LENGTH;
+        const safePreview = tooLarge
+          ? shoppingData.receiptPreview.slice(0, MAX_INLINE_RECEIPT_LENGTH)
+          : shoppingData.receiptPreview;
+        return {
+          name: shoppingData.receiptFile.name,
+          type: shoppingData.receiptFile.type,
+          size: shoppingData.receiptFile.size,
+          dataUrl: safePreview,
+          truncated: tooLarge
+        };
+      };
+
       const newExpense = {
         type: 'shopping',
         name: `${t.shoppingAt || 'Shopping at'} ${shoppingData.store}`,
         description: shoppingData.items,
         date: shoppingData.date,
-        price: shoppingData.price,
+        price: numericPrice,
         quantity: 1,
         unit: 'item',
         store: shoppingData.store,
-        hasReceipt: shoppingData.receipt,
+        hasReceipt: shoppingData.receipt || !!shoppingData.receiptFile,
         notes: shoppingData.notes || '',
-        totalValue: shoppingData.price,
+        totalValue: numericPrice,
         status: 'confirmed',
         createdAt: new Date(),
-        companyId: userCompanyId
+        companyId: userCompanyId,
+        receiptAttachment: buildReceiptAttachment()
       };
       
       await onAddShopping(newExpense);
+      setShoppingData({
+        store: '',
+        items: '',
+        date: new Date().toISOString().split('T')[0],
+        price: '',
+        receipt: false,
+        notes: '',
+        receiptFile: null,
+        receiptPreview: ''
+      });
       setIsSubmitting(false);
     } catch (err) {
       console.error("Error adding shopping expense:", err);
@@ -820,31 +1041,79 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             {t.totalAmount || 'Total Amount*'}
           </label>
-          <div className="relative">
+          <div className="relative space-y-2">
             <input
               type="number"
+              inputMode="decimal"
               value={shoppingData.price}
-              onChange={(e) => setShoppingData({...shoppingData, price: parseFloat(e.target.value) || 0})}
+              onChange={(e) => setShoppingData({...shoppingData, price: e.target.value})}
+              onFocus={(e) => {
+                if (e.target.value === '0') {
+                  setShoppingData(prev => ({ ...prev, price: '' }));
+                }
+              }}
               className="w-full pl-8 p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
               required
             />
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <span className="text-gray-500">€</span>
             </div>
+            <div className="flex gap-2">
+              {[10, 20, 30].map(pct => (
+                <button
+                  key={pct}
+                  type="button"
+                  onClick={() => applyMarkup(pct)}
+                  className="flex-1 py-2 text-sm border border-gray-300 rounded-md bg-gray-50 hover:bg-gray-100 text-gray-800"
+                >
+                  +{pct}%
+                </button>
+              ))}
+            </div>
           </div>
         </div>
         
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            id="hasReceipt"
-            checked={shoppingData.receipt}
-            onChange={(e) => setShoppingData({...shoppingData, receipt: e.target.checked})}
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-          />
-          <label htmlFor="hasReceipt" className="ml-2 block text-sm text-gray-700">
-            {t.receiptAvailable || 'Receipt available'}
-          </label>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="block text-sm font-medium text-gray-700">
+              {t.receiptAvailable || 'Receipt available'}
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="hasReceipt"
+                checked={shoppingData.receipt}
+                onChange={(e) => setShoppingData({...shoppingData, receipt: e.target.checked})}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="hasReceipt" className="text-xs text-gray-600">
+                {t.receiptCheckbox || 'Mark if receipt exists'}
+              </label>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              capture="environment"
+              onChange={(e) => handleReceiptChange(e.target.files?.[0] || null)}
+              className="w-full text-sm text-gray-700"
+            />
+          </div>
+          {shoppingData.receiptFile && (
+            <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-sm">
+              <div className="text-gray-700 truncate">
+                {shoppingData.receiptFile.name}
+              </div>
+              <button
+                type="button"
+                onClick={() => handleReceiptChange(null)}
+                className="text-red-600 hover:text-red-700 text-xs font-medium"
+              >
+                {t.remove || 'Remove'}
+              </button>
+            </div>
+          )}
         </div>
         
         <div>
@@ -877,7 +1146,7 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
           <button
             onClick={handleSubmit}
             className="flex-1 py-3 bg-pink-500 hover:bg-pink-600 text-white rounded-lg font-medium transition-colors"
-            disabled={isSubmitting || !shoppingData.store || !shoppingData.items || shoppingData.price <= 0}
+            disabled={isSubmitting || !shoppingData.store || !shoppingData.items || Number.isNaN(parseFloat(shoppingData.price)) || parseFloat(shoppingData.price) <= 0}
           >
             {isSubmitting ? (
               <div className="flex items-center justify-center">
@@ -1009,7 +1278,7 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
   const getStatusBadgeClass = (status) => {
     return statusColors[status]?.cssClass || 'bg-gray-100 text-gray-700 border-gray-200';
   };
-  
+
   const getDaysLeft = (date) => {
     if (!date) return '';
     const today = new Date();
@@ -1457,6 +1726,7 @@ const UpcomingBookings = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [selectedService, setSelectedService] = useState(null);
+  const [paymentTargetService, setPaymentTargetService] = useState(null);
   const bottomSheetRef = useRef(null);
   const bookingListAnchorId = 'booking-results';
   
@@ -1804,8 +2074,26 @@ useEffect(() => {
             };
           }
           
-          const totalValue = booking.totalValue || booking.totalAmount || 0;
+          const baseTotalValue = booking.totalValue || booking.totalAmount || 0;
           const paidAmount = booking.paidAmount || booking.totalPaid || 0;
+          
+          // Compute services total for this booking (fallback if total missing)
+          const serviceTotalForBooking = Array.isArray(booking.services)
+            ? booking.services.reduce((sum, svc) => {
+                const price = svc?.price || 0;
+                const qty = svc?.quantity || 1;
+                return sum + price * qty;
+              }, 0)
+            : 0;
+          
+          // Re-sync effective total so it never falls below services total or paid amount
+          const combinedTotal = Math.max(baseTotalValue, serviceTotalForBooking, paidAmount);
+          let effectiveTotalValue = combinedTotal > 0 ? combinedTotal : serviceTotalForBooking;
+          
+          // Ensure effective total is not below paid amount to keep ratios sane
+          if (effectiveTotalValue < paidAmount) {
+            effectiveTotalValue = paidAmount;
+          }
           
           // Extract all payment history
           if (booking.paymentHistory && booking.paymentHistory.length > 0) {
@@ -1823,11 +2111,21 @@ useEffect(() => {
           }
           
           // Extract all services - FIXED: properly extract services and handle dates
-          if (booking.services && booking.services.length > 0) {
-            booking.services.forEach(service => {
+          const bookingServices = Array.isArray(booking.services)
+            ? booking.services
+            : (Array.isArray(booking.extras) ? booking.extras : []);
+          
+          if (bookingServices.length > 0) {
+            bookingServices.forEach((service, serviceIndex) => {
+              const stableId = service.id 
+                || service.templateId 
+                || service.uid 
+                || `${booking.id || 'booking'}_${serviceIndex}_${Math.floor(Math.random() * 1e6)}`;
+              
               // Process service date and createdAt fields
               const processedService = {
                 ...service,
+                id: stableId,
                 date: service.date?.toDate?.() || service.date,
                 createdAt: service.createdAt?.toDate?.() || service.createdAt || new Date()
               };
@@ -1840,9 +2138,9 @@ useEffect(() => {
           }
           
           groups[clientId].bookings.push(booking);
-          groups[clientId].totalValue += totalValue;
+          groups[clientId].totalValue += effectiveTotalValue;
           groups[clientId].paidAmount += paidAmount;
-          groups[clientId].dueAmount += Math.max(0, totalValue - paidAmount);
+          groups[clientId].dueAmount += Math.max(0, effectiveTotalValue - paidAmount);
           
           // Track last activity (either booking date or last payment)
           const bookingDate = booking.createdAt || booking.checkIn || new Date();
@@ -1970,6 +2268,33 @@ useEffect(() => {
     setTimeout(() => {
       setShowNotification(false);
     }, 3000);
+  };
+
+  const handleDownloadReceipt = (service) => {
+    const attachment = service?.receiptAttachment;
+    if (!attachment) {
+      showNotificationMessage(t.noReceiptAvailable || 'No receipt attached', 'error');
+      return;
+    }
+    if (!attachment.dataUrl) {
+      showNotificationMessage(t.receiptNotStored || 'Receipt preview not stored (file too large). Please reattach.', 'error');
+      return;
+    }
+    try {
+      const link = document.createElement('a');
+      link.href = attachment.dataUrl;
+      const ext = attachment.type?.includes('pdf') ? 'pdf' : 'png';
+      const safeName = (attachment.name || 'receipt').replace(/[^a-z0-9._-]/gi, '_');
+      link.download = safeName.endsWith(ext) ? safeName : `${safeName}.${ext}`;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Receipt download failed', err);
+      showNotificationMessage(t.receiptDownloadFailed || 'Failed to download receipt', 'error');
+    }
   };
   
   // Filter clients based on time and search filters
@@ -2130,6 +2455,15 @@ const closeBottomSheet = () => {
     setSelectedItem(null);
     setSelectedPayment(null);
     setSelectedService(null);
+    setPaymentTargetService(null);
+    setPaymentData({
+      amount: 0,
+      method: 'cash',
+      notes: '',
+      receiptNumber: '',
+      createdAt: new Date(),
+      modifiedAt: new Date()
+    });
     console.log('Bottom sheet state cleared');
   }, 300);
 };
@@ -2146,9 +2480,21 @@ const viewClientDetails = (clientId) => {
   }
 };
 
-const openPaymentModal = (client) => {
-  console.log('openPaymentModal called with client:', client);
+const openPaymentModal = (client, service = null) => {
+  console.log('openPaymentModal called with client:', client, 'service:', service);
   if (client) {
+    setPaymentTargetService(service);
+    // Pre-fill amount with service total if provided, otherwise client's due amount
+    const context = getPaymentContext(client, service, client.paymentHistory || [], safeRender);
+    const defaultAmount = context.due || 0;
+    setPaymentData({
+      amount: defaultAmount,
+      method: 'cash',
+      notes: '',
+      receiptNumber: '',
+      createdAt: new Date(),
+      modifiedAt: new Date()
+    });
     showBottomSheetWithContent('quick-payment', client);
   } else {
     console.error('No client provided to openPaymentModal');
@@ -2327,10 +2673,26 @@ const renderMainContent = (filteredClients) => {
         {/* PAYMENT FORM */}
         {(bottomSheetContent === 'quick-payment' || bottomSheetContent === 'edit-payment') && selectedItem && (
           <div className="p-4 bg-white space-y-4">
-            <div className="text-center border-b pb-4">
-              <h2 className="text-lg font-semibold text-gray-900">{t.client || 'Client'}: {safeRender(selectedItem.clientName)}</h2>
-              <p className="text-red-600 font-bold text-xl">{t.amountDue || 'Due'}: {selectedItem.dueAmount.toLocaleString()} €</p>
-            </div>
+            {(() => {
+              const paymentContext = getPaymentContext(selectedItem, paymentTargetService, selectedItem.paymentHistory || [], safeRender);
+              return (
+                <div className="text-center border-b pb-4">
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    {paymentTargetService ? (t.service || 'Service') : (t.client || 'Client')}:{' '}
+                    {paymentTargetService ? safeRender(paymentTargetService.name) : safeRender(selectedItem.clientName)}
+                  </h2>
+                  <p className="text-red-600 font-bold text-xl">
+                    {t.amountDue || 'Due'}: {paymentContext.due.toLocaleString()} €
+                  </p>
+                  {paymentTargetService && (
+                    <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full text-xs text-blue-700">
+                      <span>{t.client || 'Client'}:</span>
+                      <span className="font-medium">{safeRender(selectedItem.clientName)}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">{t.paymentAmount || 'Payment Amount'} *</label>
@@ -2715,10 +3077,20 @@ const renderMainContent = (filteredClients) => {
       
       // Add the shopping expense to services array with regular Date instead of serverTimestamp
       const currentDate = new Date();
+      const sanitizedReceipt = shoppingExpense.receiptAttachment ? {
+        name: shoppingExpense.receiptAttachment.name || 'receipt',
+        type: shoppingExpense.receiptAttachment.type || 'image',
+        size: shoppingExpense.receiptAttachment.size || 0,
+        dataUrl: shoppingExpense.receiptAttachment.dataUrl && shoppingExpense.receiptAttachment.dataUrl.length > 0
+          ? shoppingExpense.receiptAttachment.dataUrl.slice(0, MAX_INLINE_RECEIPT_LENGTH)
+          : null,
+        truncated: shoppingExpense.receiptAttachment.truncated || false
+      } : null;
       
       // Create service object WITHOUT serverTimestamp - add a unique ID
       const newService = {
         ...shoppingExpense,
+        receiptAttachment: sanitizedReceipt,
         id: 'shopping_' + Date.now(), // Add a unique ID
         createdAt: currentDate
       };
@@ -2729,6 +3101,7 @@ const renderMainContent = (filteredClients) => {
       await updateDoc(bookingRef, {
         services: services,
         totalValue: newTotal,
+        totalAmount: newTotal, // keep legacy field in sync so reloads calculate correctly
         // KEEP paidAmount unchanged
         updatedAt: serverTimestamp()
       });
@@ -2746,6 +3119,7 @@ const renderMainContent = (filteredClients) => {
               ...booking,
               services: updatedServices,
               totalValue: newTotal,
+              totalAmount: newTotal,
               // Maintain the existing paidAmount
               paidAmount: booking.paidAmount || 0
             };
@@ -2787,7 +3161,7 @@ const renderMainContent = (filteredClients) => {
         
         // Keep paidAmount the same
         const paidAmount = updatedGroup.paidAmount;
-        updatedGroup.dueAmount = updatedGroup.totalValue - paidAmount;
+        updatedGroup.dueAmount = Math.max(0, updatedGroup.totalValue - paidAmount);
         
         // Update client payment status
         if (paidAmount >= updatedGroup.totalValue) {
@@ -2802,6 +3176,27 @@ const renderMainContent = (filteredClients) => {
         updatedGroup.lastActivity = new Date();
         
         return { ...prev, [clientId]: updatedGroup };
+      });
+
+      // Keep selected item (open modal) in sync so progress bar reflects new total
+      setSelectedItem(prev => {
+        if (!prev || prev.clientId !== client.clientId) return prev;
+        const paidAmountSafe = prev.paidAmount || 0;
+        const updatedTotal = (prev.totalValue || 0) + shoppingExpense.totalValue;
+        const updatedDue = Math.max(0, updatedTotal - paidAmountSafe);
+        const nextPaymentStatus = paidAmountSafe >= updatedTotal
+          ? 'paid'
+          : paidAmountSafe > 0
+            ? 'partiallyPaid'
+            : 'notPaid';
+
+        return {
+          ...prev,
+          services: [...(prev.services || []), { ...newService, bookingId: targetBooking.id }],
+          totalValue: updatedTotal,
+          dueAmount: updatedDue,
+          paymentStatus: nextPaymentStatus
+        };
       });
       
       console.log('Successfully added shopping expense to booking:', targetBooking.id);
@@ -2876,6 +3271,7 @@ const renderMainContent = (filteredClients) => {
       await updateDoc(bookingRef, {
         services: services,
         totalValue: newTotal,
+        totalAmount: newTotal, // keep legacy field in sync so reloads calculate correctly
         // KEEP paidAmount unchanged
         updatedAt: serverTimestamp()
       });
@@ -2885,17 +3281,18 @@ const renderMainContent = (filteredClients) => {
         return prev.map(booking => {
           if (booking.id === targetBooking.id) {
             // Create updated services array including the new service
-            const updatedServices = Array.isArray(booking.services) 
-              ? [...booking.services, preparedService]
-              : [preparedService];
+              const updatedServices = Array.isArray(booking.services) 
+                ? [...booking.services, preparedService]
+                : [preparedService];
               
-            return {
-              ...booking,
-              services: updatedServices,
-              totalValue: newTotal,
-              // Maintain the existing paidAmount
-              paidAmount: booking.paidAmount || 0
-            };
+              return {
+                ...booking,
+                services: updatedServices,
+                totalValue: newTotal,
+                totalAmount: newTotal,
+                // Maintain the existing paidAmount
+                paidAmount: booking.paidAmount || 0
+              };
           }
           return booking;
         });
@@ -2934,7 +3331,7 @@ const renderMainContent = (filteredClients) => {
         
         // Keep paidAmount the same
         const paidAmount = updatedGroup.paidAmount;
-        updatedGroup.dueAmount = updatedGroup.totalValue - paidAmount;
+        updatedGroup.dueAmount = Math.max(0, updatedGroup.totalValue - paidAmount);
         
         // Update client payment status
         if (paidAmount >= updatedGroup.totalValue) {
@@ -2949,6 +3346,27 @@ const renderMainContent = (filteredClients) => {
         updatedGroup.lastActivity = new Date();
         
         return { ...prev, [clientId]: updatedGroup };
+      });
+
+      // Keep selected item (open modal) in sync so progress bar reflects new total
+      setSelectedItem(prev => {
+        if (!prev || prev.clientId !== client.clientId) return prev;
+        const paidAmountSafe = prev.paidAmount || 0;
+        const updatedTotal = (prev.totalValue || 0) + preparedService.totalValue;
+        const updatedDue = Math.max(0, updatedTotal - paidAmountSafe);
+        const nextPaymentStatus = paidAmountSafe >= updatedTotal
+          ? 'paid'
+          : paidAmountSafe > 0
+            ? 'partiallyPaid'
+            : 'notPaid';
+
+        return {
+          ...prev,
+          services: [...(prev.services || []), { ...preparedService, bookingId: targetBooking.id }],
+          totalValue: updatedTotal,
+          dueAmount: updatedDue,
+          paymentStatus: nextPaymentStatus
+        };
       });
       
       console.log('Successfully added service to booking:', targetBooking.id);
@@ -3006,7 +3424,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
 
   
   // PAYMENT HANDLING
-  const handleQuickPayment = async (client, amount) => {
+  const handleQuickPayment = async (client, amount, targetServiceOverride = null, overrides = {}) => {
     if (!amount || amount <= 0 || !client) return;
     // Find the booking to update
     const targetBooking = client.bookings[0]; // Usually update the first booking
@@ -3028,12 +3446,20 @@ async function handleShoppingFormSubmit(shoppingExpense) {
         throw new Error(t.notAuthorizedToModify || 'You are not authorized to modify this booking');
       }
       
+      const targetService = targetServiceOverride || paymentTargetService;
+      const now = new Date();
       const payment = {
+        id: uuidv4(),
         amount,
-        method: paymentData.method,
-        notes: paymentData.notes,
-        receiptNumber: paymentData.receiptNumber,
-        date: new Date(),
+        method: overrides.method ?? paymentData.method,
+        notes: overrides.notes ?? paymentData.notes,
+        receiptNumber: overrides.receiptNumber ?? paymentData.receiptNumber,
+        serviceId: targetService?.id || null,
+        serviceName: targetService ? safeRender(targetService.name || targetService) : null,
+        bookingId: targetBooking.id,
+        date: now,
+        createdAt: now,
+        createdBy: auth.currentUser?.uid || 'unknown',
         companyId: userCompanyId // Add company ID to payment record
       };
       
@@ -3123,6 +3549,26 @@ async function handleShoppingFormSubmit(shoppingExpense) {
         updatedGroup.lastActivity = new Date();
         
         return { ...prev, [clientId]: updatedGroup };
+      });
+
+      // Keep selected client (modal + progress bar) in sync with the payment
+      setSelectedItem(prev => {
+        if (!prev || prev.clientId !== targetBooking.clientId) return prev;
+        const updatedPaid = (prev.paidAmount || 0) + payment.amount;
+        const updatedDue = Math.max(0, (prev.totalValue || 0) - updatedPaid);
+        const updatedStatus = updatedPaid >= (prev.totalValue || 0)
+          ? 'paid'
+          : updatedPaid > 0
+            ? 'partiallyPaid'
+            : 'notPaid';
+        return {
+          ...prev,
+          paidAmount: updatedPaid,
+          dueAmount: updatedDue,
+          paymentStatus: updatedStatus,
+          lastPaymentDate: new Date(),
+          paymentHistory: [{ ...payment, bookingId: targetBooking.id }, ...(prev.paymentHistory || [])]
+        };
       });
       
       showNotificationMessage(t.paymentSuccess || 'Payment processed successfully');
@@ -3371,21 +3817,112 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                   <p className="text-gray-500">{t.noAdditionalServices || 'No additional services'}</p>
                 </div>
               ) : (
-                selectedItem.services.map((service, idx) => (
+                selectedItem.services.map((service, idx) => {
+                  const ctx = getPaymentContext(selectedItem, service, selectedItem.paymentHistory || [], safeRender);
+                  const isPaidOut = ctx.due <= 0;
+                  return (
                   <div 
                     key={idx} 
-                    className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
-                    onClick={() => openEditServiceModal(selectedItem, service)}
+                    className="p-3 bg-gray-50 rounded-lg"
                   >
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="font-medium text-gray-900">{safeRender(service.name)}</p>
-                        <p className="text-sm text-gray-600">{formatShortDate(service.date)}</p>
+                    {(() => {
+                      const { total, paid, due } = getServicePaymentInfo(service, selectedItem.paymentHistory || [], safeRender);
+                      const status =
+                        due <= 0 ? 'paid' :
+                        paid > 0 ? 'partial' : 'unpaid';
+                      const statusStyles = status === 'paid'
+                        ? 'bg-green-100 text-green-800 border-green-200'
+                        : status === 'partial'
+                          ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                          : 'bg-red-100 text-red-800 border-red-200';
+                      const statusLabel = status === 'paid'
+                        ? (t.paid || 'Paid')
+                        : status === 'partial'
+                          ? (t.partiallyPaid || 'Partially Paid')
+                          : (t.notPaid || 'Not Paid');
+                      return (
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium text-gray-900">{safeRender(service.name)}</p>
+                            <p className="text-sm text-gray-600">{formatShortDate(service.date)}</p>
+                          </div>
+                          <div className="text-right space-y-2">
+                            <p className="font-semibold text-gray-900">{total.toLocaleString()} €</p>
+                            <div className={`inline-block px-2 py-0.5 rounded-full text-xs border ${statusStyles}`}>
+                              {statusLabel}
+                            </div>
+                            <p className="text-xs text-green-700">{t.paid || 'Paid'}: {paid.toLocaleString()} €</p>
+                            <p className={`text-xs ${due <= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                              {t.amountDue || 'Due'}: {due.toLocaleString()} €
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      {service.receiptAttachment && (
+                        <div className="flex items-center gap-2 text-xs text-gray-700 bg-gray-100 border border-gray-200 rounded px-2 py-1">
+                          <span className="font-medium">{t.receipt || 'Receipt'}:</span>
+                          <span className="truncate max-w-[140px]" title={service.receiptAttachment.name || 'receipt'}>
+                            {service.receiptAttachment.name || 'receipt'}
+                          </span>
+                          {service.receiptAttachment.dataUrl ? (
+                            <button
+                              className="px-2 py-0.5 bg-blue-50 border border-blue-200 rounded text-[11px] text-blue-700 hover:bg-blue-100"
+                              onClick={() => handleDownloadReceipt(service)}
+                            >
+                              {t.download || 'Download'}
+                            </button>
+                          ) : (
+                            <span className="text-red-600 text-[11px]">
+                              {t.receiptNotStored || 'Not stored (too large)'}
+                            </span>
+                          )}
+                          {service.receiptAttachment.truncated && service.receiptAttachment.dataUrl && (
+                            <span className="text-amber-600 text-[11px]">
+                              {t.receiptTruncated || 'Preview truncated due to size'}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      <div className="text-xs text-gray-500">
+                        {t.paymentStatus || 'Payment Status'}
                       </div>
-                      <p className="font-medium text-gray-900">{((service.price || 0) * (service.quantity || 1)).toLocaleString()} €</p>
+                      <div className="flex gap-2 mt-3 w-full">
+                        <button
+                          className="flex-1 py-2 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:border-gray-300"
+                          onClick={() => openEditServiceModal(selectedItem, service)}
+                        >
+                          {t.editService || 'Edit Service'}
+                        </button>
+                        <button
+                          className={`flex-1 py-2 border rounded text-sm ${
+                            isPaidOut
+                              ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                              : 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+                          }`}
+                          onClick={() => openPaymentModal(selectedItem, service)}
+                          disabled={isPaidOut}
+                        >
+                          {t.addPayment || 'Add Payment'}
+                        </button>
+                        {!isPaidOut && (
+                          <button
+                            className="flex-1 py-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700 hover:bg-blue-100"
+                            onClick={() => {
+                              if (ctx.due > 0) {
+                                handleQuickPayment(selectedItem, ctx.due, service, { method: 'cash' });
+                              }
+                            }}
+                          >
+                            {t.markPaid || 'Mark Paid'}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                ))
+                );
+                })
               )}
             </div>
 
@@ -3401,13 +3938,15 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                   {selectedItem.paymentHistory.map((payment, idx) => (
                     <div 
                       key={idx} 
-                      className="p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
-                      onClick={() => openEditPaymentModal(selectedItem, payment)}
+                      className="p-3 bg-gray-50 rounded-lg"
                     >
                       <div className="flex justify-between items-center">
                         <div>
                           <p className="font-medium text-gray-900">{(payment.amount || 0).toLocaleString()} €</p>
                           <p className="text-sm text-gray-600">{formatLongDate(payment.date)}</p>
+                          {payment.serviceName && (
+                            <p className="text-xs text-blue-600 mt-1">{safeRender(payment.serviceName)}</p>
+                          )}
                         </div>
                         <span className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs">{payment.method}</span>
                       </div>
@@ -3478,14 +4017,20 @@ async function handleShoppingFormSubmit(shoppingExpense) {
               <div className="flex gap-2 mt-2">
                 <button
                   type="button"
-                  onClick={() => setPaymentData({...paymentData, amount: selectedItem.dueAmount})}
+                  onClick={() => {
+                    const ctx = getPaymentContext(selectedItem, paymentTargetService, selectedItem.paymentHistory || [], safeRender);
+                    setPaymentData({...paymentData, amount: ctx.due});
+                  }}
                   className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
                 >
                   {t.fullAmount || 'Full Amount'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPaymentData({...paymentData, amount: Math.round(selectedItem.dueAmount / 2)})}
+                  onClick={() => {
+                    const ctx = getPaymentContext(selectedItem, paymentTargetService, selectedItem.paymentHistory || [], safeRender);
+                    setPaymentData({...paymentData, amount: Math.round(ctx.due / 2)});
+                  }}
                   className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
                 >
                   {t.half || 'Half'}

@@ -3,6 +3,14 @@
     "default": "conciergeapp-513ca",
     "conciergeapp": "conciergeapp-513ca"
   },
-  "targets": {},
+  "targets": {
+    "conciergeapp-513ca": {
+      "storage": {
+        "default": [
+          "conciergeapp-513ca.firebasestorage.app"
+        ]
+      }
+    }
+  },
   "etags": {}
 }
