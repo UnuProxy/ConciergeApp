@@ -109,15 +109,11 @@
         import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
         import { getFirestore, collection, getDocs, doc, updateDoc } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js';
         import { getStorage, ref, listAll, getDownloadURL } from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-storage.js';
+        import { firebaseConfig } from './config/firebase-config.js';
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyC7tM5PZaGXm4YMQyHCMAzAqFCELJJy6CU",
-            authDomain: "conciergeapp-513ca.firebaseapp.com",
-            projectId: "conciergeapp-513ca",
-            storageBucket: "conciergeapp-513ca.firebasestorage.app",
-            messagingSenderId: "845445283531",
-            appId: "1:845445283531:web:8619efa0ebf8971d21654e"
-        };
+        if (!firebaseConfig?.apiKey) {
+            throw new Error('Missing Firebase config. Copy config/firebase-config.example.js to config/firebase-config.js with your project values.');
+        }
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);

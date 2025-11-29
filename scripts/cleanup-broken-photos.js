@@ -11,15 +11,34 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { getStorage, ref, getDownloadURL } from 'firebase/storage';
+import 'dotenv/config';
 
-// Firebase configuration
+const requiredEnvVars = [
+  'VITE_FIREBASE_API_KEY',
+  'VITE_FIREBASE_AUTH_DOMAIN',
+  'VITE_FIREBASE_PROJECT_ID',
+  'VITE_FIREBASE_STORAGE_BUCKET',
+  'VITE_FIREBASE_MESSAGING_SENDER_ID',
+  'VITE_FIREBASE_APP_ID'
+];
+
+const missingEnvVars = requiredEnvVars.filter((key) => !process.env[key]);
+
+if (missingEnvVars.length) {
+  throw new Error(
+    `Missing Firebase config in environment: ${missingEnvVars.join(', ')}. ` +
+    'Add them to your .env file before running this script.'
+  );
+}
+
+// Firebase configuration pulled from environment to avoid committing secrets
 const firebaseConfig = {
-  apiKey: "AIzaSyC7tM5PZaGXm4YMQyHCMAzAqFCELJJy6CU",
-  authDomain: "conciergeapp-513ca.firebaseapp.com",
-  projectId: "conciergeapp-513ca",
-  storageBucket: "conciergeapp-513ca.firebasestorage.app",
-  messagingSenderId: "845445283531",
-  appId: "1:845445283531:web:8619efa0ebf8971d21654e"
+  apiKey: process.env.VITE_FIREBASE_API_KEY,
+  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.VITE_FIREBASE_APP_ID
 };
 
 // Initialize Firebase
