@@ -61,3 +61,4 @@ yarn-error.log*
 *.sw?
 server/serviceAccountKey.json
 server/serviceAccountKey.json
+config/firebase-config.js
