@@ -162,7 +162,12 @@ function Navbar({ sidebarOpen, setSidebarOpen }) {
   return (
     <header className="app-navbar">
       <div className="app-navbar__left">
-        <button className="app-navbar__icon-button" onClick={() => setSidebarOpen(!sidebarOpen)}>
+        <button
+          type="button"
+          className="app-navbar__icon-button"
+          onClick={() => setSidebarOpen((prev) => !prev)}
+          aria-label="Toggle menu"
+        >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="18" height="18">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>

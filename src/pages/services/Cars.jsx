@@ -40,6 +40,11 @@ const styles = {
     color: '#1f2937',
     marginBottom: '12px'
   },
+  helperText: {
+    fontSize: '13px',
+    color: '#4b5563',
+    marginBottom: '12px',
+  },
   card: {
     background: '#fff',
     borderRadius: '8px',
@@ -197,7 +202,7 @@ resultsCount: {
     backgroundColor: '#3b82f6',
     color: 'white',
     fontWeight: '500',
-    padding: '12px 16px',
+    padding: '11px 15px',
     borderRadius: '6px',
     border: 'none',
     cursor: 'pointer',
@@ -210,22 +215,40 @@ resultsCount: {
     backgroundColor: '#f3f4f6',
     color: '#1f2937',
     fontWeight: '500',
-    padding: '12px 16px',
-    borderRadius: '6px',
+    padding: '10px 14px',
+    borderRadius: '8px',
     border: '1px solid #d1d5db',
     cursor: 'pointer',
-    fontSize: '16px',
+    fontSize: '15px',
     touchAction: 'manipulation'
   },
   buttonDanger: {
     backgroundColor: '#fee2e2',
     color: '#b91c1c',
     fontWeight: '500',
-    padding: '12px 16px',
-    borderRadius: '6px',
+    padding: '10px 14px',
+    borderRadius: '8px',
     border: 'none',
     cursor: 'pointer',
-    fontSize: '16px',
+    fontSize: '15px',
+    touchAction: 'manipulation'
+  },
+  toggleRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '12px',
+    margin: '12px 0'
+  },
+  toggleButton: {
+    backgroundColor: '#f3f4f6',
+    color: '#1f2937',
+    fontWeight: '500',
+    padding: '10px 14px',
+    borderRadius: '6px',
+    border: '1px solid #d1d5db',
+    cursor: 'pointer',
+    fontSize: '14px',
     touchAction: 'manipulation'
   },
   tabContainer: {
@@ -316,7 +339,7 @@ resultsCount: {
     objectFit: 'cover'
   },
   carCardContent: {
-    padding: '16px'
+    padding: '20px 20px 22px'
   },
   carCardTitle: {
     fontSize: '18px',
@@ -331,9 +354,10 @@ resultsCount: {
   },
   buttonRow: {
     display: 'flex',
-    justifyContent: 'space-between',
-    marginTop: '16px',
-    gap: '8px'
+    justifyContent: 'flex-start',
+    marginTop: '20px',
+    gap: '12px',
+    alignItems: 'center'
   },
   currencyInput: {
     position: 'relative',
@@ -450,11 +474,13 @@ function Cars() {
   const [isAddingCar, setIsAddingCar] = useState(false);
   const [isEditingCar, setIsEditingCar] = useState(false);
   const [currentCar, setCurrentCar] = useState(null);
+  const [selectedCar, setSelectedCar] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [photoFiles, setPhotoFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
   const [activeTab, setActiveTab] = useState('basic');
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [imageErrors, setImageErrors] = useState({});
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 768);
   
@@ -494,11 +520,10 @@ function Cars() {
   // Form data with comprehensive car details (existing code continues...)
   const [formData, setFormData] = useState({
     // Basic Information
-    name_en: '',
-    name_ro: '',
     make: '',
     model: '',
     year: '',
+    priceMonth: 'may',
     seats: '',
     doors: '',
     transmission: 'automatic', // automatic or manual
@@ -773,7 +798,7 @@ function Cars() {
     
     setFormData(prev => {
       // Handle price fields with number validation
-      if (name.includes('price') && type !== 'checkbox') {
+      if (name.includes('price') && name !== 'priceMonth' && type !== 'checkbox') {
         const numericValue = value.replace(/[^0-9.]/g, '');
         if (numericValue.split('.').length > 2) return prev;
         // Handle top-level price fields
@@ -829,11 +854,10 @@ function Cars() {
   // Reset form to initial state
   const resetForm = () => {
     setFormData({
-      name_en: '',
-      name_ro: '',
       make: '',
       model: '',
       year: '',
+      priceMonth: 'may',
       seats: '',
       doors: '',
       transmission: 'automatic',
@@ -890,6 +914,7 @@ function Cars() {
     setPhotoFiles([]);
     setPreviewUrls([]);
     setActiveTab('basic');
+    setShowAdvanced(false);
     setImageErrors({});
   };
   
@@ -998,14 +1023,16 @@ function Cars() {
   
   // Convert form data to structured format for database
   const prepareFormDataForSave = () => {
+    const computedName = `${formData.make || ''} ${formData.model || ''}`.trim() || 'Car';
     return {
       // Basic company association
       companyId: 'just_enjoy_ibiza',
       companyName: 'Just Enjoy Ibiza',
+      priceMonth: formData.priceMonth || 'may',
       // Localized fields
       name: {
-        en: formData.name_en || '',
-        ro: formData.name_ro || ''
+        en: computedName,
+        ro: computedName
       },
       description: {
         en: formData.description_en || '',
@@ -1032,7 +1059,10 @@ function Cars() {
       // Pricing
       pricing: {
         daily: formData.priceDaily || '',
-        monthly: formData.monthlyPrices
+        monthly: {
+          ...formData.monthlyPrices,
+          [(formData.priceMonth || 'may')]: formData.priceDaily || ''
+        }
       },
       // Features
       features: formData.features,
@@ -1186,11 +1216,10 @@ function Cars() {
     
     // Extract data to flat form structure
     setFormData({
-      name_en: car.name?.en || '',
-      name_ro: car.name?.ro || '',
       make: car.make || '',
       model: car.model || '',
       year: car.year || '',
+      priceMonth: Object.keys(car.pricing?.monthly || {}).find(m => car.pricing?.monthly?.[m]) || 'may',
       seats: car.seats || '',
       doors: car.doors || '',
       transmission: car.transmission || 'automatic',
@@ -1415,6 +1444,14 @@ function Cars() {
         previous: "Previous",
         back: "Back",
         finish: "Save Car",
+      },
+      quickForm: {
+        subtitle: "",
+        advancedIntro: ""
+      },
+      advancedToggle: {
+        show: "Add optional details",
+        hide: "Hide optional details"
       }
     },
     ro: {
@@ -1544,6 +1581,14 @@ function Cars() {
         previous: "Anterior",
         back: "Înapoi",
         finish: "Salvează Mașina",
+      },
+      quickForm: {
+        subtitle: "",
+        advancedIntro: ""
+      },
+      advancedToggle: {
+        show: "Adaugă detalii opționale",
+        hide: "Ascunde detaliile opționale"
       }
     }
   };
@@ -1585,6 +1630,158 @@ function Cars() {
         <div className="text-center">
           <div className="text-4xl mb-2">🚗</div>
           <div>{getLocalizedContent(car.name, language, t.noPhotos)}</div>
+        </div>
+      </div>
+    );
+  };
+
+  // Compact quick add form with only essential fields
+  const renderQuickForm = () => {
+    const gridStyle = isMobile ? styles.formGrid : styles.formGridDesktop;
+    const monthLabels = language === 'en'
+      ? { may: 'May', june: 'June', july: 'July', august: 'August', september: 'September', october: 'October' }
+      : { may: 'Mai', june: 'Iunie', july: 'Iulie', august: 'August', september: 'Septembrie', october: 'Octombrie' };
+    return (
+      <div>
+        <div style={gridStyle}>
+          <div>
+            <label style={styles.formLabel}>
+              {t.make}
+            </label>
+            <input
+              type="text"
+              name="make"
+              value={formData.make || ''}
+              onChange={handleInputChange}
+              style={styles.input}
+            />
+          </div>
+          <div>
+            <label style={styles.formLabel}>
+              {t.model}
+            </label>
+            <input
+              type="text"
+              name="model"
+              value={formData.model || ''}
+              onChange={handleInputChange}
+              style={styles.input}
+            />
+          </div>
+        </div>
+        <div style={gridStyle}>
+          <div>
+            <label style={styles.formLabel}>
+              {t.year}
+            </label>
+            <input
+              type="number"
+              name="year"
+              value={formData.year || ''}
+              onChange={handleInputChange}
+              min="1900"
+              max={new Date().getFullYear() + 1}
+              style={styles.input}
+            />
+          </div>
+          <div>
+            <label style={styles.formLabel}>
+              {t.fuel}
+            </label>
+            <select
+              name="fuel"
+              value={formData.fuel || 'petrol'}
+              onChange={handleInputChange}
+              style={styles.select}
+            >
+              <option value="petrol">{t.fuelTypes.petrol}</option>
+              <option value="diesel">{t.fuelTypes.diesel}</option>
+              <option value="hybrid">{t.fuelTypes.hybrid}</option>
+              <option value="electric">{t.fuelTypes.electric}</option>
+            </select>
+          </div>
+        </div>
+        <div style={gridStyle}>
+          <div>
+            <label style={styles.formLabel}>
+              {language === 'en' ? 'Month (season)' : 'Lună (sezon)'}
+            </label>
+            <select
+              name="priceMonth"
+              value={formData.priceMonth || 'may'}
+              onChange={handleInputChange}
+              style={styles.select}
+            >
+              {['may','june','july','august','september','october'].map(monthKey => (
+                <option key={monthKey} value={monthKey}>
+                  {monthLabels[monthKey] || monthKey}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={styles.formLabel}>
+              {t.price.daily}
+            </label>
+            <div style={styles.currencyInput}>
+              <span style={styles.currencySymbol}>
+                €
+              </span>
+              <input
+                type="text"
+                name="priceDaily"
+                value={formData.priceDaily || ''}
+                onChange={handleInputChange}
+                style={styles.currencyTextInput}
+              />
+            </div>
+          </div>
+        </div>
+        <div style={styles.formSection}>
+          <label style={styles.formLabel}>
+            {t.photos}
+          </label>
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handlePhotoChange}
+            style={styles.fileInput}
+          />
+          <div style={styles.photosContainer}>
+            {existingPhotos.map((photo, index) => (
+              <div key={`existing-${index}`} style={styles.photoPreview}>
+                <img
+                  src={photo.url}
+                  alt={`Photo ${index}`}
+                  style={{width: '100%', height: '100%', objectFit: 'cover'}}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleDeletePhoto(index, true)}
+                  style={styles.deleteButton}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            {previewUrls.map((url, index) => (
+              <div key={`preview-${index}`} style={styles.photoPreview}>
+                <img
+                  src={url}
+                  alt={`Preview ${index}`}
+                  style={{width: '100%', height: '100%', objectFit: 'cover'}}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleDeletePhoto(index, false)}
+                  style={styles.deleteButton}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -1877,60 +2074,7 @@ function Cars() {
       case 'basic':
         return (
           <div>
-            <div style={styles.formSection}>
-              <label style={styles.formLabel}>
-                {t.carName}
-              </label>
-              <input
-                type="text"
-                name={`name_${language}`}
-                value={formData[`name_${language}`] || ''}
-                onChange={handleInputChange}
-                required
-                style={styles.input}
-              />
-            </div>
             <div style={gridStyle}>
-              <div>
-                <label style={styles.formLabel}>
-                  {t.make}
-                </label>
-                <input
-                  type="text"
-                  name="make"
-                  value={formData.make || ''}
-                  onChange={handleInputChange}
-                  style={styles.input}
-                />
-              </div>
-              <div>
-                <label style={styles.formLabel}>
-                  {t.model}
-                </label>
-                <input
-                  type="text"
-                  name="model"
-                  value={formData.model || ''}
-                  onChange={handleInputChange}
-                  style={styles.input}
-                />
-              </div>
-            </div>
-            <div style={gridStyle}>
-              <div>
-                <label style={styles.formLabel}>
-                  {t.year}
-                </label>
-                <input
-                  type="number"
-                  name="year"
-                  value={formData.year || ''}
-                  onChange={handleInputChange}
-                  min="1900"
-                  max={new Date().getFullYear() + 1}
-                  style={styles.input}
-                />
-              </div>
               <div>
                 <label style={styles.formLabel}>
                   {t.seats}
@@ -1945,8 +2089,6 @@ function Cars() {
                   style={styles.input}
                 />
               </div>
-            </div>
-            <div style={gridStyle}>
               <div>
                 <label style={styles.formLabel}>
                   {t.doors}
@@ -1978,22 +2120,6 @@ function Cars() {
             </div>
             <div style={styles.formSection}>
               <label style={styles.formLabel}>
-                {t.fuel}
-              </label>
-              <select
-                name="fuel"
-                value={formData.fuel || 'petrol'}
-                onChange={handleInputChange}
-                style={styles.select}
-              >
-                <option value="petrol">{t.fuelTypes.petrol}</option>
-                <option value="diesel">{t.fuelTypes.diesel}</option>
-                <option value="hybrid">{t.fuelTypes.hybrid}</option>
-                <option value="electric">{t.fuelTypes.electric}</option>
-              </select>
-            </div>
-            <div style={styles.formSection}>
-              <label style={styles.formLabel}>
                 {t.description}
               </label>
               <textarea
@@ -2003,55 +2129,6 @@ function Cars() {
                 rows="4"
                 style={styles.textarea}
               />
-            </div>
-            <div style={styles.formSection}>
-              <label style={styles.formLabel}>
-                {t.photos}
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handlePhotoChange}
-                style={styles.fileInput}
-              />
-              {/* Photo previews */}
-              <div style={styles.photosContainer}>
-                {/* Existing photos */}
-                {existingPhotos.map((photo, index) => (
-                  <div key={`existing-${index}`} style={styles.photoPreview}>
-                    <img
-                      src={photo.url}
-                      alt={`Photo ${index}`}
-                      style={{width: '100%', height: '100%', objectFit: 'cover'}}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleDeletePhoto(index, true)}
-                      style={styles.deleteButton}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-                {/* New photo previews */}
-                {previewUrls.map((url, index) => (
-                  <div key={`preview-${index}`} style={styles.photoPreview}>
-                    <img
-                      src={url}
-                      alt={`Preview ${index}`}
-                      style={{width: '100%', height: '100%', objectFit: 'cover'}}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleDeletePhoto(index, false)}
-                      style={styles.deleteButton}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         );
@@ -2151,23 +2228,6 @@ function Cars() {
         return (
           <div>
             <h3 style={styles.sectionTitle}>{language === 'en' ? 'Pricing' : 'Prețuri'}</h3>
-            <div style={{marginBottom: '20px'}}>
-              <label style={styles.formLabel}>
-                {t.price.daily}
-              </label>
-              <div style={styles.currencyInput}>
-                <span style={styles.currencySymbol}>
-                  €
-                </span>
-                <input
-                  type="text"
-                  name="priceDaily"
-                  value={formData.priceDaily || ''}
-                  onChange={handleInputChange}
-                  style={styles.currencyTextInput}
-                />
-              </div>
-            </div>
             <h4 style={styles.sectionSubtitle}>
               {t.price.monthly}
             </h4>
@@ -2612,35 +2672,57 @@ function Cars() {
               {t.cancel}
             </button>
           </div>
-          
-          {/* Mobile step indicator */}
-          {isMobile && renderFormSteps()}
-          
-          {/* Desktop tab navigation */}
-          {!isMobile && (
-            <div style={styles.tabContainer}>
-              {Object.entries(t.formTabs).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setActiveTab(key)}
-                  style={{
-                    ...styles.tab,
-                    ...(activeTab === key ? styles.activeTab : styles.inactiveTab)
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-          
-          {/* Form content based on active tab */}
+
           <div style={styles.formContent}>
-            {renderFormTab()}
-            
-            {/* Mobile navigation buttons */}
-            {isMobile && renderFormNavigation()}
+            {renderQuickForm()}
+
+            <div style={styles.toggleRow}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAdvanced(prev => {
+                    const next = !prev;
+                    if (!next) {
+                      setActiveTab('basic');
+                    }
+                    return next;
+                  });
+                }}
+                style={styles.toggleButton}
+              >
+                {showAdvanced ? t.advancedToggle.hide : t.advancedToggle.show}
+              </button>
+            </div>
+
+            {showAdvanced && (
+              <>
+                {isMobile && renderFormSteps()}
+                
+                {!isMobile && (
+                  <div style={styles.tabContainer}>
+                    {Object.entries(t.formTabs).map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setActiveTab(key)}
+                        style={{
+                          ...styles.tab,
+                          ...(activeTab === key ? styles.activeTab : styles.inactiveTab)
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{marginTop: '8px'}}>
+                  {renderFormTab()}
+                </div>
+
+                {isMobile && renderFormNavigation()}
+              </>
+            )}
             
             {/* Upload progress indicator */}
             {isUploading && (
@@ -2659,9 +2741,9 @@ function Cars() {
                 </div>
               </div>
             )}
-            
-            {/* Desktop submit button */}
-            {!isMobile && !isUploading && (
+
+            {/* Submit button */}
+            {!isUploading && (
               <div style={{marginTop: '24px', display: 'flex', justifyContent: 'flex-end'}}>
                 <button
                   type="button"
@@ -2733,6 +2815,13 @@ function Cars() {
                     <div style={styles.buttonRow}>
                       <button
                         type="button"
+                        onClick={() => setSelectedCar(car)}
+                        style={isMobile ? {...styles.buttonSecondary, flex: 1} : styles.buttonSecondary}
+                      >
+                        {t.view || 'Vezi'}
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => startEditingCar(car)}
                         style={isMobile ? {...styles.buttonSecondary, flex: 1} : styles.buttonSecondary}
                       >
@@ -2757,8 +2846,98 @@ function Cars() {
           )}
         </div>
       )}
+      {selectedCar && (
+        <CarViewModal
+          car={selectedCar}
+          onClose={() => setSelectedCar(null)}
+          language={language}
+          t={t}
+          getLocalizedContent={getLocalizedContent}
+        />
+      )}
     </div>
   );
 }
 
 export default Cars;
+
+// View modal for cars (read-only overview)
+function CarViewModal({ car, onClose, language, t, getLocalizedContent }) {
+  if (!car) return null;
+
+  const specItem = (label, value) => (
+    value ? <div style={{ color: '#374151', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>{label}: {value}</div> : null
+  );
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: '1rem' }}>
+      <div style={{ width: '100%', maxWidth: '900px', background: '#fff', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 20px 45px rgba(0,0,0,0.18)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', borderBottom: '1px solid #e5e7eb' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#111827' }}>
+              {getLocalizedContent(car.name, language) || `${car.make || ''} ${car.model || ''}`}
+            </h2>
+            <p style={{ margin: 0, color: '#6b7280', fontSize: '0.95rem' }}>
+              {car.make} {car.model} {car.year ? `(${car.year})` : ''}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ border: '1px solid #d1d5db', background: '#f3f4f6', color: '#111827', borderRadius: '8px', padding: '0.45rem 0.75rem', cursor: 'pointer' }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {car.photoUrl && (
+          <div style={{ width: '100%', maxHeight: '360px', overflow: 'hidden' }}>
+            <img src={car.photoUrl} alt={car.make || car.model || t.unnamed} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
+        )}
+
+        <div style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e5e7eb' }}>
+            {specItem(t.year || 'Year', car.year)}
+            {specItem(t.seats || 'Seats', car.seats)}
+            {specItem(t.doors || 'Doors', car.doors)}
+            {specItem(t.transmission || 'Transmission', car.transmission)}
+            {specItem(t.fuelType || 'Fuel', car.fuelType)}
+            {specItem(t.mileage || 'Mileage', car.mileage)}
+          </div>
+
+          {car.pricing?.daily && (
+            <div style={{ paddingBottom: '0.75rem', borderBottom: '1px solid #e5e7eb' }}>
+              <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '1rem', fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                {t.pricing || 'Pricing'}
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', color: '#374151' }}>
+                <span>€{car.pricing.daily}/{language === 'en' ? 'day' : 'zi'}</span>
+                {car.pricing.weekly && <span>€{car.pricing.weekly}/{language === 'en' ? 'week' : 'săptămână'}</span>}
+                {car.pricing.monthly && typeof car.pricing.monthly === 'object'
+                  ? Object.entries(car.pricing.monthly)
+                      .filter(([, val]) => val)
+                      .map(([k, val]) => (
+                        <span key={k}>€{val} / {k}</span>
+                      ))
+                  : car.pricing.monthly
+                    ? <span>€{car.pricing.monthly}/{language === 'en' ? 'month' : 'lună'}</span>
+                    : null}
+              </div>
+            </div>
+          )}
+
+          {car.description && (
+            <div>
+              <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '1rem', fontWeight: 600, color: '#111827' }}>
+                {t.description || 'Description'}
+              </h4>
+              <p style={{ margin: 0, color: '#374151', lineHeight: 1.5 }}>
+                {getLocalizedContent(car.description, language)}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

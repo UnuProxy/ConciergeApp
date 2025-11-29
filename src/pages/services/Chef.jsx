@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { getCurrentLanguage } from "../../utils/languageHelper"; // Import the language helper
+import { useDatabase } from '../../context/DatabaseContext';
 
 // Translation strings for Chef component
 const translations = {
@@ -65,6 +66,8 @@ function Chef() {
   // Use global language from localStorage instead of local state
   const [lang, setLang] = useState(getCurrentLanguage);
   const t = translations[lang];
+  const dbContext = useDatabase();
+  const userCompanyId = dbContext?.companyId || dbContext?.companyInfo?.id || null;
 
   // Add event listener to update language when it changes globally
   useEffect(() => {
@@ -88,10 +91,16 @@ function Chef() {
 
   // Load chefs with booking stats
   const loadChefs = async () => {
+    if (!userCompanyId) {
+      setChefs([]);
+      setFiltered([]);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const snap = await getDocs(collection(db, 'chefs'));
+      const chefQuery = query(collection(db, 'chefs'), where('companyId', '==', userCompanyId));
+      const snap = await getDocs(chefQuery);
       const raw = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       const withStats = await Promise.all(
         raw.map(async chef => {
@@ -120,7 +129,7 @@ function Chef() {
 
   useEffect(() => {
     loadChefs();
-  }, [lang]);
+  }, [lang, userCompanyId]);
 
   // Filter by name
   useEffect(() => {
@@ -134,11 +143,16 @@ function Chef() {
     setLoading(true);
     setError(null);
     try {
+      if (!userCompanyId) {
+        setError('No company selected. Please refresh and try again.');
+        return;
+      }
       const data = {
         name: form.name,
         email: form.email,
         phone: form.phone,
         rate: form.rate,
+        companyId: userCompanyId,
         createdAt: Timestamp.now()
       };
       if (editingId) {

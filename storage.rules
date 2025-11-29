@@ -1,0 +1,98 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    function userCompanyId() {
+      return isAuthed()
+        ? firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.companyId
+        : null;
+    }
+
+    function matchesCompany(companyId) {
+      return isAuthed() && companyId != null && userCompanyId() == companyId;
+    }
+
+    // ========================================================================
+    // SHARED CATALOG FOLDERS - Both companies can read/write
+    // (villas, cars, boats, chefs, security, services, properties)
+    // ========================================================================
+    match /villas/shared/{fileName} {
+      allow read: if isAuthed();
+      allow write: if isAuthed();
+    }
+    match /villas/shared/brochures/{fileName} {
+      allow read: if isAuthed();
+      allow write: if isAuthed();
+    }
+
+    match /cars/shared/{fileName} {
+      allow read: if isAuthed();
+      allow write: if isAuthed();
+    }
+    match /cars/{allPaths=**} {
+      allow read: if isAuthed();
+      allow write: if isAuthed();
+    }
+
+    match /boats/shared/{fileName} {
+      allow read: if isAuthed();
+      allow write: if isAuthed();
+    }
+    match /boats/{allPaths=**} {
+      allow read: if isAuthed();
+      allow write: if isAuthed();
+    }
+
+    match /chefs/shared/{fileName} {
+      allow read: if isAuthed();
+      allow write: if isAuthed();
+    }
+
+    match /security/shared/{fileName} {
+      allow read: if isAuthed();
+      allow write: if isAuthed();
+    }
+
+    match /services/shared/{fileName} {
+      allow read: if isAuthed();
+      allow write: if isAuthed();
+    }
+
+    match /properties/shared/{fileName} {
+      allow read: if isAuthed();
+      allow write: if isAuthed();
+    }
+
+    // ========================================================================
+    // COMPANY-PRIVATE FOLDERS - Only owning company can access
+    // (bookings, clients, finances)
+    // ========================================================================
+    match /{companyId}/villas/{allPaths=**} {
+      // Allow any authenticated user to view villa media; restrict writes to owning company
+      allow read: if isAuthed();
+      allow write: if matchesCompany(companyId);
+    }
+    match /{companyId}/bookings/{fileName} {
+      allow read, write: if matchesCompany(companyId);
+    }
+
+    match /{companyId}/clients/{fileName} {
+      allow read, write: if matchesCompany(companyId);
+    }
+
+    match /{companyId}/finances/{fileName} {
+      allow read, write: if matchesCompany(companyId);
+    }
+
+    // ========================================================================
+    // LEGACY/PUBLIC FOLDER - For backwards compatibility
+    // ========================================================================
+    match /public/{allPaths=**} {
+      allow read: if isAuthed();
+      allow write: if isAuthed();
+    }
+  }
+}

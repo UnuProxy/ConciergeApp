@@ -1,0 +1,119 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return isAuthed()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid))
+        : null;
+    }
+
+    function userCompanyId() {
+      let u = userDoc();
+      return u != null && u.data.companyId != null ? u.data.companyId : null;
+    }
+
+    function userRole() {
+      let u = userDoc();
+      return u != null && u.data.role != null ? u.data.role : null;
+    }
+
+    function matchesCompany(companyId) {
+      return isAuthed() && companyId != null && userCompanyId() == companyId;
+    }
+
+    function isAdminOf(companyId) {
+      return matchesCompany(companyId) && userRole() == "admin";
+    }
+
+    // Companies (metadata) + nested per-company collections
+    match /companies/{companyId} {
+      allow read: if isAuthed();
+      allow write: if false;
+
+      match /{sub=**} {
+        allow read, write: if matchesCompany(companyId);
+      }
+    }
+
+    // authorized_users: allow any signed-in user to read
+    match /authorized_users/{docId} {
+      allow read: if isAuthed();
+      allow create, update: if isAuthed()
+        && request.resource.data.companyId != null
+        && isAdminOf(request.resource.data.companyId);
+      allow delete: if false;
+    }
+
+    // users: self-access only
+    match /users/{uid} {
+      allow read: if isAuthed() && request.auth.uid == uid;
+      allow create: if isAuthed() && request.auth.uid == uid;
+      allow update: if isAuthed()
+        && request.auth.uid == uid
+        && request.resource.data.companyId == resource.data.companyId
+        && request.resource.data.role == resource.data.role;
+      allow delete: if false;
+    }
+
+    // ========================================================================
+    // TEMPORARY: OPEN EVERYTHING FOR AUTHENTICATED USERS
+    // This lets us see what's broken in the data
+    // ========================================================================
+
+    match /cars/{id} {
+      allow read, write: if isAuthed();
+    }
+
+    match /villas/{id} {
+      allow read, write: if isAuthed();
+    }
+
+    match /boats/{id} {
+      allow read, write: if isAuthed();
+    }
+
+    match /chefs/{id} {
+      allow read, write: if isAuthed();
+    }
+
+    match /services/{id} {
+      allow read, write: if isAuthed();
+    }
+
+    match /security/{id} {
+      allow read, write: if isAuthed();
+    }
+
+    match /properties/{id} {
+      allow read, write: if isAuthed();
+    }
+
+    match /reservations/{id} {
+      allow read, write: if isAuthed();
+    }
+
+    match /clients/{id} {
+      allow read, write: if isAuthed();
+    }
+
+    match /collaborators/{id} {
+      allow read, write: if isAuthed();
+    }
+
+    match /offers/{id} {
+      allow read, write: if isAuthed();
+    }
+
+    match /expenses/{id} {
+      allow read, write: if isAuthed();
+    }
+
+    match /categoryPayments/{id} {
+      allow read, write: if isAuthed();
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   getFirestore, 
   collection, 
@@ -174,6 +174,8 @@ function AddClient() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
   
   // State for team members
   const [teamMembers, setTeamMembers] = useState([]);
@@ -392,6 +394,12 @@ function AddClient() {
       
       // Show success message
       setSuccess(true);
+      // Show floating toast feedback
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+      setToast({ type: 'success', message: t.successSaving });
+      toastTimerRef.current = setTimeout(() => setToast(null), 4000);
       
       // Reset success after 3 seconds
       setTimeout(() => {
@@ -408,6 +416,27 @@ function AddClient() {
 
   return (
     <div className="p-6 font-sans">
+      {toast && (
+        <div
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-white shadow-lg border border-green-200 rounded-lg px-4 py-3 text-sm text-green-800"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-700">
+            ✓
+          </span>
+          <div className="font-medium">{toast.message}</div>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            className="ml-2 text-green-700 hover:text-green-900"
+            aria-label="Dismiss notification"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       <h1 className="text-2xl font-bold mb-6 text-gray-800">{t.title}</h1>
       
       {/* Loading indicator */}

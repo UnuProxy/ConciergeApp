@@ -63,28 +63,16 @@ function App() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // PWA: Service Worker registration
+  // PWA: Disable service worker registration and aggressively unregister any existing one
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then((registration) => {
-            console.log('SW registered: ', registration);
-            
-            // Check for updates
-            registration.addEventListener('updatefound', () => {
-              const newWorker = registration.installing;
-              newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  console.log('New content is available; please refresh.');
-                }
-              });
-            });
-          })
-          .catch((registrationError) => {
-            console.log('SW registration failed: ', registrationError);
-          });
-      });
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+
+    // Unregister any existing service workers and clear caches to avoid intercepting fetches
+    navigator.serviceWorker.getRegistrations?.().then((registrations) => {
+      registrations.forEach((registration) => registration.unregister());
+    });
+    if (window.caches?.keys) {
+      caches.keys().then((keys) => keys.forEach((key) => caches.delete(key)));
     }
   }, [])
 

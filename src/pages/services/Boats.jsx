@@ -27,7 +27,7 @@ const styles = {
   title: {
     fontSize: '1.5rem',
     fontWeight: '700',
-    color: '#1a202c'
+    color: '#111827'
   },
   subtitle: {
     fontSize: '1.25rem',
@@ -89,13 +89,14 @@ const styles = {
   gridContainer: {
     display: 'grid',
     gridTemplateColumns: '1fr',
-    gap: '1rem',
+    gap: '1.25rem',
     marginTop: '1.25rem',
+    justifyItems: 'stretch',
     '@media (min-width: 640px)': {
-      gridTemplateColumns: 'repeat(2, 1fr)',
+      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
     },
-    '@media (min-width: 768px)': {
-      gridTemplateColumns: 'repeat(3, 1fr)',
+    '@media (min-width: 1024px)': {
+      gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
     }
   },
   checkboxLabel: {
@@ -111,19 +112,19 @@ const styles = {
     height: '1rem'
   },
   buttonPrimary: {
-  backgroundColor: '#3b82f6',
-  color: 'white',
-  fontWeight: '500',
-  padding: '0.625rem 1rem',
-  borderRadius: '6px',
-  border: 'none',
-  cursor: 'pointer',
-  minHeight: '2.5rem',
-  width: 'auto',
-  '@media (max-width: 639px)': {
-    width: '100%'
-  }
-},
+    backgroundColor: '#4F46E5',
+    color: 'white',
+    fontWeight: '500',
+    padding: '0.625rem 1rem',
+    borderRadius: '6px',
+    border: 'none',
+    cursor: 'pointer',
+    minHeight: '2.5rem',
+    width: 'auto',
+    '@media (max-width: 639px)': {
+      width: '100%'
+    }
+  },
   buttonSecondary: {
     backgroundColor: '#f3f4f6',
     color: '#1f2937',
@@ -140,7 +141,7 @@ const styles = {
   },
   buttonDanger: {
     backgroundColor: '#fee2e2',
-    color: '#b91c1c',
+    color: '#ef4444',
     fontWeight: '500',
     padding: '0.625rem 1rem',
     borderRadius: '6px',
@@ -169,8 +170,8 @@ const styles = {
     flex: '0 0 auto'
   },
   activeTab: {
-    borderBottom: '2px solid #3b82f6',
-    color: '#3b82f6'
+    borderBottom: '2px solid #4F46E5',
+    color: '#4F46E5'
   },
   inactiveTab: {
     color: '#6b7280'
@@ -228,36 +229,26 @@ const styles = {
   // IMPROVED BOAT CARDS - More compact and responsive
   boatListContainer: {
     display: 'grid',
-    gridTemplateColumns: '1fr',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
     gap: '1rem',
-    '@media (min-width: 640px)': {
-      gridTemplateColumns: 'repeat(2, 1fr)',
-    },
-    '@media (min-width: 768px)': {
-      gridTemplateColumns: 'repeat(3, 1fr)',
-    },
-    '@media (min-width: 1024px)': {
-      gridTemplateColumns: 'repeat(4, 1fr)',
-    },
-    '@media (min-width: 1280px)': {
-      gridTemplateColumns: 'repeat(5, 1fr)',
-    }
+    width: '100%',
+    margin: '0 auto',
+    justifyItems: 'stretch'
   },
   boatCard: {
     backgroundColor: '#fff',
-    borderRadius: '8px',
+    borderRadius: '12px',
     overflow: 'hidden',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-    maxWidth: '320px',
-    margin: '0 auto',
-    transition: 'box-shadow 0.2s'
+    boxShadow: '0 5px 14px rgba(15, 23, 42, 0.08)',
+    transition: 'transform 0.18s ease, box-shadow 0.18s ease',
+    border: '1px solid #e5e7eb',
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column'
   },
   boatImageContainer: {
-    height: '10rem',
-    backgroundColor: '#f3f4f6',
-    '@media (min-width: 768px)': {
-      height: '11rem',
-    }
+    height: '180px',
+    backgroundColor: '#f3f4f6'
   },
   boatImage: {
     width: '100%',
@@ -265,48 +256,44 @@ const styles = {
     objectFit: 'cover'
   },
   boatCardContent: {
-    padding: '0.75rem',
-    '@media (min-width: 768px)': {
-      padding: '1rem',
-    }
+    padding: '0.875rem 1rem 1.25rem',
+    flex: 1
   },
   boatCardTitle: {
-    fontSize: '1rem',
-    fontWeight: '600',
-    marginBottom: '0.5rem',
+    fontSize: '1.2rem',
+    fontWeight: '700',
+    marginBottom: '0.25rem',
     color: '#1f2937',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    '@media (min-width: 768px)': {
-      fontSize: '1.125rem',
-    }
+    whiteSpace: 'nowrap'
   },
   boatCardDetails: {
-    fontSize: '0.8rem',
+    fontSize: '0.9rem',
     color: '#6b7280',
-    marginBottom: '0.75rem',
-    '@media (min-width: 768px)': {
-      fontSize: '0.875rem',
-    }
+    marginBottom: '0.5rem'
   },
   buttonRow: {
     display: 'flex',
-    flexDirection: 'column',
-    gap: '0.5rem',
-    marginTop: '0.75rem',
-    '@media (min-width: 640px)': {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-    }
+    gap: '0.75rem',
+    marginTop: '1rem',
+    paddingTop: '0.75rem',
+    paddingBottom: '1.5rem',
+    borderTop: '1px solid #e5e7eb',
+    justifyContent: 'space-between',
+    alignItems: 'center'
   },
   compactButton: {
-    fontSize: '0.75rem',
-    padding: '0.5rem 0.75rem',
-    '@media (min-width: 768px)': {
-      fontSize: '0.875rem',
-      padding: '0.625rem 1rem',
-    }
+    fontSize: '1rem',
+    fontWeight: '600',
+    padding: '0.8rem 1rem',
+    borderRadius: '12px',
+    border: '1px solid #d8dee9',
+    background: '#fff',
+    color: '#111827',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.06)',
+    transition: 'all 0.18s ease',
+    flex: 1
   },
   currencyInput: {
     position: 'relative',
@@ -560,6 +547,66 @@ const cx = (...classNames) => {
   return classNames.filter(Boolean).join(' ');
 };
 
+// Minimal inline icon set (stroke-only, neutral)
+const Icon = ({ name, size = 16, color = '#6b7280' }) => {
+  const common = { width: size, height: size, fill: 'none', stroke: color, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' };
+  switch (name) {
+    case 'length':
+      return (
+        <svg {...common} viewBox="0 0 24 24">
+          <path d="M4 7v10m16-10v10M8 7v4m4-4v4m0 2v4m4-4v4" />
+        </svg>
+      );
+    case 'people':
+      return (
+        <svg {...common} viewBox="0 0 24 24">
+          <path d="M8 11a3 3 0 110-6 3 3 0 010 6zm8 0a3 3 0 110-6 3 3 0 010 6zM4 20v-1a4 4 0 014-4h0M16 15h0a4 4 0 014 4v1" />
+        </svg>
+      );
+    case 'calendar':
+      return (
+        <svg {...common} viewBox="0 0 24 24">
+          <path d="M7 4v2m10-2v2M5 8h14M6 5h12a1 1 0 011 1v14H5V6a1 1 0 011-1z" />
+        </svg>
+      );
+    case 'engine':
+      return (
+        <svg {...common} viewBox="0 0 24 24">
+          <path d="M5 9l2-2h6l2 2v6l-2 2H7l-2-2V9z" />
+          <path d="M9 9v6m6-3h2m-12 0h2" />
+        </svg>
+      );
+    case 'hp':
+      return (
+        <svg {...common} viewBox="0 0 24 24">
+          <path d="M6 12h12M12 6v12" />
+        </svg>
+      );
+    case 'pricing':
+      return (
+        <svg {...common} viewBox="0 0 24 24">
+          <path d="M7 7h10v10H7z" />
+          <path d="M9 10h6m-6 4h6" />
+        </svg>
+      );
+    case 'amenities':
+      return (
+        <svg {...common} viewBox="0 0 24 24">
+          <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5zM6 17l1 3m10-3l-1 3" />
+        </svg>
+      );
+    case 'description':
+      return (
+        <svg {...common} viewBox="0 0 24 24">
+          <path d="M7 4h7l3 3v13H7z" />
+          <path d="M10 12h4m-4 3h4m-4-6h2" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+};
+
 function Boats() {
   const [boats, setBoats] = useState([]);
   const [isAddingBoat, setIsAddingBoat] = useState(false);
@@ -570,6 +617,7 @@ function Boats() {
   const [photoFiles, setPhotoFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
   const [activeTab, setActiveTab] = useState('basic'); // For form navigation
+  const [selectedBoat, setSelectedBoat] = useState(null);
   
   // Search and filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -1148,7 +1196,8 @@ function Boats() {
       const boatData = {
         ...prepareFormDataForSave(),
         photos: photoUrls,
-        createdAt: new Date()
+        createdAt: new Date(),
+        companyId: userCompanyId
       };
       
       // Save to Firestore
@@ -1187,7 +1236,8 @@ function Boats() {
       const boatData = {
         ...prepareFormDataForSave(),
         photos: updatedPhotos,
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        companyId: currentBoat.companyId || userCompanyId
       };
       
       // Update in Firestore
@@ -3279,20 +3329,31 @@ function Boats() {
                     <div className="buttonRow">
                       <button
                         type="button"
-                        onClick={() => startEditingBoat(boat)}
-                        className={cx('buttonSecondary', 'compactButton')}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedBoat(boat);
+                        }}
+                        className="btn-soft w-full sm:w-auto"
+                      >
+                        {t.view || 'View'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); startEditingBoat(boat); }}
+                        className="btn-soft w-full sm:w-auto"
                       >
                         {t.edit}
                       </button>
                       
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           if (window.confirm(language === 'en' ? 'Are you sure you want to delete this boat?' : 'Ești sigur că vrei să ștergi această barcă?')) {
                             handleDeleteBoat(boat.id);
                           }
                         }}
-                        className={cx('buttonDanger', 'compactButton')}
+                        className="btn-soft btn-soft-danger w-full sm:w-auto"
                       >
                         {t.delete}
                       </button>
@@ -3302,6 +3363,153 @@ function Boats() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {selectedBoat && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.45)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 60,
+          padding: '1rem'
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: '960px',
+            background: '#fff',
+            borderRadius: '12px',
+            overflow: 'hidden',
+            boxShadow: '0 20px 45px rgba(0,0,0,0.18)'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '1rem 1.25rem',
+              borderBottom: '1px solid #e5e7eb'
+            }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#111827' }}>
+                  {getLocalizedContent(selectedBoat.name, language)}
+                </h2>
+                <p style={{ margin: 0, color: '#6b7280', fontSize: '0.95rem' }}>
+                  {getLocalizedContent(selectedBoat.cruisingArea, language)}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedBoat(null)}
+                style={{
+                  border: '1px solid #d1d5db',
+                  background: '#f3f4f6',
+                  color: '#111827',
+                  borderRadius: '8px',
+                  padding: '0.45rem 0.75rem',
+                  cursor: 'pointer'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {selectedBoat.photos && selectedBoat.photos.length > 0 && (
+              <div style={{ width: '100%', maxHeight: '360px', overflow: 'hidden' }}>
+                <img
+                  src={selectedBoat.photos[0].url}
+                  alt={getLocalizedContent(selectedBoat.name, language)}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              </div>
+            )}
+
+            <div style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e5e7eb' }}>
+                {selectedBoat.length && (
+                  <div style={{ color: '#374151', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Icon name="length" />
+                    <span>{selectedBoat.length}m</span>
+                  </div>
+                )}
+                {selectedBoat.capacity && (
+                  <div style={{ color: '#374151', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Icon name="people" />
+                    <span>{selectedBoat.capacity} {language === 'en' ? 'people' : 'persoane'}</span>
+                  </div>
+                )}
+                {selectedBoat.specs?.year && (
+                  <div style={{ color: '#374151', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Icon name="calendar" />
+                    <span>{language === 'en' ? 'Year' : 'An'}: {selectedBoat.specs.year}</span>
+                  </div>
+                )}
+                {selectedBoat.specs?.engine && (
+                  <div style={{ color: '#374151', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Icon name="engine" />
+                    <span>{language === 'en' ? 'Engine' : 'Motor'}: {selectedBoat.specs.engine}</span>
+                  </div>
+                )}
+                {selectedBoat.specs?.horsePower && (
+                  <div style={{ color: '#374151', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Icon name="hp" />
+                    <span>{selectedBoat.specs.horsePower} HP</span>
+                  </div>
+                )}
+              </div>
+
+              {(selectedBoat.pricing?.daily || selectedBoat.pricing?.weekly || selectedBoat.pricing?.monthly) && (
+                <div style={{ paddingBottom: '0.75rem', borderBottom: '1px solid #e5e7eb' }}>
+                  <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '1rem', fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <Icon name="pricing" />
+                    {language === 'en' ? 'Pricing' : 'Tarife'}
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', color: '#374151' }}>
+                    {selectedBoat.pricing?.daily && <span>€{selectedBoat.pricing.daily}/{language === 'en' ? 'day' : 'zi'}</span>}
+                    {selectedBoat.pricing?.weekly && <span>€{selectedBoat.pricing.weekly}/{language === 'en' ? 'week' : 'săptămână'}</span>}
+                    {selectedBoat.pricing?.monthly && typeof selectedBoat.pricing.monthly === 'object'
+                      ? Object.entries(selectedBoat.pricing.monthly)
+                          .filter(([, val]) => val)
+                          .map(([month, val]) => (
+                            <span key={month}>€{val} / {month}</span>
+                          ))
+                      : selectedBoat.pricing?.monthly
+                        ? <span>€{selectedBoat.pricing.monthly}/{language === 'en' ? 'month' : 'lună'}</span>
+                        : null}
+                  </div>
+                </div>
+              )}
+
+              {selectedBoat.amenities && selectedBoat.amenities.length > 0 && (
+                <div style={{ paddingBottom: '0.75rem', borderBottom: '1px solid #e5e7eb' }}>
+                  <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '1rem', fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <Icon name="amenities" />
+                    {language === 'en' ? 'Amenities' : 'Facilități'}
+                  </h4>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    {selectedBoat.amenities.map((a, idx) => (
+                      <span key={idx} style={{ padding: '0.35rem 0.6rem', background: '#f3f4f6', color: '#374151', borderRadius: '999px', fontSize: '0.85rem' }}>
+                        {getLocalizedContent(a, language)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedBoat.description && (
+                <div>
+                  <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '1rem', fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <Icon name="description" />
+                    {language === 'en' ? 'Description' : 'Descriere'}
+                  </h4>
+                  <p style={{ margin: 0, color: '#374151', lineHeight: 1.5 }}>
+                    {getLocalizedContent(selectedBoat.description, language)}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

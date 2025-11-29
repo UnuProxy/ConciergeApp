@@ -10,7 +10,8 @@ import {
   where,
   updateDoc,
   addDoc,
-  deleteDoc 
+  deleteDoc,
+  serverTimestamp 
 } from 'firebase/firestore';
 import { useDatabase } from "../../context/DatabaseContext";
 import { jsPDF } from "jspdf";
@@ -96,6 +97,29 @@ const toNumericPrice = (value) => {
   }
   return 0;
 };
+
+// Core concierge services available even without database records
+const CORE_CONCIERGE_SERVICES = [
+  { id: 'core-villa-rentals', name: { en: 'Luxury villa rentals', ro: 'Închirieri de vile de lux' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-yachts', name: { en: 'Yacht & boat charters', ro: 'Închirieri de iahturi & bărci' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-cars', name: { en: 'Premium car rentals', ro: 'Închirieri de mașini premium' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-club-bookings', name: { en: 'VIP club reservations', ro: 'Rezervări VIP în cluburi' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-restaurants', name: { en: 'Exclusive restaurant bookings', ro: 'Rezervări în restaurante exclusiviste' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-parties', name: { en: 'Private party planning', ro: 'Organizare petreceri private' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-chef', name: { en: 'Private chef & gourmet catering', ro: 'Chef privat & catering gourmet' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-transfers', name: { en: 'Private transfers', ro: 'Transferuri private' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-security', name: { en: 'Bodyguard & private security', ro: 'Bodyguard & securitate privată' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-housekeeping', name: { en: 'Housekeeping & cleaning', ro: 'Servicii de menaj & housekeeping' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-babysitting', name: { en: 'Babysitting & nanny', ro: 'Servicii de babysitting & nanny' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-spa', name: { en: 'In-villa massage & spa', ro: 'Masaj & spa la vilă' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-excursions', name: { en: 'Excursions & activities', ro: 'Organizare de excursii & activități' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-shopping', name: { en: 'Personal shopping assistance', ro: 'Asistență personală pentru cumpărături' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-photo-video', name: { en: 'Professional photo & video', ro: 'Servicii foto & video profesionale' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-romantic', name: { en: 'Romantic event planning', ro: 'Planificare evenimente romantice' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-medical', name: { en: 'Private medical & doctor at home', ro: 'Servicii medicale private & doctor la domiciliu' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-groups', name: { en: 'Group logistics coordination', ro: 'Organizare logistică pentru grupuri mari' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-property-mgmt', name: { en: 'Property management', ro: 'Management de proprietăți' }, price: 0, unit: 'service', category: 'concierge-core' },
+];
 
 const formatSeasonalMonthLabel = (monthKey, language, t) => {
   try {
@@ -218,6 +242,7 @@ const translations = {
     deleteOffer: 'Delete Offer',
     selectClient: 'Select a client from the list to view their details.',
     confirmDelete: 'Are you sure you want to delete this client?',
+    addClient: 'Add Client',
     from: 'From',
     to: 'To',
     actions: 'Actions',
@@ -233,6 +258,7 @@ const translations = {
     sendOffer: 'Send Offer',
     generatePdf: 'Generate PDF',
     viewProperty: 'View property',
+    conciergeCore: 'Core Concierge Services',
     villas: 'Villas & Accommodations',
     cars: 'Cars & Transportation',
     boats: 'Boats & Yachts',
@@ -408,6 +434,7 @@ const translations = {
     noClientSelected: 'Niciun Client Selectat',
     selectClient: 'Selectează un client din listă pentru a vedea detaliile.',
     confirmDelete: 'Ești sigur că dorești să ștergi acest client?',
+    addClient: 'Adaugă Client',
     from: 'De la',
     to: 'Până la',
     actions: 'Acțiuni',
@@ -423,6 +450,7 @@ const translations = {
     sendOffer: 'Trimite Oferta',
     generatePdf: 'Generează PDF',
     viewProperty: 'Deschide proprietatea',
+    conciergeCore: 'Servicii Concierge Principale',
     villas: 'Vile și Cazări',
     cars: 'Mașini și Transport',
     boats: 'Bărci și Iahturi',
@@ -789,6 +817,7 @@ const extractImageUrl = (data) => {
   
   // Service categories for offerings (memoized to prevent infinite re-render)
   const serviceCategories = useMemo(() => [
+    { id: 'concierge-core', name: t.conciergeCore, icon: '⭐', collection: null, staticServices: CORE_CONCIERGE_SERVICES },
     { id: 'villas', name: t.villas, icon: '🏠', collection: 'villas' },
     { id: 'boats', name: t.boats, icon: '🛥️', collection: 'boats' },
     { id: 'cars', name: t.cars, icon: '🚗', collection: 'cars' },
@@ -943,6 +972,17 @@ useEffect(() => {
         // Fetch all service types based on serviceCategories
         for (const category of serviceCategories) {
           try {
+            // Provide built-in concierge options without needing Firestore records
+            if (category.staticServices) {
+              services[category.id] = category.staticServices;
+              continue;
+            }
+            
+            if (!category.collection) {
+              services[category.id] = [];
+              continue;
+            }
+            
             // Create a reference to the collection
             const collectionRef = collection(db, category.collection);
             let queryRef = collectionRef;
@@ -1370,25 +1410,41 @@ setAvailableServices(services);
   
   // Fetch offer history when a client is selected
   useEffect(() => {
-    const fetchOfferHistory = async () => {
+  const fetchOfferHistory = async () => {
       if (!selectedClient || !companyInfo) return;
       
       try {
         const offersRef = collection(db, "offers");
-        const q = query(
-          offersRef, 
+        const baseQuery = query(
+          offersRef,
           where("clientId", "==", selectedClient.id),
           where("companyId", "==", companyInfo.id)
         );
         
-        const querySnapshot = await getDocs(q);
+        let querySnapshot = await getDocs(baseQuery);
+        
+        // Fallback: if nothing is found (older offers may miss companyId), try without company filter
+        if (querySnapshot.empty) {
+          const fallbackQuery = query(
+            offersRef,
+            where("clientId", "==", selectedClient.id)
+          );
+          querySnapshot = await getDocs(fallbackQuery);
+        }
+        
         const offersData = querySnapshot.docs.map(doc => {
           const data = doc.data();
-          const createdAt = data.createdAt ? 
-            (data.createdAt instanceof Date ? 
-              data.createdAt.toISOString().split('T')[0] : 
-              new Date(data.createdAt.seconds * 1000).toISOString().split('T')[0]) : 
-            '';
+          
+          let createdAt = '';
+          if (data.createdAt) {
+            if (data.createdAt instanceof Date) {
+              createdAt = data.createdAt.toISOString().split('T')[0];
+            } else if (data.createdAt.seconds) {
+              createdAt = new Date(data.createdAt.seconds * 1000).toISOString().split('T')[0];
+            } else if (typeof data.createdAt === 'string') {
+              createdAt = data.createdAt;
+            }
+          }
             
           return {
             id: doc.id,
@@ -1676,6 +1732,7 @@ const fetchCompanyAdminForPdf = async (companyId) => {
               // Add this service to the included services
               includedServices.push({
                 ...item,
+                id: item.id || `${category}_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
                 startDate: item.startDate || reservationData.checkIn,
                 endDate: item.endDate || reservationData.checkOut,
                 paymentStatus: item.paymentStatus || 'unpaid',
@@ -1698,6 +1755,7 @@ const fetchCompanyAdminForPdf = async (companyId) => {
         offer.items.forEach(item => {
           includedServices.push({
             ...item,
+            id: item.id || `${item.category || 'service'}_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
             included: true,
             startDate: reservationData.checkIn,
             endDate: reservationData.checkOut,
@@ -1744,6 +1802,22 @@ const fetchCompanyAdminForPdf = async (companyId) => {
       } else if (totalPaid > 0) {
         overallPaymentStatus = 'partially_paid';
       }
+
+      // Build initial payment history entries based on pre-paid services (so per-service payments show up)
+      const conversionPaymentDate = new Date();
+      const initialPaymentHistory = includedServices
+        .filter(item => (parseFloat(item.amountPaid) || 0) > 0)
+        .map((item, idx) => ({
+          id: `offer-payment-${Date.now()}-${idx}`,
+          amount: parseFloat(item.amountPaid) || 0,
+          method: 'offer-conversion',
+          notes: 'Imported from offer conversion',
+          serviceId: item.id,
+          serviceName: typeof item.name === 'object' ? getLocalizedText(item.name, language) : item.name,
+          date: conversionPaymentDate,
+          createdAt: conversionPaymentDate,
+          createdBy: currentUser.uid
+        }));
       
       // Save reservation to Firestore
       const reservationsRef = collection(db, "reservations");
@@ -1763,8 +1837,12 @@ const fetchCompanyAdminForPdf = async (companyId) => {
         baseAmount: totalAmount,
         totalAmount: totalAmount,
         totalPaid: totalPaid,
+        paidAmount: totalPaid,
         paymentStatus: overallPaymentStatus,
-        services: includedServices
+        services: includedServices,
+        paymentHistory: initialPaymentHistory,
+        lastPaymentDate: initialPaymentHistory.length ? conversionPaymentDate : null,
+        lastPaymentMethod: initialPaymentHistory.length ? 'offer-conversion' : null
       });
       
       // Update the offer status to 'booked'
@@ -2174,7 +2252,7 @@ const handleSelectClient = async (client) => {
         notes: offerNotes,
         subtotal: calculateSubtotal(),
         status: 'draft',
-        createdAt: new Date(),
+        createdAt: serverTimestamp(),
         createdBy: currentUser.uid
       };
       const offerData = removeUndefinedFields(rawOfferData);
@@ -2476,6 +2554,7 @@ const generateOfferPdf = async (offer) => {
         if (item.category === 'villas') icon = '🏠';
         else if (item.category === 'boats') icon = '🛥️';
         else if (item.category === 'cars') icon = '🚗';
+        else if (item.category === 'concierge-core') icon = '⭐';
         else if (item.category === 'security') icon = '🔒';
         else if (item.category === 'nannies') icon = '👶';
         else if (item.category === 'chefs') icon = '🍽️';
@@ -3037,6 +3116,7 @@ const getUserName = async (userId) => {
             {service.category === 'villas' ? '🏠' :
              service.category === 'boats' ? '🛥️' :
              service.category === 'cars' ? '🚗' :
+             service.category === 'concierge-core' ? '⭐' :
              service.category === 'security' ? '🔒' :
              service.category === 'nannies' ? '👶' :
              service.category === 'chefs' ? '🍽️' :
@@ -3228,11 +3308,17 @@ const getUserName = async (userId) => {
       {/* Header with language toggle */}
       <div className={`flex ${isMobile ? 'flex-col gap-3' : 'flex-row justify-between items-center'} mb-6`}>
         <h1 className="text-2xl font-bold text-gray-800">{t.title}</h1>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/clients/add')}
+            className="bg-indigo-600 text-white border-0 rounded-md py-2 px-4 text-sm font-medium cursor-pointer hover:bg-indigo-700 transition-colors"
+          >
+            {t.addClient}
+          </button>
           {isMobile && (
             <button
               onClick={() => setShowMobileMenu(!showMobileMenu)}
-              className="bg-indigo-600 text-white border-0 rounded-md py-2 px-3 text-xs font-medium cursor-pointer"
+              className="bg-gray-100 text-gray-800 border border-gray-200 rounded-md py-2 px-3 text-xs font-medium cursor-pointer hover:bg-gray-200"
             >
               {t.mobileMenu} ☰
             </button>
@@ -3242,184 +3328,58 @@ const getUserName = async (userId) => {
       
       {/* Mobile menu */}
       {isMobile && showMobileMenu && (
-        <div className="absolute top-full right-0 z-20 bg-white border border-gray-200 rounded-md shadow-lg w-48">
-          <button 
-            onClick={() => {
-              setCurrentView('list');
-              setShowMobileMenu(false);
-            }}
-            className="block w-full px-4 py-3 text-left border-b border-gray-200 bg-transparent text-sm"
-          >
-            {t.title}
-          </button>
-          {/* Client Details - Additional Information */}
-{selectedClient && (
-  <>
-    {/* Lead Information */}
-    <div className="mb-6">
-      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-        Lead Information
-      </h3>
-      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-        <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2 md:grid-cols-3'} gap-4`}>
-          {/* Lead Status */}
-          {selectedClient.leadStatus && (
-            <div>
-              <p className="text-xs text-gray-500 font-medium mb-1">Lead Status</p>
-              <p className="text-sm text-gray-900 capitalize">{selectedClient.leadStatus || '-'}</p>
+        <>
+          <div
+            className="fixed inset-0 bg-black/40 z-30"
+            onClick={() => setShowMobileMenu(false)}
+            aria-hidden="true"
+          />
+          <div className="fixed top-16 left-4 right-4 z-40 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-y-auto max-h-[70vh]">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <div className="font-semibold text-gray-900">{t.mobileMenu || 'Menu'}</div>
+              <button
+                type="button"
+                onClick={() => setShowMobileMenu(false)}
+                className="text-gray-500 hover:text-gray-700"
+                aria-label="Close menu"
+              >
+                ×
+              </button>
             </div>
-          )}
-          
-          {/* Lead Source */}
-          {selectedClient.leadSource && (
-            <div>
-              <p className="text-xs text-gray-500 font-medium mb-1">Lead Source</p>
-              <p className="text-sm text-gray-900 capitalize">{selectedClient.leadSource || '-'}</p>
-            </div>
-          )}
-          
-          {/* Conversion Potential */}
-          {selectedClient.conversionPotential && (
-            <div>
-              <p className="text-xs text-gray-500 font-medium mb-1">Conversion Potential</p>
-              <p className="text-sm text-gray-900 capitalize">{selectedClient.conversionPotential || '-'}</p>
-            </div>
-          )}
-          
-          {/* Assigned To */}
-          {selectedClient.assignedTo && (
-            <div>
-              <p className="text-xs text-gray-500 font-medium mb-1">Assigned To</p>
-              <p className="text-sm text-gray-900">{selectedClient.assignedTo || '-'}</p>
-            </div>
-          )}
-          
-          {/* Follow-up Date */}
-          {selectedClient.followUpDate && (
-            <div>
-              <p className="text-xs text-gray-500 font-medium mb-1">Follow-up Date</p>
-              <p className="text-sm text-gray-900">{selectedClient.followUpDate || '-'}</p>
-            </div>
-          )}
-          
-          {/* Is Previous Client */}
-          {selectedClient.isPreviousClient !== undefined && (
-            <div>
-              <p className="text-xs text-gray-500 font-medium mb-1">Previous Client</p>
-              <p className="text-sm text-gray-900">{selectedClient.isPreviousClient ? 'Yes' : 'No'}</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-    
-    {/* Trip Details */}
-    {(selectedClient.startDate || selectedClient.endDate || selectedClient.adults || 
-      selectedClient.children || selectedClient.budget || selectedClient.activities) && (
-      <div className="mb-6">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-          Trip Details
-        </h3>
-        <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
-          <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2 md:grid-cols-3'} gap-4`}>
-            {/* Trip Dates */}
-            {(selectedClient.startDate || selectedClient.endDate) && (
-              <div>
-                <p className="text-xs text-indigo-700 font-medium mb-1">Trip Dates</p>
-                <p className="text-sm text-indigo-900">
-                  {selectedClient.startDate ? formatDate(selectedClient.startDate) : '-'} to {selectedClient.endDate ? formatDate(selectedClient.endDate) : '-'}
-                </p>
-              </div>
-            )}
-            
-            {/* Guests */}
-            {(selectedClient.adults !== undefined || selectedClient.children !== undefined) && (
-              <div>
-                <p className="text-xs text-indigo-700 font-medium mb-1">Guests</p>
-                <p className="text-sm text-indigo-900">
-                  {selectedClient.adults || 0} Adults, {selectedClient.children || 0} Children
-                </p>
-              </div>
-            )}
-            
-            {/* Budget */}
-            {selectedClient.budget && (
-              <div>
-                <p className="text-xs text-indigo-700 font-medium mb-1">Budget</p>
-                <p className="text-sm text-indigo-900">€ {selectedClient.budget}</p>
-              </div>
-            )}
-            
-            {/* Activities */}
-            {selectedClient.activities && (
-              <div className={isMobile ? '' : 'col-span-2'}>
-                <p className="text-xs text-indigo-700 font-medium mb-1">Requested Activities</p>
-                <p className="text-sm text-indigo-900">{selectedClient.activities}</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    )}
-    
-    {/* Property Preferences */}
-    {selectedClient.propertyTypes && (
-      <div className="mb-6">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-          Accommodation Preferences
-        </h3>
-        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(selectedClient.propertyTypes).map(([type, isSelected]) => 
-              isSelected ? (
-                <span key={type} className="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs font-medium capitalize">
-                  {type}
-                </span>
-              ) : null
-            )}
-            {Object.values(selectedClient.propertyTypes || {}).every(v => !v) && (
-              <span className="text-sm text-gray-500">No preferences specified</span>
-            )}
-          </div>
-        </div>
-      </div>
-    )}
-    
-    {/* Additional Contact Persons */}
-    {selectedClient.contactPersons && selectedClient.contactPersons.length > 0 && (
-      <div className="mb-6">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-          Additional Contacts
-        </h3>
-        <div className="bg-gray-50 rounded-lg overflow-hidden border border-gray-200">
-          {selectedClient.contactPersons.map((contact, index) => (
-            <div 
-              key={`contact-${index}`}
-              className={`p-3 ${index < selectedClient.contactPersons.length - 1 ? 'border-b border-gray-200' : ''}`}
-            >
-              <div className="font-medium text-sm mb-1">{contact.name || 'Unnamed Contact'}</div>
-              <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
-                {contact.email && (
-                  <div className="flex items-center gap-1">
-                    <span className="text-gray-400">✉️</span>
-                    <span>{contact.email}</span>
+            <div className="p-3 space-y-2">
+              <button 
+                onClick={() => {
+                  navigate('/clients/add');
+                  setShowMobileMenu(false);
+                }}
+                className="w-full px-4 py-3 text-left border border-indigo-200 rounded-lg bg-indigo-50 text-indigo-700 font-medium text-sm"
+              >
+                {t.addClient}
+              </button>
+              <button 
+                onClick={() => {
+                  setCurrentView('list');
+                  setShowMobileMenu(false);
+                }}
+                className="w-full px-4 py-3 text-left border border-gray-200 rounded-lg bg-white text-sm"
+              >
+                {t.title}
+              </button>
+              {selectedClient && (
+                <div className="mt-2 space-y-2">
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1">
+                    {t.clientDetails || 'Client Details'}
                   </div>
-                )}
-                {contact.phone && (
-                  <div className="flex items-center gap-1">
-                    <span className="text-gray-400">📱</span>
-                    <span>{contact.phone}</span>
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 space-y-2 text-sm text-gray-800">
+                    <div className="flex justify-between"><span className="text-gray-500">Lead</span><span className="font-medium capitalize">{selectedClient.leadStatus || '-'}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">Source</span><span className="font-medium">{selectedClient.leadSource || '-'}</span></div>
+                    <div className="flex justify-between"><span className="text-gray-500">Guests</span><span className="font-medium">{(selectedClient.adults || 0) + 'A / ' + (selectedClient.children || 0) + 'C'}</span></div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
-          ))}
-        </div>
-      </div>
-    )}
-  </>
-)}
-        </div>
+          </div>
+        </>
       )}
       
       {/* Company Information Banner */}
@@ -4318,6 +4278,7 @@ const getUserName = async (userId) => {
                         : getUnitDisplayLabel(service.unit || 'day', t);
                       const selectSeasonLabel = t.selectMonthLabel || 'Select season';
                       const useStandardLabel = t.useStandardRate || 'Use standard rate';
+                      const priceIsAvailable = displayPrice && displayPrice > 0;
                       // Enhanced Service Card Component
                       return (
                         <div key={service.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300">
@@ -4338,6 +4299,7 @@ const getUserName = async (userId) => {
                                     {service.category === 'villas' ? '🏠' :
                                      service.category === 'boats' ? '🛥️' :
                                      service.category === 'cars' ? '🚗' :
+                                     service.category === 'concierge-core' ? '⭐' :
                                      service.category === 'security' ? '🔒' :
                                      service.category === 'nannies' ? '👶' :
                                      service.category === 'chefs' ? '🍽️' :
@@ -4495,16 +4457,20 @@ const getUserName = async (userId) => {
                             <div className="flex items-center justify-between">
   <div>
     <div className="text-lg font-bold text-indigo-600">
-      €{displayPrice.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+      {priceIsAvailable
+        ? `€${displayPrice.toLocaleString(undefined, { minimumFractionDigits: 0 })}`
+        : (language === 'ro' ? 'Preț la cerere' : 'Price on request')}
     </div>
-    <div className="text-xs text-gray-500">
-      {displayUnitLabel}
-      {selectedMonthOption && (
-        <span className="ml-1 text-gray-600">
-          ({selectedMonthOption.label})
-        </span>
-      )}
-    </div>
+    {priceIsAvailable && (
+      <div className="text-xs text-gray-500">
+        {displayUnitLabel}
+        {selectedMonthOption && (
+          <span className="ml-1 text-gray-600">
+            ({selectedMonthOption.label})
+          </span>
+        )}
+      </div>
+    )}
   </div>
   
   <button 

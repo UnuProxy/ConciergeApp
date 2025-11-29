@@ -581,12 +581,12 @@ const PropertiesForSale = () => {
         </div>
       ) : (
         <div className="px-4 pt-4">
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 justify-items-stretch">
             {getFilteredProperties().map(prop => (
               <div
                 key={prop.id}
                 onClick={() => navigate(`/services/properties-for-sale/${prop.id}`)}
-                className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-200 max-w-sm mx-auto h-full flex flex-col"
+                className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-200 w-full h-full flex flex-col"
               >
                 {/* Fixed height image container */}
                 <div className="relative h-40 md:h-44 flex-shrink-0">

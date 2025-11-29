@@ -19,6 +19,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Only handle same-origin requests; let cross-origin (e.g., Firebase Storage) pass through
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin !== self.location.origin) {
+    return;
+  }
+
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)

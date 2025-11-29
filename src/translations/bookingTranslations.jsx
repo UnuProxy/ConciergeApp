@@ -86,7 +86,7 @@ export const translations = {
       
       // Payments
       client: "Client:",
-      amountDue: "Amount Due:",
+      amountDue: "Amount Due",
       paymentAmount: "Payment Amount",
       paymentMethod: "Payment Method",
       cash: "Cash",
@@ -132,11 +132,13 @@ export const translations = {
       // Service Selection
       selectServiceCategory: "Select Service Category",
       servicesTitle: "Services",
+      conciergeCore: "Concierge Essentials",
       customService: "Custom Service",
       serviceName: "Service Name*",
       description: "Description",
       pricePerUnit: "Price per",
       serviceTotalAmount: "Total Amount",
+      priceOnRequest: "Price on request",
       
       // Payment Status
       paid: "Paid",
@@ -243,7 +245,7 @@ export const translations = {
       
       // Payments
       client: "Client:",
-      amountDue: "Sumă de plată:",
+      amountDue: "Sumă de plată",
       paymentAmount: "Suma Plății",
       paymentMethod: "Metoda de Plată",
       cash: "Numerar",
@@ -289,11 +291,13 @@ export const translations = {
       // Service Selection
       selectServiceCategory: "Selectați Categoria de Servicii",
       servicesTitle: "Servicii",
+      conciergeCore: "Servicii Concierge Principale",
       customService: "Serviciu Personalizat",
       serviceName: "Numele Serviciului*",
       description: "Descriere",
       pricePerUnit: "Preț per",
       serviceTotalAmount: "Suma Totală",
+      priceOnRequest: "Preț la cerere",
       
       // Payment Status
       paid: "Plătit",
