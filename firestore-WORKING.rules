@@ -29,6 +29,25 @@ service cloud.firestore {
       return matchesCompany(companyId) && userRole() == "admin";
     }
 
+    function canCreateForCompany(companyId) {
+      return isAuthed() && matchesCompany(companyId);
+    }
+
+    function canUpdateForCompany(companyId) {
+      return isAuthed()
+        && matchesCompany(companyId)
+        && request.resource.data.companyId == companyId
+        && resource.data.companyId == companyId;
+    }
+
+    function canDeleteForCompany(companyId) {
+      return isAuthed() && matchesCompany(companyId);
+    }
+
+    // ========================================================================
+    // SYSTEM COLLECTIONS
+    // ========================================================================
+
     // Companies (metadata) + nested per-company collections
     match /companies/{companyId} {
       allow read: if isAuthed();
@@ -39,7 +58,7 @@ service cloud.firestore {
       }
     }
 
-    // authorized_users: allow any signed-in user to read
+    // authorized_users: allow any signed-in user to read (for UI initialization)
     match /authorized_users/{docId} {
       allow read: if isAuthed();
       allow create, update: if isAuthed()
@@ -48,7 +67,7 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // users: self-access only
+    // users: self-access only, company/role immutable after creation
     match /users/{uid} {
       allow read: if isAuthed() && request.auth.uid == uid;
       allow create: if isAuthed() && request.auth.uid == uid;
@@ -60,10 +79,11 @@ service cloud.firestore {
     }
 
     // ========================================================================
-    // TEMPORARY: OPEN EVERYTHING FOR AUTHENTICATED USERS
-    // This lets us see what's broken in the data
+    // SHARED CATALOGS: Both companies can read and write
+    // (villas, cars, boats, chefs, security, services, properties)
     // ========================================================================
 
+    // Make catalog items easier: any authenticated user can read/write
     match /cars/{id} {
       allow read, write: if isAuthed();
     }
@@ -77,43 +97,95 @@ service cloud.firestore {
     }
 
     match /chefs/{id} {
-      allow read, write: if isAuthed();
+      allow read: if isAuthed();
+      allow create: if isAuthed() && request.resource.data.companyId != null;
+      allow update: if isAuthed() && matchesCompany(resource.data.companyId);
+      allow delete: if isAuthed() && matchesCompany(resource.data.companyId);
     }
 
     match /services/{id} {
-      allow read, write: if isAuthed();
+      allow read: if isAuthed();
+      allow create: if isAuthed() && request.resource.data.companyId != null;
+      allow update: if isAuthed() && matchesCompany(resource.data.companyId);
+      allow delete: if isAuthed() && matchesCompany(resource.data.companyId);
+    }
+
+    match /serviceCategories/{id} {
+      allow read: if isAuthed();
+      allow create: if isAuthed() && request.resource.data.companyId != null;
+      allow update: if isAuthed() && matchesCompany(resource.data.companyId);
+      allow delete: if isAuthed() && matchesCompany(resource.data.companyId);
     }
 
     match /security/{id} {
-      allow read, write: if isAuthed();
+      allow read: if isAuthed();
+      allow create: if isAuthed() && request.resource.data.companyId != null;
+      allow update: if isAuthed() && matchesCompany(resource.data.companyId);
+      allow delete: if isAuthed() && matchesCompany(resource.data.companyId);
     }
 
     match /properties/{id} {
-      allow read, write: if isAuthed();
+      allow read: if isAuthed();
+      allow create: if isAuthed() && request.resource.data.companyId != null;
+      allow update: if isAuthed() && matchesCompany(resource.data.companyId);
+      allow delete: if isAuthed() && matchesCompany(resource.data.companyId);
+    }
+
+    // ========================================================================
+    // COMPANY-PRIVATE DATA: Each company can ONLY access their own
+    // (clients, reservations/bookings, offers, expenses, finances)
+    // ========================================================================
+
+    match /clients/{id} {
+      // List queries MUST filter by companyId in your code: where("companyId", "==", userCompanyId)
+      allow read: if matchesCompany(resource.data.companyId);
+      allow create: if canCreateForCompany(request.resource.data.companyId);
+      allow update: if canUpdateForCompany(resource.data.companyId);
+      allow delete: if canDeleteForCompany(resource.data.companyId);
     }
 
     match /reservations/{id} {
-      allow read, write: if isAuthed();
-    }
-
-    match /clients/{id} {
-      allow read, write: if isAuthed();
+      // List queries MUST filter by companyId in your code: where("companyId", "==", userCompanyId)
+      allow read: if matchesCompany(resource.data.companyId);
+      allow create: if canCreateForCompany(request.resource.data.companyId);
+      allow update: if canUpdateForCompany(resource.data.companyId);
+      allow delete: if canDeleteForCompany(resource.data.companyId);
     }
 
     match /collaborators/{id} {
-      allow read, write: if isAuthed();
+      allow read: if matchesCompany(resource.data.companyId);
+      allow create: if canCreateForCompany(request.resource.data.companyId);
+      allow update: if canUpdateForCompany(resource.data.companyId);
+      allow delete: if canDeleteForCompany(resource.data.companyId);
     }
 
     match /offers/{id} {
-      allow read, write: if isAuthed();
+      allow read: if matchesCompany(resource.data.companyId);
+      allow create: if canCreateForCompany(request.resource.data.companyId);
+      allow update: if canUpdateForCompany(resource.data.companyId);
+      allow delete: if canDeleteForCompany(resource.data.companyId);
     }
 
     match /expenses/{id} {
-      allow read, write: if isAuthed();
+      allow read: if matchesCompany(resource.data.companyId);
+      allow create: if canCreateForCompany(request.resource.data.companyId);
+      allow update: if canUpdateForCompany(resource.data.companyId);
+      allow delete: if canDeleteForCompany(resource.data.companyId);
     }
 
     match /categoryPayments/{id} {
-      allow read, write: if isAuthed();
+      allow read: if matchesCompany(resource.data.companyId);
+      allow create: if canCreateForCompany(request.resource.data.companyId);
+      allow update: if canUpdateForCompany(resource.data.companyId);
+      allow delete: if canDeleteForCompany(resource.data.companyId);
+    }
+
+    // Finance records: provider payouts & profit
+    match /financeRecords/{id} {
+      allow read: if matchesCompany(resource.data.companyId);
+      allow create: if canCreateForCompany(request.resource.data.companyId);
+      allow update: if canUpdateForCompany(resource.data.companyId);
+      allow delete: if canDeleteForCompany(resource.data.companyId);
     }
   }
 }
