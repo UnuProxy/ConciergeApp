@@ -138,7 +138,7 @@ service cloud.firestore {
 
     match /clients/{id} {
       // List queries MUST filter by companyId in your code: where("companyId", "==", userCompanyId)
-      allow read: if isAuthed();
+      allow read: if matchesCompany(resource.data.companyId);
       allow create: if canCreateForCompany(request.resource.data.companyId);
       allow update: if canUpdateForCompany(resource.data.companyId);
       allow delete: if canDeleteForCompany(resource.data.companyId);
@@ -146,35 +146,35 @@ service cloud.firestore {
 
     match /reservations/{id} {
       // List queries MUST filter by companyId in your code: where("companyId", "==", userCompanyId)
-      allow read: if isAuthed();
+      allow read: if matchesCompany(resource.data.companyId);
       allow create: if canCreateForCompany(request.resource.data.companyId);
       allow update: if canUpdateForCompany(resource.data.companyId);
       allow delete: if canDeleteForCompany(resource.data.companyId);
     }
 
     match /collaborators/{id} {
-      allow read: if isAuthed();
+      allow read: if matchesCompany(resource.data.companyId);
       allow create: if canCreateForCompany(request.resource.data.companyId);
       allow update: if canUpdateForCompany(resource.data.companyId);
       allow delete: if canDeleteForCompany(resource.data.companyId);
     }
 
     match /offers/{id} {
-      allow read: if isAuthed();
+      allow read: if matchesCompany(resource.data.companyId);
       allow create: if canCreateForCompany(request.resource.data.companyId);
       allow update: if canUpdateForCompany(resource.data.companyId);
       allow delete: if canDeleteForCompany(resource.data.companyId);
     }
 
     match /expenses/{id} {
-      allow read: if isAuthed();
+      allow read: if matchesCompany(resource.data.companyId);
       allow create: if canCreateForCompany(request.resource.data.companyId);
       allow update: if canUpdateForCompany(resource.data.companyId);
       allow delete: if canDeleteForCompany(resource.data.companyId);
     }
 
     match /categoryPayments/{id} {
-      allow read: if isAuthed();
+      allow read: if matchesCompany(resource.data.companyId);
       allow create: if canCreateForCompany(request.resource.data.companyId);
       allow update: if canUpdateForCompany(resource.data.companyId);
       allow delete: if canDeleteForCompany(resource.data.companyId);
@@ -182,14 +182,10 @@ service cloud.firestore {
 
     // Finance records: provider payouts & profit
     match /financeRecords/{id} {
-      allow read: if isAuthed();
-      // Allow create when a companyId is provided (some users may not have user.companyId populated yet)
-      allow create: if isAuthed() && request.resource.data.companyId != null;
-      // Allow update when companyId stays consistent
-      allow update: if isAuthed()
-        && request.resource.data.companyId == resource.data.companyId
-        && request.resource.data.companyId != null;
-      allow delete: if isAuthed() && resource.data.companyId != null;
+      allow read: if matchesCompany(resource.data.companyId);
+      allow create: if canCreateForCompany(request.resource.data.companyId);
+      allow update: if canUpdateForCompany(resource.data.companyId);
+      allow delete: if canDeleteForCompany(resource.data.companyId);
     }
   }
 }
