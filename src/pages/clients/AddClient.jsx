@@ -3,7 +3,9 @@ import {
   getFirestore, 
   collection, 
   addDoc,
-  getDocs
+  getDocs,
+  query,
+  where
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { useDatabase } from "../../context/DatabaseContext";
@@ -236,14 +238,22 @@ function AddClient() {
     setTeamMembersError(null);
     
     try {
+      // Only list teammates from the same company to avoid cross-company assignment
+      if (!companyInfo?.id) {
+        setTeamMembers([]);
+        return;
+      }
+
+      const companyFilter = where('companyId', '==', companyInfo.id);
+
       // Try to fetch from authorized_users collection
       let usersRef = collection(db, "authorized_users");
-      let querySnapshot = await getDocs(usersRef);
+      let querySnapshot = await getDocs(query(usersRef, companyFilter));
       
       // If no results, try the users collection
       if (querySnapshot.empty) {
         usersRef = collection(db, "users");
-        querySnapshot = await getDocs(usersRef);
+        querySnapshot = await getDocs(query(usersRef, companyFilter));
       }
       
       const members = [];

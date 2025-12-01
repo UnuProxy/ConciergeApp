@@ -211,18 +211,13 @@ function Villas() {
 
   useEffect(() => {
     fetchVillas();
+    // Villas are shared across companies; no companyId filter needed
   }, [userCompanyId]);
 
   const fetchVillas = async () => {
-    if (!userCompanyId) {
-      console.warn('No companyId resolved; skipping villa fetch.');
-      setVillas([]);
-      return;
-    }
     try {
       const villaCollection = collection(db, 'villas');
-      const villaQuery = query(villaCollection, where('companyId', '==', userCompanyId));
-      const villaSnapshot = await getDocs(villaQuery);
+      const villaSnapshot = await getDocs(villaCollection);
       const villaList = await Promise.all(
         villaSnapshot.docs.map(async (doc) => {
           const data = doc.data();
@@ -822,7 +817,6 @@ function Villas() {
           })
         )}
       </div>
-
       {isAddingVilla && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
