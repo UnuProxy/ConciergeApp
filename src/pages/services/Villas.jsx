@@ -1149,11 +1149,18 @@ function Villas() {
               <div className="flex flex-wrap gap-4 text-gray-700 text-sm pb-3 border-b">
                 <span>{viewVilla.bedrooms || '-'} {t.bedrooms}</span>
                 <span>{viewVilla.bathrooms || '-'} {t.bathrooms}</span>
-                {viewVilla.propertyLink && (
-                  <a href={viewVilla.propertyLink} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-800">
-                    {t.propertyLink}
-                  </a>
-                )}
+                <a
+                  href={
+                    (viewVilla.propertyLink && viewVilla.propertyLink.trim())
+                      ? viewVilla.propertyLink
+                      : `/services/properties-for-sale/${viewVilla.id}`
+                  }
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-indigo-600 hover:text-indigo-800"
+                >
+                  {t.propertyLink}
+                </a>
               </div>
 
               {(viewVilla.priceConfigurations && viewVilla.priceConfigurations.length > 0) && (
