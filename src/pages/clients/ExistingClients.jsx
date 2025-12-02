@@ -238,6 +238,9 @@ const translations = {
     noClientSelected: 'No Client Selected',
     confirmDeleteOffer: 'Are you sure you want to delete this offer?', 
     cannotDeleteBookedOffer: 'Cannot delete an offer that has been converted to a booking.',
+    collaborator: 'Collaborator',
+    selectCollaborator: 'Select collaborator (optional)',
+    noCollaborators: 'No collaborators found',
     offerDeletedSuccess: 'Offer deleted successfully.',
     deleteOffer: 'Delete Offer',
     selectClient: 'Select a client from the list to view their details.',
@@ -431,6 +434,9 @@ const translations = {
     editClient: 'Editează Client',
     deleteClient: 'Șterge Client',
     createReservation: 'Creează Rezervare Nouă',
+    collaborator: 'Colaborator',
+    selectCollaborator: 'Selectează colaborator (opțional)',
+    noCollaborators: 'Nu există colaboratori',
     noClientSelected: 'Niciun Client Selectat',
     selectClient: 'Selectează un client din listă pentru a vedea detaliile.',
     confirmDelete: 'Ești sigur că dorești să ștergi acest client?',
@@ -717,8 +723,34 @@ const extractImageUrl = (data) => {
     children: 0,
     accommodationType: '',
     transport: '',
-    notes: ''
+    notes: '',
+    collaboratorId: ''
   });
+  const [collaborators, setCollaborators] = useState([]);
+  const [collaboratorsLoading, setCollaboratorsLoading] = useState(false);
+
+  // Load collaborators for the current company to allow booking attribution
+  useEffect(() => {
+    const fetchCollaborators = async () => {
+      if (!companyInfo?.id) {
+        setCollaborators([]);
+        return;
+      }
+      setCollaboratorsLoading(true);
+      try {
+        const snap = await getDocs(
+          query(collection(db, 'collaborators'), where('companyId', '==', companyInfo.id))
+        );
+        setCollaborators(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (err) {
+        console.error('Error loading collaborators:', err);
+      } finally {
+        setCollaboratorsLoading(false);
+      }
+    };
+
+    fetchCollaborators();
+  }, [companyInfo]);
 
   const fetchUsersBatch = async (userIds) => {
   if (!userIds || userIds.length === 0) return;
@@ -1632,7 +1664,8 @@ const fetchCompanyAdminForPdf = async (companyId) => {
         totalAmount: offer.totalValue,
         totalPaid: 0,
         paymentStatus: 'unpaid',
-        extras: []
+        extras: [],
+        collaboratorId: ''
       };
       
       // Transform offer items to include payment tracking for each service
@@ -1834,6 +1867,7 @@ const fetchCompanyAdminForPdf = async (companyId) => {
         createdAt: new Date(),
         createdBy: currentUser.uid,
         status: 'confirmed',
+        collaboratorId: reservationData.collaboratorId || null,
         baseAmount: totalAmount,
         totalAmount: totalAmount,
         totalPaid: totalPaid,
@@ -2928,6 +2962,7 @@ const generateOfferPdf = async (offer) => {
         accommodationType: reservationData.accommodationType,
         transport: reservationData.transport,
         notes: reservationData.notes,
+        collaboratorId: reservationData.collaboratorId || null,
         createdAt: new Date(),
         createdBy: currentUser.uid,
         status: 'confirmed'
@@ -2959,7 +2994,7 @@ const generateOfferPdf = async (offer) => {
         setClients(prev => prev.map(client => client.id === selectedClient.id ? updatedClient : client));
       }
       
-      setReservationData({ startDate: '', endDate: '', adults: 1, children: 0, accommodationType: '', transport: '', notes: '' });
+      setReservationData({ startDate: '', endDate: '', adults: 1, children: 0, accommodationType: '', transport: '', notes: '', collaboratorId: '' });
       setShowCreateReservation(false);
       
       if (isMobile) {
@@ -4864,6 +4899,28 @@ const getUserName = async (userId) => {
                         </select>
                       </div>
                     </div>
+
+                    <div className="w-full">
+                      <label className="block text-sm font-medium text-gray-600 mb-2">
+                        {t.collaborator}
+                      </label>
+                      <select
+                        name="collaboratorId"
+                        value={reservationData.collaboratorId}
+                        onChange={handleReservationChange}
+                        className="w-full p-2.5 border border-gray-300 rounded-md text-sm bg-white"
+                      >
+                        <option value="">{t.selectCollaborator}</option>
+                        {collaborators.map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.name || c.email || 'Unnamed collaborator'}
+                          </option>
+                        ))}
+                      </select>
+                      {!collaboratorsLoading && collaborators.length === 0 && (
+                        <p className="text-xs text-gray-500 mt-1">{t.noCollaborators}</p>
+                      )}
+                    </div>
                     
                     <div className="w-full">
                       <label className="block text-sm font-medium text-gray-600 mb-2">
@@ -5387,6 +5444,32 @@ const getUserName = async (userId) => {
                         {t.additionalInformation}
                       </h3>
                       
+                      <div className="w-full mb-4">
+                        <label className="block text-sm font-medium text-gray-600 mb-2">
+                          {t.collaborator}
+                        </label>
+                        <select
+                          name="collaboratorId"
+                          value={reservationFromOffer.reservationData.collaboratorId || ''}
+                          onChange={handleReservationFromOfferChange}
+                          className={`
+                            w-full p-2.5 border border-gray-300 rounded-md
+                            text-sm bg-white
+                            ${isMobile ? 'min-h-11' : ''}
+                          `}
+                        >
+                          <option value="">{t.selectCollaborator}</option>
+                          {collaborators.map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.name || c.email || 'Unnamed collaborator'}
+                            </option>
+                          ))}
+                        </select>
+                        {!collaboratorsLoading && collaborators.length === 0 && (
+                          <p className="text-xs text-gray-500 mt-1">{t.noCollaborators}</p>
+                        )}
+                      </div>
+
                       <div className="w-full mb-4">
                         <label className="block text-sm font-medium text-gray-600 mb-2">
                           {t.notes}
@@ -6058,6 +6141,30 @@ const getUserName = async (userId) => {
                           required
                           className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
                         />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-4">
+                      <div className="w-full">
+                        <label className="block text-sm font-medium text-gray-600 mb-2">
+                          {t.collaborator}
+                        </label>
+                        <select
+                          name="collaboratorId"
+                          value={reservationFromOffer.reservationData.collaboratorId || ''}
+                          onChange={handleReservationFromOfferChange}
+                          className="w-full p-2.5 border border-gray-300 rounded-md text-sm bg-white"
+                        >
+                          <option value="">{t.selectCollaborator}</option>
+                          {collaborators.map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.name || c.email || 'Unnamed collaborator'}
+                            </option>
+                          ))}
+                        </select>
+                        {!collaboratorsLoading && collaborators.length === 0 && (
+                          <p className="text-xs text-gray-500 mt-1">{t.noCollaborators}</p>
+                        )}
                       </div>
                     </div>
                     

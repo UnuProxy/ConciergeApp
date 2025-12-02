@@ -11,6 +11,7 @@ import {
   Timestamp
 } from 'firebase/firestore';
 import { db } from '../../firebase/config';
+import { useDatabase } from '../../context/DatabaseContext';
 import { getCurrentLanguage } from "../../utils/languageHelper"; // Import the language helper
 
 // Translation strings
@@ -63,6 +64,7 @@ const translations = {
 
 // Main component
 function Collaborators() {
+  const { companyId, loading: dbLoading, error: dbError } = useDatabase();
   // Use global language from localStorage instead of local state
   const [lang, setLang] = useState(getCurrentLanguage);
   const t = translations[lang];
@@ -89,16 +91,23 @@ function Collaborators() {
 
   // Load collaborators with booking stats
   const loadCollaborators = async () => {
+    if (!companyId) {
+      setError('Missing company context. Please re-login.');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const snap = await getDocs(collection(db, 'collaborators'));
+      const snap = await getDocs(
+        query(collection(db, 'collaborators'), where('companyId', '==', companyId))
+      );
       const raw = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       const withStats = await Promise.all(
         raw.map(async c => {
           const bookingSnap = await getDocs(
             query(
               collection(db, 'reservations'),
+              where('companyId', '==', companyId),
               where('collaboratorId', '==', c.id),
               where('status', '==', 'confirmed')
             )
@@ -122,9 +131,11 @@ function Collaborators() {
   };
 
   useEffect(() => {
-    loadCollaborators();
+    if (companyId) {
+      loadCollaborators();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lang]);
+  }, [lang, companyId]);
 
   // Filter by name search
   useEffect(() => {
@@ -141,11 +152,15 @@ function Collaborators() {
     setLoading(true);
     setError(null);
     try {
+      if (!companyId) {
+        throw new Error('Missing company context. Please re-login.');
+      }
       const data = {
         name: form.name,
         email: form.email,
         phone: form.phone,
         commissionRate: form.commissionRate / 100,
+        companyId,
         createdAt: Timestamp.now()
       };
       if (editingId) {
@@ -359,4 +374,3 @@ function Collaborators() {
 }
 
 export default Collaborators;
-
