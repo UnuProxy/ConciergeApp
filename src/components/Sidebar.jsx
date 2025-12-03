@@ -175,21 +175,16 @@ function Sidebar({ open, setOpen }) {
           >
             {t.appName}
           </Link>
-          <button
-            type="button"
-            style={{
-              color: 'white',
-              background: 'none',
-              border: 'none',
-              display: isMobile ? 'flex' : 'none',
-              fontSize: '1.5rem',
-              cursor: 'pointer'
-            }}
-            aria-label="Close sidebar"
-            onClick={closeSidebar}
-          >
-            ×
-          </button>
+          {isMobile && (
+            <button
+              type="button"
+              className="app-sidebar__close"
+              aria-label="Close sidebar"
+              onClick={closeSidebar}
+            >
+              ×
+            </button>
+          )}
         </div>
 
         <div className="app-sidebar__nav">
@@ -331,9 +326,9 @@ function Sidebar({ open, setOpen }) {
               />
               {isAdmin && (
                 <SidebarLink
-                  to="/users"
+                  to="/users/manage"
                   label={t.userManagement}
-                  active={location.pathname === '/users'}
+                  active={location.pathname.startsWith('/users')}
                   onClick={handleLinkClick}
                 />
               )}

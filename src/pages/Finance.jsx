@@ -692,7 +692,7 @@ const Finance = () => {
     }
     
     try {
-      await addDoc(collection(db, 'expenses'), {
+      const docRef = await addDoc(collection(db, 'expenses'), {
         companyId,
         createdBy: userId || null,
         createdByEmail: userEmail || null,
@@ -704,7 +704,7 @@ const Finance = () => {
       });
       
       const expense = {
-        id: `expense-${Date.now()}`,
+        id: docRef.id,
         companyId,
         createdBy: userId || null,
         createdByEmail: userEmail || null,
@@ -1272,26 +1272,45 @@ const Finance = () => {
     }
     
     return (
-      <div className="space-y-4 pb-20">
+      <div className="space-y-6 pb-20">
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100">
-            <h2 className="font-bold">{t.expenses}</h2>
+            <div className="flex justify-between items-center">
+              <h2 className="font-bold">{t.expenses}</h2>
+              <button
+                className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg"
+                onClick={() => setActiveSubView('add')}
+              >
+                <span className="text-lg leading-none">+</span>
+                <span>{t.addExpense || 'Add expense'}</span>
+              </button>
+            </div>
           </div>
           
           <div className="p-4">
             {filteredExpenses.length === 0 ? (
-              <div className="py-8 text-center text-gray-500">
-                {t.noExpenses}
+              <div className="py-8 text-center text-gray-500 flex flex-col items-center gap-3">
+                <div>{t.noExpenses}</div>
+                <button
+                  className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg"
+                  onClick={() => setActiveSubView('add')}
+                >
+                  <span className="text-lg leading-none">+</span>
+                  <span>{t.addExpense || 'Add expense'}</span>
+                </button>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div
+                className="grid gap-4"
+                style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}
+              >
                 {filteredExpenses.map(item => (
-                  <div key={item.id} className="p-3 bg-gray-50 rounded-lg">
+                  <div key={item.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200 shadow-sm">
                     <div className="flex justify-between">
                       <div className="font-medium text-sm capitalize">{getExpenseCategoryName(item.category)}</div>
                       <div className="text-xs text-gray-500">{formatDate(item.date)}</div>
                     </div>
-                    <div className="text-xs text-gray-500 mt-1 mb-2 line-clamp-1">{item.description}</div>
+                    <div className="text-xs text-gray-500 mt-1 mb-2 line-clamp-2">{item.description}</div>
                     <div className="flex items-center justify-between mt-1">
                       <div className="text-right font-bold">
                         €{item.amount.toLocaleString()}
@@ -1307,7 +1326,7 @@ const Finance = () => {
                   </div>
                 ))}
                 
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                <div className="mt-2 p-3 bg-blue-50 rounded-lg col-span-full">
                   <div className="flex justify-between items-center">
                     <div className="font-medium">{t.total}</div>
                     <div className="font-bold">€{totalExpenses.toLocaleString()}</div>
