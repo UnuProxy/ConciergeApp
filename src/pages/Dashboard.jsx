@@ -225,6 +225,7 @@ function Dashboard() {
         const user = auth.currentUser;
         if (!user) {
           navigate('/login');
+          setLoading(false);
           return;
         }
 
@@ -246,6 +247,7 @@ function Dashboard() {
           if (authorizedSnapshot.empty) {
             console.error('User not authorized');
             navigate('/login');
+            setLoading(false);
             return;
           }
   
@@ -256,6 +258,7 @@ function Dashboard() {
         if (!userData?.companyId) {
           console.error('No company assigned to user');
           navigate('/login');
+          setLoading(false);
           return;
         }
 
@@ -264,11 +267,19 @@ function Dashboard() {
         
       } catch (error) {
         console.error('Error fetching user auth:', error);
+        setLoading(false);
       }
     };
 
     fetchUserAuth();
   }, [navigate]);
+
+  // If we still don't have a company ID after auth init, stop loading so we render the fallback UI
+  useEffect(() => {
+    if (userCompanyId === null && auth.currentUser) {
+      setLoading(false);
+    }
+  }, [userCompanyId]);
 
   // Fetch dashboard data
   useEffect(() => {
@@ -384,6 +395,12 @@ function Dashboard() {
 
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
+        // If permission or data issues, render an empty dashboard instead of a blank screen
+        setDashboardData({
+          quickStats: { activeRequests: 0, pendingBookings: 0, todayRevenue: 0, totalClients: 0 },
+          recentActivity: [],
+          upcomingBookings: []
+        });
       } finally {
         setLoading(false);
       }
@@ -561,6 +578,23 @@ function Dashboard() {
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600 font-medium">{t.loading}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!userCompanyId) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="max-w-md text-center bg-white rounded-2xl shadow p-6 border border-gray-200">
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">{t.labels.commandCenter}</h2>
+          <p className="text-gray-600 mb-4">No company selected or access missing.</p>
+          <button
+            onClick={() => navigate('/select-company')}
+            className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+          >
+            Go to company selection
+          </button>
         </div>
       </div>
     );

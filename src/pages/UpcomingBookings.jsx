@@ -95,6 +95,21 @@ const CORE_CONCIERGE_SERVICES = [
   { id: 'core-property-mgmt', name: { en: 'Property management', ro: 'Management de proprietăți' }, price: 0, unit: 'service', category: 'concierge-core' },
 ];
 
+// Hide items already covered by dedicated categories (villas, cars, boats, chefs, restaurants, excursions/tours, massages, shopping)
+const EXCLUDED_CORE_SERVICE_IDS = new Set([
+  'core-villa-rentals',
+  'core-yachts',
+  'core-cars',
+  'core-chef',
+  'core-restaurants',
+  'core-excursions',
+  'core-spa',
+  'core-shopping'
+]);
+const CORE_CONCIERGE_SERVICES_FILTERED = CORE_CONCIERGE_SERVICES.filter(
+  (service) => !EXCLUDED_CORE_SERVICE_IDS.has(service.id)
+);
+
 // Enhanced category icon components
 const CategoryIcon = ({ type, size = "small" }) => {
   const sizeClass = size === "large" ? "w-8 h-8" : "w-5 h-5";
@@ -276,13 +291,33 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
     fetchCategories();
   }, [userCompanyId, t]);
 
+const getServiceThumbnail = (service) => {
+  const pickFromArray = (arr) => {
+    if (!Array.isArray(arr) || arr.length === 0) return null;
+    // prefer object with url
+    const objWithUrl = arr.find((p) => p && typeof p === 'object' && p.url);
+      if (objWithUrl?.url) return objWithUrl.url;
+      const firstString = arr.find((p) => typeof p === 'string' && p.trim() !== '');
+      return firstString || null;
+    };
+
+  return (
+    service.thumbnail ||
+    service.imageUrl ||
+    service.image ||
+    pickFromArray(service.photos) ||
+    pickFromArray(service.images) ||
+    null
+  );
+};
+
   // Fetch services for selected category
   useEffect(() => {
     const fetchServices = async () => {
       if (!selectedCategory || selectedCategory.id === 'custom') return;
 
       if (selectedCategory.id === 'concierge-core') {
-        setServices(CORE_CONCIERGE_SERVICES);
+        setServices(CORE_CONCIERGE_SERVICES_FILTERED);
         setLoading(false);
         return;
       }
@@ -386,7 +421,11 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
                 model: data.model || '',
                 bedrooms: data.bedrooms || '',
                 bathrooms: data.bathrooms || '',
-                address: typeof data.address === 'object' ? data.address.en : data.address || ''
+                address: typeof data.address === 'object' ? data.address.en : data.address || '',
+                photos: data.photos || data.images || [],
+                images: data.images || [],
+                thumbnail: data.thumbnail || data.image || data.imageUrl || null,
+                imageUrl: data.imageUrl || null
               });
             });
           } catch (err) {
@@ -517,8 +556,8 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
   );
 
   // RENDER SERVICES LIST
-  const renderServicesList = () => (
-    <div className="bg-white">
+const renderServicesList = () => (
+  <div className="bg-white">
       <div className="flex justify-between items-center mb-4">
         <h4 className="text-lg font-medium text-gray-900">{selectedCategory?.name} {t.servicesTitle || 'Services'}</h4>
         <button 
@@ -539,47 +578,75 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
         <>
           {services.length > 0 ? (
             <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-              {services.map((service, index) => (
-                <button
-                  key={service.id || index}
-                  onClick={() => handleServiceSelect(service)}
-                  className="w-full p-3 border border-gray-300 rounded-lg text-left hover:bg-blue-50 hover:border-blue-300 transition-colors bg-white"
-                >
-                  {(() => {
-                    const displayName = (() => {
-                      if (service.displayName) return service.displayName;
-                      if (typeof service.name === 'object') {
-                        return service.name.en || service.name.ro || Object.values(service.name)[0] || t.unnamedService || 'Unnamed';
-                      }
-                      return service.name || t.unnamedService || 'Unnamed';
-                    })();
-                    const displayDesc = service.brand && service.model
-                      ? `${service.brand} ${service.model}`
-                      : service.brand
-                        ? service.brand
-                        : service.model
-                          ? service.model
-                          : (typeof service.description === 'object' ? (service.description.en || service.description.ro) : service.description);
-                    const hasPrice = service.price && Number(service.price) > 0;
-                    const displayPrice = hasPrice
-                      ? `${Number(service.price).toLocaleString()} € / ${service.unit || 'item'}`
-                      : (t.priceOnRequest || 'Price on request');
-                    return (
-                      <>
-                        <div className="font-medium text-gray-900">{displayName}</div>
-                        {displayDesc && (
-                          <div className="text-sm text-gray-600 mt-1">
-                            {displayDesc}
+              {services.map((service, index) => {
+                const displayName = (() => {
+                  if (service.displayName) return service.displayName;
+                  if (typeof service.name === 'object') {
+                    return service.name.en || service.name.ro || Object.values(service.name)[0] || t.unnamedService || 'Unnamed';
+                  }
+                  return service.name || t.unnamedService || 'Unnamed';
+                })();
+
+                const displayDesc = service.brand && service.model
+                  ? `${service.brand} ${service.model}`
+                  : service.brand
+                    ? service.brand
+                    : service.model
+                      ? service.model
+                      : (typeof service.description === 'object' ? (service.description.en || service.description.ro) : service.description);
+
+                const hasPrice = service.price && Number(service.price) > 0;
+                const displayPrice = hasPrice
+                  ? `${Number(service.price).toLocaleString()} € / ${service.unit || 'item'}`
+                  : (t.priceOnRequest || 'Price on request');
+
+                const descriptionSnippet = displayDesc && displayDesc.length > 120
+                  ? `${displayDesc.slice(0, 117)}…`
+                  : displayDesc;
+
+                const thumbnail = getServiceThumbnail(service);
+
+                return (
+                  <button
+                    key={service.id || index}
+                    onClick={() => handleServiceSelect(service)}
+                    className="w-full p-3 border border-gray-300 rounded-lg text-left hover:bg-blue-50 hover:border-blue-300 transition-colors bg-white"
+                  >
+                    <div className="flex gap-3 items-start">
+                      <div className="w-16 h-16 rounded-md bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-200">
+                        {thumbnail ? (
+                          <img
+                            src={thumbnail}
+                            alt={displayName}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">No img</div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900 truncate">{displayName}</div>
+                        {descriptionSnippet && (
+                          <div
+                            className="text-sm text-gray-600 mt-1"
+                            style={{
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden'
+                            }}
+                          >
+                            {descriptionSnippet}
                           </div>
                         )}
-                        <div className="mt-2 text-blue-600 font-medium">
+                        <div className="mt-2 inline-flex items-center px-2 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold border border-blue-100">
                           {displayPrice}
                         </div>
-                      </>
-                    );
-                  })()}
-                </button>
-              ))}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-8 bg-gray-50 rounded-lg mb-4">
@@ -871,6 +938,7 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
     items: '',
     date: new Date().toISOString().split('T')[0],
     price: '',
+    lastMarkupApplied: null,
     receipt: false,
     notes: '',
     receiptFile: null,
@@ -913,10 +981,16 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
   };
 
   const applyMarkup = (percentage) => {
-    const base = parseFloat(shoppingData.price);
+    const base = parseFloat(shoppingData.basePrice || shoppingData.price);
     if (Number.isNaN(base)) return;
+    // Prevent multiple presses compounding; always apply to original base
     const updated = parseFloat((base * (1 + percentage / 100)).toFixed(2));
-    setShoppingData(prev => ({ ...prev, price: updated.toString() }));
+    setShoppingData(prev => ({
+      ...prev,
+      price: updated.toString(),
+      basePrice: shoppingData.basePrice || shoppingData.price,
+      lastMarkupApplied: percentage
+    }));
   };
   
   const handleSubmit = async () => {
@@ -1713,12 +1787,6 @@ const UpcomingBookings = () => {
       return '';
     }
   }, [language]);
-
-  const handleNewBookingClick = () => {
-    navigate('/clients/existing', {
-      state: { startBookingFlow: true }
-    });
-  };
   
   // Modal states
   const [showBottomSheet, setShowBottomSheet] = useState(false);
@@ -1826,49 +1894,55 @@ const UpcomingBookings = () => {
   
 
 useEffect(() => {
-  if (showBottomSheet && bottomSheetRef.current) {
-    const modal = bottomSheetRef.current;
-    const header = modal.querySelector('.bottom-sheet-header');
-    
-    if (header) {
-      const handleTouchStart = (e) => {
-        const startY = e.touches[0].clientY;
-        
-        const handleTouchMove = (e) => {
-          const currentY = e.touches[0].clientY;
-          const deltaY = currentY - startY;
-          
-          if (deltaY > 0) {
-            modal.style.transform = `translateY(${deltaY}px)`;
-            modal.style.transition = 'none';
-          }
-        };
-        
-        const handleTouchEnd = (e) => {
-          modal.style.transition = 'transform 0.3s ease-out';
-          const endY = e.changedTouches[0].clientY;
-          const deltaY = endY - startY;
-          
-          if (deltaY > 100) {
-            closeBottomSheet();
-          } else {
-            modal.style.transform = 'translateY(0)';
-          }
-        };
-        
-        document.addEventListener('touchmove', handleTouchMove);
-        document.addEventListener('touchend', handleTouchEnd);
-        
-        return () => {
-          document.removeEventListener('touchmove', handleTouchMove);
-          document.removeEventListener('touchend', handleTouchEnd);
-        };
-      };
-      
-      header.addEventListener('touchstart', handleTouchStart);
-      return () => header.removeEventListener('touchstart', handleTouchStart);
+  if (!showBottomSheet || !bottomSheetRef.current) return;
+
+  const modal = bottomSheetRef.current;
+  const header = modal.querySelector('.bottom-sheet-header');
+  if (!header) return;
+
+  let startY = 0;
+  let dragging = false;
+
+  const handleTouchStart = (e) => {
+    dragging = true;
+    startY = e.touches[0].clientY;
+    modal.style.transition = 'none';
+  };
+
+  const handleTouchMove = (e) => {
+    if (!dragging) return;
+    const deltaY = e.touches[0].clientY - startY;
+    if (deltaY > 0) {
+      modal.style.transform = `translateY(${deltaY}px)`;
     }
-  }
+  };
+
+  const handleTouchEnd = (e) => {
+    if (!dragging) return;
+    dragging = false;
+    modal.style.transition = 'transform 0.25s ease-out';
+
+    const deltaY = e.changedTouches[0].clientY - startY;
+    if (deltaY > 140) {
+      closeBottomSheet();
+    } else {
+      modal.style.transform = 'translateY(0)';
+    }
+  };
+
+  header.addEventListener('touchstart', handleTouchStart, { passive: true });
+  header.addEventListener('touchmove', handleTouchMove, { passive: true });
+  header.addEventListener('touchend', handleTouchEnd, { passive: true });
+  header.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+
+  return () => {
+    header.removeEventListener('touchstart', handleTouchStart);
+    header.removeEventListener('touchmove', handleTouchMove);
+    header.removeEventListener('touchend', handleTouchEnd);
+    header.removeEventListener('touchcancel', handleTouchEnd);
+    modal.style.transform = 'translateY(0)';
+    modal.style.transition = '';
+  };
 }, [showBottomSheet]);
   
   // Helper functions for status text
@@ -1992,6 +2066,7 @@ useEffect(() => {
         const bookingsSnapshot = await getDocs(bookingsQuery);
         const bookingsData = [];
         const clientIds = new Set();
+        const clientNameFallbacks = {};
         
         bookingsSnapshot.forEach((doc) => {
           const data = doc.data();
@@ -2008,6 +2083,9 @@ useEffect(() => {
             bookingsData.push(processedData);
             if (data.clientId) {
               clientIds.add(data.clientId);
+              if (data.clientName && !clientNameFallbacks[data.clientId]) {
+                clientNameFallbacks[data.clientId] = data.clientName;
+              }
             }
           } else {
             console.warn(`Booking ${doc.id} has wrong company ID: ${data.companyId} vs ${userCompanyId}`);
@@ -2043,7 +2121,17 @@ useEffect(() => {
               }
             }
           } catch (err) {
-            console.error(`Error fetching client ${clientId}:`, err);
+            // Handle permission errors gracefully by falling back to booking-provided name
+            const permDenied =
+              err?.code === 'permission-denied' ||
+              err?.code === 'PERMISSION_DENIED' ||
+              (typeof err?.message === 'string' && err.message.toLowerCase().includes('permission'));
+            if (permDenied) {
+              console.warn(`Permission denied reading client ${clientId}; using booking fallback name.`);
+              clientDetailsObj[clientId] = { name: clientNameFallbacks[clientId] || 'Client' };
+            } else {
+              console.error(`Error fetching client ${clientId}:`, err);
+            }
           }
         }
         
@@ -3657,15 +3745,6 @@ async function handleShoppingFormSubmit(shoppingExpense) {
               <span className="booking-headline__muted">{todayLabel}</span>
             )}
           </div>
-        </div>
-        <div className="booking-headline__actions">
-          <button
-            type="button"
-            onClick={handleNewBookingClick}
-            className="booking-headline__cta"
-          >
-            {t.newBooking || 'Add Booking'}
-          </button>
         </div>
 
         <div className="booking-filters__row mt-6">

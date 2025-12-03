@@ -63,7 +63,9 @@ const PropertiesForSale = () => {
       anyStatus: "Any Status",
       clearFilters: "Clear Filters",
       resultsFound: "properties found",
-      size: "Size"
+      size: "Size",
+      livingArea: "Living area",
+      gardenArea: "Garden/outdoor"
     },
     ro: {
       title: 'Proprietăți De Vânzare',
@@ -97,7 +99,9 @@ const PropertiesForSale = () => {
       anyStatus: "Orice Status",
       clearFilters: "Șterge Filtrele",
       resultsFound: "proprietăți găsite",
-      size: "Suprafață"
+      size: "Suprafață",
+      livingArea: "Suprafață utilă",
+      gardenArea: "Curte/Grădină"
     }
   };
   const t = translations[language] || translations.en;
@@ -125,6 +129,8 @@ const PropertiesForSale = () => {
             type: data.type || 'villa',
             price: parseFloat(data.pricing?.price || 0),
             size: parseFloat(data.size || 0),
+            livingArea: parseFloat(data.specs?.livingArea || 0),
+            gardenArea: parseFloat(data.specs?.gardenArea || 0),
             status: data.status || 'available',
             bedrooms: parseInt(data.specs?.bedrooms || '0', 10),
             bathrooms: parseInt(data.specs?.bathrooms || '0', 10),
@@ -641,11 +647,31 @@ const PropertiesForSale = () => {
                       <span className="mr-1">€</span>
                       <span className="truncate">{formatPrice(prop.price)}</span>
                     </div>
-                    <div className="flex items-center text-gray-600 flex-shrink-0">
-                      <svg className="w-4 h-4 text-indigo-600 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-                      </svg>
-                      <span className="text-sm">{prop.size} m<sup>2</sup></span>
+                    <div className="flex items-center text-gray-600 flex-shrink-0 gap-2 flex-wrap justify-end">
+                      {prop.livingArea > 0 && (
+                        <div className="flex items-center bg-indigo-50 text-indigo-700 rounded px-2 py-1 text-xs font-medium">
+                          <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h10a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z" />
+                          </svg>
+                          <span>{prop.livingArea} m<sup>2</sup> {t.livingArea}</span>
+                        </div>
+                      )}
+                      {prop.gardenArea > 0 && (
+                        <div className="flex items-center bg-green-50 text-green-700 rounded px-2 py-1 text-xs font-medium">
+                          <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span>{prop.gardenArea} m<sup>2</sup> {t.gardenArea}</span>
+                        </div>
+                      )}
+                      {prop.livingArea <= 0 && prop.gardenArea <= 0 && (
+                        <div className="flex items-center">
+                          <svg className="w-4 h-4 text-indigo-600 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                          </svg>
+                          <span className="text-sm">{prop.size} m<sup>2</sup></span>
+                        </div>
+                      )}
                     </div>
                   </div>
 

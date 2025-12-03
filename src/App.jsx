@@ -192,16 +192,14 @@ function App() {
                 
                 {/* User Management Routes */}
                 <Route
-                  path="/users/*"
+                  path="/users/manage"
                   element={
                     <PrivateRoute>
                       <ProtectedLayout
                         sidebarOpen={sidebarOpen}
                         setSidebarOpen={setSidebarOpen}
                       >
-                        <Routes>
-                          <Route path="manage" element={<UserManagement />} />
-                        </Routes>
+                        <UserManagement />
                       </ProtectedLayout>
                     </PrivateRoute>
                   }

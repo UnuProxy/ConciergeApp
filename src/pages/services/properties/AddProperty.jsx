@@ -80,6 +80,8 @@ function AddProperty() {
       location: 'Locație',
       price: 'Preț',
       size: 'Mărime',
+      livingArea: 'Suprafață utilă',
+      gardenArea: 'Suprafață curte/grădină',
       status: 'Status',
       available: 'Disponibilă',
       underOffer: 'Ofertă în Curs',
@@ -141,6 +143,8 @@ function AddProperty() {
       location: 'Location',
       price: 'Price',
       size: 'Size',
+      livingArea: 'Living area',
+      gardenArea: 'Garden/outdoor area',
       status: 'Status',
       available: 'Available',
       underOffer: 'Under Offer',
@@ -207,6 +211,8 @@ function AddProperty() {
     }, // Initialize as an object with language keys
     price: '',
     size: '',
+    livingArea: '',
+    gardenArea: '',
     status: 'available',
     images: [],
     documents: [],
@@ -220,7 +226,13 @@ function AddProperty() {
     // Land parcel-specific fields
     zoning: '',
     buildableArea: '',
-    terrain: ''
+    terrain: '',
+
+    // Owner/manager confidential contact (admins only)
+    ownerName: '',
+    ownerEmail: '',
+    ownerPhone: '',
+    ownerConfidential: false
   });
   
   
@@ -271,6 +283,8 @@ function AddProperty() {
               
               price: data.pricing?.price?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") || '',
               size: data.size?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") || '',
+              livingArea: data.specs?.livingArea?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") || '',
+              gardenArea: data.specs?.gardenArea?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") || '',
               status: data.status || 'available',
               images: data.photos || [],
               documents: data.documents || [],
@@ -286,7 +300,13 @@ function AddProperty() {
               // Land-specific fields
               zoning: data.specs?.zoning || '',
               buildableArea: data.specs?.buildableArea || '',
-              terrain: data.specs?.terrain || ''
+              terrain: data.specs?.terrain || '',
+
+              // Owner/manager
+              ownerName: data.owner?.name || '',
+              ownerEmail: data.owner?.email || '',
+              ownerPhone: data.owner?.phone || '',
+              ownerConfidential: !!data.owner?.confidential
             });
           }else {
             setError(t.errorLoadingProperty);
@@ -621,7 +641,9 @@ function AddProperty() {
               // Villa specs
               bedrooms: parseInt(formData.bedrooms, 10) || 0,
               bathrooms: parseInt(formData.bathrooms, 10) || 0,
-              year: parseInt(formData.yearBuilt, 10) || null
+              year: parseInt(formData.yearBuilt, 10) || null,
+              livingArea: parseFloat(formData.livingArea.replace(/,/g, '')) || 0,
+              gardenArea: parseFloat(formData.gardenArea.replace(/,/g, '')) || 0
             }
           : {
               // Land specs
@@ -635,6 +657,14 @@ function AddProperty() {
           ...obj,
           [amenity.id]: formData.amenities.includes(amenity.id)
         }), {}),
+
+        // Confidential owner/manager details (admins only)
+        owner: {
+          name: formData.ownerName || '',
+          email: formData.ownerEmail || '',
+          phone: formData.ownerPhone || '',
+          confidential: !!formData.ownerConfidential
+        },
         
         // Image and document URLs
         photos: formData.images,
@@ -786,6 +816,38 @@ function AddProperty() {
               autoComplete="off"
             />
           </div>
+
+          {/* Interior and garden sizes (villas) */}
+          {formData.type === 'villa' && (
+            <>
+              <div>
+                <label className="block text-gray-700 font-medium mb-2">{t.livingArea} (m²)</label>
+                <input
+                  type="text"
+                  name="livingArea"
+                  value={formData.livingArea}
+                  onChange={handleNumberChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="0.00"
+                  inputMode="numeric"
+                  autoComplete="off"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700 font-medium mb-2">{t.gardenArea} (m²)</label>
+                <input
+                  type="text"
+                  name="gardenArea"
+                  value={formData.gardenArea}
+                  onChange={handleNumberChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="0.00"
+                  inputMode="numeric"
+                  autoComplete="off"
+                />
+              </div>
+            </>
+          )}
           
           {/* Status */}
           <div>
@@ -915,6 +977,69 @@ function AddProperty() {
             </div>
           </div>
         )}
+
+        {/* Owner / Manager (confidential) */}
+        <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 mb-4 sm:mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-800">{language === 'ro' ? 'Proprietar / Manager' : 'Owner / Manager'}</h3>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="ownerConfidential"
+                name="ownerConfidential"
+                checked={formData.ownerConfidential}
+                onChange={(e) => setFormData(prev => ({ ...prev, ownerConfidential: e.target.checked }))}
+                className="h-4 w-4"
+              />
+              <label htmlFor="ownerConfidential" className="text-sm text-gray-700">
+                {language === 'ro' ? 'Confidențial (doar admin)' : 'Confidential (admin only)'}
+              </label>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                {language === 'ro' ? 'Nume Proprietar' : 'Owner Name'} <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="ownerName"
+                value={formData.ownerName}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                {language === 'ro' ? 'Email Proprietar' : 'Owner Email'} <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                name="ownerEmail"
+                value={formData.ownerEmail}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                {language === 'ro' ? 'Telefon Proprietar' : 'Owner Phone'} <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="ownerPhone"
+                value={formData.ownerPhone}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 mt-2">
+            {language === 'ro'
+              ? 'Aceste detalii sunt confidențiale și vizibile doar pentru administratori.'
+              : 'These details are confidential and visible only to administrators.'}
+          </p>
+        </div>
         
         {/* Description */}
         <div className="mb-4 sm:mb-6">

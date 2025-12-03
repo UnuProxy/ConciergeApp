@@ -131,6 +131,7 @@ const buildBrochurePath = (file) => {
 function Villas() {
   const dbContext = useDatabase();
   const userCompanyId = dbContext?.companyId || dbContext?.companyInfo?.id || null;
+  const userRole = dbContext?.userRole || dbContext?.role || dbContext?.currentUser?.role || null;
   const [villas, setVillas] = useState([]);
   const [isAddingVilla, setIsAddingVilla] = useState(false);
   const [isEditingVilla, setIsEditingVilla] = useState(false);
@@ -165,6 +166,7 @@ function Villas() {
     owner_phone: '',
     owner_notes_en: '',
     owner_notes_ro: '',
+    owner_confidential: false,
   });
   
   const [priceConfigs, setPriceConfigs] = useState([{
@@ -348,6 +350,7 @@ function Villas() {
       amenities_en: '', amenities_ro: '',
       owner_name: '', owner_email: '', owner_phone: '',
       owner_notes_en: '', owner_notes_ro: '',
+      owner_confidential: false,
     });
     setPriceConfigs([{
       id: Date.now(),
@@ -485,7 +488,8 @@ function Villas() {
         name: formData.owner_name || '',
         email: formData.owner_email || '',
         phone: formData.owner_phone || '',
-        notes: { en: formData.owner_notes_en || '', ro: formData.owner_notes_ro || '' }
+        notes: { en: formData.owner_notes_en || '', ro: formData.owner_notes_ro || '' },
+        confidential: !!formData.owner_confidential
       },
       priceConfigurations: priceConfigs.map(config => ({
         id: config.id,
@@ -628,6 +632,7 @@ function Villas() {
       owner_phone: villa.owner?.phone || '',
       owner_notes_en: villa.owner?.notes?.en || '',
       owner_notes_ro: villa.owner?.notes?.ro || '',
+      owner_confidential: !!villa.owner?.confidential,
     });
     setBrochureUrl(villa.brochureUrl || '');
     if (Array.isArray(villa.priceConfigurations) && villa.priceConfigurations.length > 0) {
@@ -849,10 +854,6 @@ function Villas() {
                   <input name="propertyLink" value={formData.propertyLink} onChange={handleInputChange} className="w-full border rounded px-3 py-2" />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700">Description ({formLanguage.toUpperCase()})</label>
-                  <textarea name={`description_${formLanguage}`} value={formData[`description_${formLanguage}`]} onChange={handleInputChange} className="w-full border rounded px-3 py-2" rows={3} />
-                </div>
-                <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700">Amenities ({formLanguage.toUpperCase()})</label>
                   <input name={`amenities_${formLanguage}`} value={formData[`amenities_${formLanguage}`]} onChange={handleInputChange} className="w-full border rounded px-3 py-2" />
                   <div className="flex flex-wrap gap-2 mt-2">
@@ -867,10 +868,6 @@ function Villas() {
                       </button>
                     ))}
                   </div>
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700">Owner Notes ({formLanguage.toUpperCase()})</label>
-                  <textarea name={`owner_notes_${formLanguage}`} value={formData[`owner_notes_${formLanguage}`]} onChange={handleInputChange} className="w-full border rounded px-3 py-2" rows={2} />
                 </div>
               </div>
 
@@ -1019,10 +1016,73 @@ function Villas() {
                     ))}
                   </div>
                 </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700">Owner Notes ({formLanguage.toUpperCase()})</label>
-                  <textarea name={`owner_notes_${formLanguage}`} value={formData[`owner_notes_${formLanguage}`]} onChange={handleInputChange} className="w-full border rounded px-3 py-2" rows={2} />
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-semibold text-gray-900">Owner / Manager</h3>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="owner_confidential_edit"
+                      name="owner_confidential"
+                      checked={formData.owner_confidential}
+                      onChange={(e) => setFormData(prev => ({ ...prev, owner_confidential: e.target.checked }))}
+                      className="h-4 w-4"
+                    />
+                    <label htmlFor="owner_confidential_edit" className="text-sm text-gray-700">
+                      Confidential (admin only)
+                    </label>
+                  </div>
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Owner Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      name="owner_name"
+                      value={formData.owner_name}
+                      onChange={handleInputChange}
+                      className="w-full border border-gray-300 rounded px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Owner Email <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      name="owner_email"
+                      value={formData.owner_email}
+                      onChange={handleInputChange}
+                      className="w-full border border-gray-300 rounded px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Owner Phone <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      name="owner_phone"
+                      value={formData.owner_phone}
+                      onChange={handleInputChange}
+                      className="w-full border border-gray-300 rounded px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Owner Notes ({formLanguage.toUpperCase()})</label>
+                    <textarea
+                      name={`owner_notes_${formLanguage}`}
+                      value={formData[`owner_notes_${formLanguage}`]}
+                      onChange={handleInputChange}
+                      className="w-full border border-gray-300 rounded px-3 py-2"
+                      rows={2}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  These details are confidential and visible only to administrators.
+                </p>
               </div>
 
               <div>
@@ -1121,18 +1181,26 @@ function Villas() {
 
       {viewVilla && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-start p-4 border-b">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">{viewVilla.name?.[language] || viewVilla.name?.en || viewVilla.name?.ro || viewVilla.name || 'Villa'}</h2>
-                <p className="text-sm text-gray-600">{viewVilla.address?.[language] || viewVilla.address?.en || viewVilla.address?.ro || viewVilla.address || ''}</p>
-              </div>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <button
+                onClick={() => setViewVilla(null)}
+                className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 text-sm font-semibold"
+              >
+                ← {language === 'ro' ? 'Înapoi la Vile' : 'Back to Villas'}
+              </button>
               <button
                 onClick={() => setViewVilla(null)}
                 className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-100"
               >
                 ✕
               </button>
+            </div>
+            <div className="flex justify-between items-start p-4 border-b">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">{viewVilla.name?.[language] || viewVilla.name?.en || viewVilla.name?.ro || viewVilla.name || 'Villa'}</h2>
+                <p className="text-sm text-gray-600">{viewVilla.address?.[language] || viewVilla.address?.en || viewVilla.address?.ro || viewVilla.address || ''}</p>
+              </div>
             </div>
 
             {viewVilla.photos && viewVilla.photos.length > 0 && (
@@ -1188,12 +1256,76 @@ function Villas() {
                 </div>
               )}
 
-              {(viewVilla.amenities_en || viewVilla.amenities_ro) && (
-                <div className="pb-3">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-2">{t.amenities_en ? t.amenities_en : 'Amenities'}</h4>
-                  <p className="text-sm text-gray-700 whitespace-pre-line">
-                    {viewVilla[`amenities_${language}`] || viewVilla.amenities_en || viewVilla.amenities_ro || ''}
-                  </p>
+              {(() => {
+                const rawAmenities =
+                  viewVilla?.amenities?.[language] ||
+                  viewVilla?.amenities?.en ||
+                  viewVilla?.amenities?.ro ||
+                  viewVilla?.amenities_en ||
+                  viewVilla?.amenities_ro ||
+                  viewVilla?.amenities;
+
+                let amenitiesList = [];
+                if (Array.isArray(rawAmenities)) {
+                  amenitiesList = rawAmenities;
+                } else if (rawAmenities && typeof rawAmenities === 'object') {
+                  // object map of booleans
+                  amenitiesList = Object.keys(rawAmenities).filter(key => rawAmenities[key]);
+                } else if (typeof rawAmenities === 'string') {
+                  amenitiesList = rawAmenities.split(',').map(item => item.trim()).filter(Boolean);
+                }
+
+                if (amenitiesList.length === 0) return null;
+
+                return (
+                  <div className="pb-3 border-b">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-2">{t.amenities_en ? t.amenities_en : 'Amenities'}</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-800">
+                      {amenitiesList.map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <span className="text-indigo-600">✓</span>
+                          <span>{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {viewVilla.owner && (!viewVilla.owner.confidential || userRole === 'admin') && (
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-base font-semibold text-gray-900">
+                      {language === 'ro' ? 'Proprietar / Manager' : 'Owner / Manager'}
+                    </h4>
+                    {viewVilla.owner.confidential && (
+                      <span className="text-xs text-amber-600 bg-amber-100 px-2 py-1 rounded-full">
+                        {language === 'ro' ? 'Confidențial (doar admin)' : 'Confidential (admin only)'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-800">
+                    <div>
+                      <div className="text-gray-600">{language === 'ro' ? 'Nume proprietar' : 'Owner Name'}</div>
+                      <div className="font-medium">{viewVilla.owner.name || '-'}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-600">{language === 'ro' ? 'Email proprietar' : 'Owner Email'}</div>
+                      <div className="font-medium break-all">{viewVilla.owner.email || '-'}</div>
+                    </div>
+                    <div>
+                      <div className="text-gray-600">{language === 'ro' ? 'Telefon proprietar' : 'Owner Phone'}</div>
+                      <div className="font-medium">{viewVilla.owner.phone || '-'}</div>
+                    </div>
+                    {viewVilla.owner.notes && (
+                      <div className="md:col-span-2">
+                        <div className="text-gray-600">{language === 'ro' ? 'Note proprietar' : 'Owner Notes'}</div>
+                        <div className="font-medium whitespace-pre-line">
+                          {viewVilla.owner.notes?.[language] || viewVilla.owner.notes?.en || viewVilla.owner.notes?.ro || ''}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

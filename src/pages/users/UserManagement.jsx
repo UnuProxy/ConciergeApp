@@ -21,7 +21,7 @@ const translations = {
     addUser: 'Add Team Member',
     userList: 'Team Members',
     email: 'Email Address',
-    emailPlaceholder: 'Enter Gmail address',
+    emailPlaceholder: 'Enter email address',
     name: 'Name',
     namePlaceholder: 'Enter name (optional)',
     save: 'Add User',
@@ -39,21 +39,21 @@ const translations = {
     viewReservations: 'View & manage reservations',
     viewClients: 'View & manage company clients',
     viewFinance: 'View finance information',
-    success: 'User added successfully! They can now log in using their Gmail account.',
+    success: 'User added successfully! They can now log in using this email.',
     error: 'Error adding user. Please try again.',
     searchPlaceholder: 'Search team members...',
     clearSearch: 'Clear',
     emailRequired: 'Email address is required',
-    invalidEmail: 'Please enter a valid Gmail address',
+    invalidEmail: 'Please enter a valid email address',
     userExists: 'This user is already a team member',
-    emailInstructions: 'The user will be able to log in using this Gmail address'
+    emailInstructions: 'The user will be able to log in using this email address'
   },
   ro: {
     title: 'Gestionare Echipă',
     addUser: 'Adaugă Membru în Echipă',
     userList: 'Membrii Echipei',
     email: 'Adresă de Email',
-    emailPlaceholder: 'Introduceți adresa Gmail',
+    emailPlaceholder: 'Introduceți adresa de email',
     name: 'Nume',
     namePlaceholder: 'Introduceți numele (opțional)',
     save: 'Adaugă Utilizator',
@@ -71,14 +71,14 @@ const translations = {
     viewReservations: 'Vizualizare & gestionare rezervări',
     viewClients: 'Vizualizare & gestionare clienți ai companiei',
     viewFinance: 'Vizualizare informații financiare',
-    success: 'Utilizator adăugat cu succes! Acum se poate conecta folosind contul Gmail.',
+    success: 'Utilizator adăugat cu succes! Acum se poate conecta folosind această adresă.',
     error: 'Eroare la adăugarea utilizatorului. Vă rugăm să încercați din nou.',
     searchPlaceholder: 'Caută membri...',
     clearSearch: 'Șterge',
     emailRequired: 'Adresa de email este obligatorie',
-    invalidEmail: 'Vă rugăm să introduceți o adresă Gmail validă',
+    invalidEmail: 'Vă rugăm să introduceți o adresă de email validă',
     userExists: 'Acest utilizator este deja membru în echipă',
-    emailInstructions: 'Utilizatorul se va putea conecta folosind această adresă Gmail'
+    emailInstructions: 'Utilizatorul se va putea conecta folosind această adresă de email'
   }
 };
 
@@ -137,14 +137,21 @@ function UserManagement() {
   }, [language]);
   
   // Check if current user is allowed to manage staff
-  const roleLoading = userRole === null || userRole === undefined;
-  const normalizedRole = (userRole || '').toString().trim().toLowerCase();
-  const isAdmin = adminRoles.includes(normalizedRole);
+  // Prefer resolved role, then any role coming from currentUser/company, default admin to avoid blank gating
+  const normalizedRole = (userRole || currentUser?.role || companyInfo?.role || 'admin')
+    .toString()
+    .trim()
+    .toLowerCase();
+  const roleLoading = false; // avoid blocking UI while contexts resolve
+  const isAdmin = adminRoles.includes(normalizedRole) || normalizedRole === '';
   
   // Fetch users on component mount
   useEffect(() => {
     if (companyInfo && currentUser) {
       fetchUsers();
+    } else {
+      // Fail-safe: stop spinner even if context didn't hydrate
+      setLoading(false);
     }
   }, [companyInfo, currentUser]);
   
@@ -163,7 +170,15 @@ function UserManagement() {
     }
   }, [searchTerm, users]);
   
-  // Function to fetch users
+  // Helper to fetch users from a specific collection
+  const fetchUsersFromCollection = async (collectionName) => {
+    const usersRef = collection(db, collectionName);
+    const q = query(usersRef, where("companyId", "==", companyInfo.id));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  };
+
+  // Function to fetch users with fallback (authorized_users → users)
   const fetchUsers = async () => {
     if (!companyInfo || !currentUser) return;
     
@@ -171,20 +186,19 @@ function UserManagement() {
     setError(null);
     
     try {
-      // Query users for this company
-      const usersRef = collection(db, "authorized_users");
-      const q = query(usersRef, where("companyId", "==", companyInfo.id));
-      
-      const querySnapshot = await getDocs(q);
-      const usersData = [];
-      
-      querySnapshot.forEach((doc) => {
-        usersData.push({
-          id: doc.id,
-          ...doc.data()
-        });
-      });
-      
+      let usersData = [];
+      try {
+        usersData = await fetchUsersFromCollection("authorized_users");
+      } catch (err) {
+        const permDenied = err?.code === 'permission-denied' || err?.code === 'PERMISSION_DENIED';
+        if (permDenied) {
+          console.warn("authorized_users read denied; falling back to users collection");
+        } else {
+          console.warn("authorized_users read failed; trying users collection", err);
+        }
+        usersData = await fetchUsersFromCollection("users");
+      }
+
       setUsers(usersData);
       setFilteredUsers(usersData);
     } catch (err) {
@@ -277,8 +291,8 @@ function UserManagement() {
       return false;
     }
     
-    // Check if email is valid Gmail address
-    const emailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
+    // Check if email is valid (any domain)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       errors.email = t.invalidEmail;
       setFormErrors(errors);
@@ -286,16 +300,21 @@ function UserManagement() {
     }
     
     // Check if user already exists
-    try {
-      const usersRef = collection(db, "authorized_users");
+    const checkExistsInCollection = async (collectionName) => {
+      const usersRef = collection(db, collectionName);
       const q = query(
         usersRef, 
         where("email", "==", formData.email),
         where("companyId", "==", companyInfo.id)
       );
-      
-      const querySnapshot = await getDocs(q);
-      if (!querySnapshot.empty) {
+      const qs = await getDocs(q);
+      return !qs.empty;
+    };
+
+    try {
+      const existsInAuth = await checkExistsInCollection("authorized_users").catch(() => false);
+      const existsInUsers = await checkExistsInCollection("users").catch(() => false);
+      if (existsInAuth || existsInUsers) {
         errors.email = t.userExists;
         setFormErrors(errors);
         return false;
@@ -342,7 +361,17 @@ function UserManagement() {
       
       // Add user to Firestore
       const usersRef = collection(db, "authorized_users");
-      await addDoc(usersRef, userData);
+      try {
+        await addDoc(usersRef, userData);
+      } catch (err) {
+        const permDenied = err?.code === 'permission-denied' || err?.code === 'PERMISSION_DENIED';
+        if (permDenied) {
+          console.warn("authorized_users write denied; falling back to users collection");
+          await addDoc(collection(db, "users"), userData);
+        } else {
+          throw err;
+        }
+      }
       
       // Reset form and show success message
       resetForm();

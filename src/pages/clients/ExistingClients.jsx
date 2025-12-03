@@ -100,26 +100,30 @@ const toNumericPrice = (value) => {
 
 // Core concierge services available even without database records
 const CORE_CONCIERGE_SERVICES = [
-  { id: 'core-villa-rentals', name: { en: 'Luxury villa rentals', ro: 'Închirieri de vile de lux' }, price: 0, unit: 'service', category: 'concierge-core' },
-  { id: 'core-yachts', name: { en: 'Yacht & boat charters', ro: 'Închirieri de iahturi & bărci' }, price: 0, unit: 'service', category: 'concierge-core' },
-  { id: 'core-cars', name: { en: 'Premium car rentals', ro: 'Închirieri de mașini premium' }, price: 0, unit: 'service', category: 'concierge-core' },
-  { id: 'core-club-bookings', name: { en: 'VIP club reservations', ro: 'Rezervări VIP în cluburi' }, price: 0, unit: 'service', category: 'concierge-core' },
-  { id: 'core-restaurants', name: { en: 'Exclusive restaurant bookings', ro: 'Rezervări în restaurante exclusiviste' }, price: 0, unit: 'service', category: 'concierge-core' },
-  { id: 'core-parties', name: { en: 'Private party planning', ro: 'Organizare petreceri private' }, price: 0, unit: 'service', category: 'concierge-core' },
-  { id: 'core-chef', name: { en: 'Private chef & gourmet catering', ro: 'Chef privat & catering gourmet' }, price: 0, unit: 'service', category: 'concierge-core' },
-  { id: 'core-transfers', name: { en: 'Private transfers', ro: 'Transferuri private' }, price: 0, unit: 'service', category: 'concierge-core' },
-  { id: 'core-security', name: { en: 'Bodyguard & private security', ro: 'Bodyguard & securitate privată' }, price: 0, unit: 'service', category: 'concierge-core' },
-  { id: 'core-housekeeping', name: { en: 'Housekeeping & cleaning', ro: 'Servicii de menaj & housekeeping' }, price: 0, unit: 'service', category: 'concierge-core' },
-  { id: 'core-babysitting', name: { en: 'Babysitting & nanny', ro: 'Servicii de babysitting & nanny' }, price: 0, unit: 'service', category: 'concierge-core' },
-  { id: 'core-spa', name: { en: 'In-villa massage & spa', ro: 'Masaj & spa la vilă' }, price: 0, unit: 'service', category: 'concierge-core' },
-  { id: 'core-excursions', name: { en: 'Excursions & activities', ro: 'Organizare de excursii & activități' }, price: 0, unit: 'service', category: 'concierge-core' },
-  { id: 'core-shopping', name: { en: 'Personal shopping assistance', ro: 'Asistență personală pentru cumpărături' }, price: 0, unit: 'service', category: 'concierge-core' },
-  { id: 'core-photo-video', name: { en: 'Professional photo & video', ro: 'Servicii foto & video profesionale' }, price: 0, unit: 'service', category: 'concierge-core' },
-  { id: 'core-romantic', name: { en: 'Romantic event planning', ro: 'Planificare evenimente romantice' }, price: 0, unit: 'service', category: 'concierge-core' },
-  { id: 'core-medical', name: { en: 'Private medical & doctor at home', ro: 'Servicii medicale private & doctor la domiciliu' }, price: 0, unit: 'service', category: 'concierge-core' },
-  { id: 'core-groups', name: { en: 'Group logistics coordination', ro: 'Organizare logistică pentru grupuri mari' }, price: 0, unit: 'service', category: 'concierge-core' },
-  { id: 'core-property-mgmt', name: { en: 'Property management', ro: 'Management de proprietăți' }, price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-villa-rentals', name: 'Luxury villa rentals', price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-yachts', name: 'Yacht & boat charters', price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-cars', name: 'Premium car rentals', price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-club-bookings', name: 'VIP club reservations', price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-restaurants', name: 'Exclusive restaurant bookings', price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-parties', name: 'Private party planning', price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-chef', name: 'Private chef & gourmet catering', price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-transfers', name: 'Private transfers', price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-security', name: 'Bodyguard & private security', price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-housekeeping', name: 'Housekeeping & cleaning', price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-babysitting', name: 'Babysitting & nanny', price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-spa', name: 'In-villa massage & spa', price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-excursions', name: 'Excursions & activities', price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-shopping', name: 'Personal shopping assistance', price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-photo-video', name: 'Professional photo & video', price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-romantic', name: 'Romantic event planning', price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-medical', name: 'Private medical & doctor at home', price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-groups', name: 'Group logistics coordination', price: 0, unit: 'service', category: 'concierge-core' },
+  { id: 'core-property-mgmt', name: 'Property management', price: 0, unit: 'service', category: 'concierge-core' },
 ];
+const EXCLUDED_CORE_SERVICE_IDS = new Set(['core-villa-rentals', 'core-yachts', 'core-cars', 'core-chef', 'core-security']);
+const CORE_CONCIERGE_SERVICES_FILTERED = CORE_CONCIERGE_SERVICES.filter(
+  (service) => !EXCLUDED_CORE_SERVICE_IDS.has(service.id)
+);
 
 const formatSeasonalMonthLabel = (monthKey, language, t) => {
   try {
@@ -276,13 +280,25 @@ const translations = {
     applyDiscount: 'Apply Discount',
     subtotal: 'Subtotal',
     addToOffer: 'Add to Offer',
+    addCustomPrompt: 'Set a price and details before adding this service.',
     currentOfferItems: 'Current Offer Items',
     noItemsAdded: 'No items added to this offer yet.',
+    addedToOfferNotice: 'added to offer',
     service: 'Service',
     rate: 'Rate',
     quantity: 'Quantity',
     total: 'Total',
     additionalNotes: 'Additional Notes',
+    addCustomService: 'Add custom service',
+    customName: 'Service name',
+    customPrice: 'Price',
+    customQuantity: 'Qty',
+    customDescription: 'Description',
+    addCustom: 'Add custom',
+    customUnit: 'Unit',
+    unitService: 'Service',
+    unitDay: 'Per day',
+    unitHour: 'Per hour',
     selectMonthLabel: 'Select season',
     useStandardRate: 'Use standard rate',
     peakSeason: 'Peak Season',
@@ -471,8 +487,10 @@ const translations = {
     applyDiscount: 'Aplică Reducerea',
     subtotal: 'Subtotal',
     addToOffer: 'Adaugă la Ofertă',
+    addCustomPrompt: 'Setează prețul și detaliile înainte de a adăuga serviciul.',
     currentOfferItems: 'Articole în Oferta Curentă',
     noItemsAdded: 'Nu a fost adăugat niciun articol la această ofertă.',
+    addedToOfferNotice: 'adăugat în ofertă',
     service: 'Serviciu',
     rate: 'Tarif',
     quantity: 'Cantitate',
@@ -483,6 +501,16 @@ const translations = {
     lowSeason: 'Sezon redus',
     extraSeason: 'Sezon extra',
     additionalNotes: 'Note Suplimentare',
+    addCustomService: 'Adaugă serviciu personalizat',
+    customName: 'Nume serviciu',
+    customPrice: 'Preț',
+    customQuantity: 'Cant.',
+    customDescription: 'Descriere',
+    addCustom: 'Adaugă personalizat',
+    customUnit: 'Unitate',
+    unitService: 'Serviciu',
+    unitDay: 'Pe zi',
+    unitHour: 'Pe oră',
     cancel: 'Anulează',
     addNotesPlaceholder: 'Adaugă instrucțiuni speciale sau detalii pentru această ofertă...',
     offerSentSuccess: 'Oferta a fost trimisă cu succes către',
@@ -706,6 +734,19 @@ const extractImageUrl = (data) => {
   const [discountValue, setDiscountValue] = useState(0);
   const [availableServices, setAvailableServices] = useState({});
   const [loadingServices, setLoadingServices] = useState(false);
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [loadingTeamMembers, setLoadingTeamMembers] = useState(false);
+  const [teamMembersError, setTeamMembersError] = useState(null);
+  const [offerNotice, setOfferNotice] = useState('');
+  const [customService, setCustomService] = useState({
+    name: '',
+    price: '',
+    quantity: 1,
+    description: ''
+  });
+  const [customServiceOpen, setCustomServiceOpen] = useState(false);
+  const [pendingService, setPendingService] = useState(null);
+  const [customServiceUnit, setCustomServiceUnit] = useState('service');
   
   // Price filter states
   const [showPriceFilter, setShowPriceFilter] = useState(false);
@@ -840,16 +881,36 @@ const extractImageUrl = (data) => {
     nationality: '',
     status: 'active',
     isVip: false,
+    clientType: 'regular',
     preferredLanguage: '',
+    leadSource: '',
+    leadStatus: 'new',
+    assignedTo: '',
+    assignedToName: '',
+    followUpDate: '',
+    conversionPotential: 'medium',
+    budget: '',
+    startDate: '',
+    endDate: '',
+    propertyTypes: {
+      villas: false,
+      apartments: false,
+      hotels: false
+    },
+    activities: '',
+    adults: 1,
+    children: 0,
+    isPreviousClient: false,
     dietaryRestrictions: '',
     transportPreferences: '',
     specialRequests: '',
-    notes: ''
+    notes: '',
+    contactPersons: [{ name: '', email: '', phone: '' }]
   });
   
   // Service categories for offerings (memoized to prevent infinite re-render)
   const serviceCategories = useMemo(() => [
-    { id: 'concierge-core', name: t.conciergeCore, icon: '⭐', collection: null, staticServices: CORE_CONCIERGE_SERVICES },
+    { id: 'concierge-core', name: t.conciergeCore, icon: '⭐', collection: null, staticServices: CORE_CONCIERGE_SERVICES_FILTERED },
     { id: 'villas', name: t.villas, icon: '🏠', collection: 'villas' },
     { id: 'boats', name: t.boats, icon: '🛥️', collection: 'boats' },
     { id: 'cars', name: t.cars, icon: '🚗', collection: 'cars' },
@@ -885,17 +946,39 @@ const extractImageUrl = (data) => {
   }, [location, navigate, isMobile]);
 
   useEffect(() => {
-    if (selectedClient?.assignedTo) {
-      const fetchUserName = async () => {
+    const resolveAssignee = async () => {
+      if (!selectedClient) {
+        setAssignedUserName('-');
+        return;
+      }
+
+      if (selectedClient.assignedToName) {
+        setAssignedUserName(selectedClient.assignedToName);
+        return;
+      }
+
+      const matchedTeamMember = teamMembers.find(
+        (member) =>
+          member.id === selectedClient.assignedTo ||
+          (member.email && selectedClient.assignedTo && member.email.toLowerCase() === selectedClient.assignedTo.toLowerCase())
+      );
+
+      if (matchedTeamMember) {
+        setAssignedUserName(matchedTeamMember.name || matchedTeamMember.email || '-');
+        return;
+      }
+
+      if (selectedClient.assignedTo) {
         const name = await getUserName(selectedClient.assignedTo);
         setAssignedUserName(name);
-      };
-      
-      fetchUserName();
-    } else {
+        return;
+      }
+
       setAssignedUserName('-');
-    }
-  }, [selectedClient]);
+    };
+
+    resolveAssignee();
+  }, [selectedClient, teamMembers]);
 
   // Handle language changes
   useEffect(() => {
@@ -950,8 +1033,10 @@ useEffect(() => {
           address: data.address || '',
           nationality: data.nationality || '',
           status: data.status || 'active',
-          isVip: data.isVip || false,
+          isVip: data.isVip !== undefined ? data.isVip : (data.clientType === 'vip'),
+          clientType: data.clientType || (data.isVip ? 'vip' : 'regular'),
           preferredLanguage: data.preferredLanguage || '',
+          assignedToName: data.assignedToName || '',
           // Include additional fields that might not be in your component yet
           activities: data.activities || '',
           budget: data.budget || '',
@@ -1488,12 +1573,56 @@ setAvailableServices(services);
         offersData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         setOffersHistory(offersData);
       } catch (error) {
-        console.error("Error fetching offer history:", error);
+        console.warn("Offer history unavailable:", error?.message || error);
+        setOffersHistory([]);
       }
     };
     
     fetchOfferHistory();
   }, [selectedClient, companyInfo]);
+
+  // Fetch team members for assignment dropdown
+  useEffect(() => {
+    const fetchTeamMembers = async () => {
+      if (!companyInfo?.id) return;
+      
+      setLoadingTeamMembers(true);
+      setTeamMembersError(null);
+      try {
+        const companyFilter = where('companyId', '==', companyInfo.id);
+        
+        let usersRef = collection(db, "authorized_users");
+        let querySnapshot = await getDocs(query(usersRef, companyFilter));
+        
+        if (querySnapshot.empty) {
+          usersRef = collection(db, "users");
+          querySnapshot = await getDocs(query(usersRef, companyFilter));
+        }
+        
+        const members = [];
+        querySnapshot.forEach((doc) => {
+          const userData = doc.data();
+          const displayName = (userData.name || userData.displayName || '').trim();
+          members.push({
+            id: doc.id,
+            name: displayName || userData.email || doc.id,
+            email: userData.email || '',
+            role: userData.role || ''
+          });
+        });
+        
+        setTeamMembers(members);
+      } catch (error) {
+        console.warn("Team members unavailable:", error?.message || error);
+        setTeamMembers([]);
+        setTeamMembersError(error?.message || 'Unable to load team');
+      } finally {
+        setLoadingTeamMembers(false);
+      }
+    };
+    
+    fetchTeamMembers();
+  }, [companyInfo]);
   
   // Initialize edit client data when a client is selected
   useEffect(() => {
@@ -1510,11 +1639,37 @@ setAvailableServices(services);
           : selectedClient.nationality || '',
         status: selectedClient.status || 'active',
         isVip: selectedClient.isVip || false,
+        clientType: selectedClient.clientType || (selectedClient.isVip ? 'vip' : 'regular'),
         preferredLanguage: selectedClient.preferredLanguage || '',
+        leadSource: selectedClient.leadSource || '',
+        leadStatus: selectedClient.leadStatus || 'new',
+        assignedTo: selectedClient.assignedTo || '',
+        assignedToName: selectedClient.assignedToName || '',
+        followUpDate: selectedClient.followUpDate || '',
+        conversionPotential: selectedClient.conversionPotential || 'medium',
+        budget: selectedClient.budget || '',
+        startDate: selectedClient.startDate || '',
+        endDate: selectedClient.endDate || '',
+        propertyTypes: {
+          villas: selectedClient.propertyTypes?.villas || false,
+          apartments: selectedClient.propertyTypes?.apartments || false,
+          hotels: selectedClient.propertyTypes?.hotels || false
+        },
+        activities: selectedClient.activities || '',
+        adults: selectedClient.adults || 1,
+        children: selectedClient.children || 0,
+        isPreviousClient: selectedClient.isPreviousClient || false,
         dietaryRestrictions: selectedClient.dietaryRestrictions || '',
         transportPreferences: selectedClient.transportPreferences || '',
         specialRequests: selectedClient.specialRequests || '',
-        notes: selectedClient.notes || ''
+        notes: selectedClient.notes || '',
+        contactPersons: Array.isArray(selectedClient.contactPersons) && selectedClient.contactPersons.length > 0
+          ? selectedClient.contactPersons.map(cp => ({
+              name: cp.name || '',
+              email: cp.email || '',
+              phone: cp.phone || ''
+            }))
+          : [{ name: '', email: '', phone: '' }]
       });
     }
   }, [selectedClient, language]);
@@ -2111,10 +2266,14 @@ const handleSelectClient = async (client) => {
     
     try {
       const clientRef = doc(db, "clients", selectedClient.id);
+      const selectedAssignee = teamMembers.find(member => member.id === editClientData.assignedTo);
       
       // Prepare data for update
       const updatedData = {
         ...editClientData,
+        clientType: editClientData.clientType || (editClientData.isVip ? 'vip' : 'regular'),
+        isVip: editClientData.clientType === 'vip' || editClientData.isVip,
+        assignedToName: selectedAssignee?.name || editClientData.assignedToName || '',
         // Handle multilingual fields
         address: typeof selectedClient.address === 'object' 
           ? { ...selectedClient.address, [language]: editClientData.address } 
@@ -2153,15 +2312,97 @@ const handleSelectClient = async (client) => {
   // Handle edit form input changes
   const handleEditChange = (e) => {
     const { name, value, type, checked } = e.target;
+    setEditClientData(prev => {
+      const updated = {
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      };
+
+      if (name === 'clientType') {
+        updated.isVip = value === 'vip';
+      }
+
+      if (name === 'assignedTo') {
+        const assignee = teamMembers.find(member => member.id === value);
+        updated.assignedToName = assignee?.name || '';
+      }
+
+      // Numeric fields
+      if (name === 'adults' || name === 'children' || name === 'budget') {
+        updated[name] = value === '' ? '' : Number(value);
+      }
+
+      return updated;
+    });
+  };
+
+  const handleEditPropertyTypeChange = (e) => {
+    const { name, checked } = e.target;
+    const [, property] = name.split('.');
     setEditClientData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      propertyTypes: {
+        ...prev.propertyTypes,
+        [property]: checked
+      }
     }));
   };
+
+  const handleEditContactChange = (index, e) => {
+    const { name, value } = e.target;
+    setEditClientData(prev => {
+      const updatedContacts = [...prev.contactPersons];
+      updatedContacts[index] = {
+        ...updatedContacts[index],
+        [name]: value
+      };
+      return { ...prev, contactPersons: updatedContacts };
+    });
+  };
+
+  const addEditContactPerson = () => {
+    setEditClientData(prev => ({
+      ...prev,
+      contactPersons: [...prev.contactPersons, { name: '', email: '', phone: '' }]
+    }));
+  };
+
+  const removeEditContactPerson = (index) => {
+    setEditClientData(prev => ({
+      ...prev,
+      contactPersons: prev.contactPersons.filter((_, i) => i !== index)
+    }));
+  };
+
+  // Auto-hide offer notifications
+  useEffect(() => {
+    if (!offerNotice) return;
+    const timer = setTimeout(() => setOfferNotice(''), 2500);
+    return () => clearTimeout(timer);
+  }, [offerNotice]);
   
   // Add service to offer
-  const handleAddToOffer = (service) => {
+  const handleAddToOffer = (service, forceStayOfferView = false) => {
     if (!service) return;
+
+    // For core concierge services, require manual price/details entry
+    if (service.category === 'concierge-core') {
+      const nameText = typeof service.name === 'object' ? getLocalizedText(service.name, language) : service.name;
+      setCustomService({
+        name: nameText || '',
+        price: '',
+        quantity: 1,
+        description: ''
+      });
+      setCustomServiceUnit('service');
+      setPendingService(service);
+      setCustomServiceOpen(true);
+      setOfferNotice(t.addCustomPrompt || 'Set price and details to add this service.');
+      if (isMobile || forceStayOfferView) {
+        setCurrentView('offer');
+      }
+      return;
+    }
     
     const selectedMonthKey = selectedSeasonMonths[service.id] || 'daily';
     const monthOptions = getMonthlyOptionsForService(service, language, t);
@@ -2215,6 +2456,8 @@ const handleSelectClient = async (client) => {
     };
     
     setOfferItems(prev => [...prev, newItem]);
+    const nameText = typeof service.name === 'object' ? getLocalizedText(service.name, language) : service.name;
+    setOfferNotice(`${nameText || 'Service'} ${t.addedToOfferNotice || 'added to offer'}`);
     
     if (isMobile) {
       setTimeout(() => setCurrentView('cart'), 300);
@@ -2224,6 +2467,45 @@ const handleSelectClient = async (client) => {
   // Remove service from offer
   const handleRemoveFromOffer = (serviceId) => {
     setOfferItems(prev => prev.filter(item => item.id !== serviceId));
+  };
+  const handleCustomServiceChange = (e) => {
+    const { name, value } = e.target;
+    setCustomService(prev => ({ ...prev, [name]: name === 'quantity' ? value.replace(/[^0-9]/g, '') : value }));
+  };
+
+  const handleAddCustomService = () => {
+    const price = parseFloat(customService.price);
+    const quantity = Math.max(1, parseInt(customService.quantity, 10) || 1);
+    if (!customService.name || Number.isNaN(price)) {
+      setOfferNotice(t.addCustomService);
+      return;
+    }
+    const id = `custom-${Date.now()}`;
+    const newItem = {
+      id,
+      serviceId: id,
+      name: customService.name,
+      category: pendingService?.category || 'custom',
+      price: price,
+      originalPrice: price,
+      unit: 'service',
+      customUnit: customServiceUnit,
+      quantity,
+      discountType: 'percentage',
+      discountValue: 0,
+      hasCustomDiscount: false,
+      selectedMonth: null,
+      selectedMonthLabel: null,
+      propertyLink: '',
+      imageUrl: '',
+      description: customService.description || ''
+    };
+    setOfferItems(prev => [...prev, newItem]);
+    setOfferNotice(`${customService.name} ${t.addedToOfferNotice || 'added to offer'}`);
+    setCustomService({ name: '', price: '', quantity: 1, description: '' });
+    setCustomServiceUnit('service');
+    setCustomServiceOpen(false);
+    setPendingService(null);
   };
   
   // Update quantity in offer
@@ -3018,40 +3300,70 @@ const generateOfferPdf = async (offer) => {
       return dateString;
     }
   };
-  const [userCache, setUserCache] = useState({});
+const [userCache, setUserCache] = useState({});
 const [loadingUsers, setLoadingUsers] = useState(false);
 
-// Function to get user details by ID
+// Function to get user details by ID or email
 const getUserName = async (userId) => {
   if (!userId) return '-';
   
-  // Check if we already have this user in cache
   if (userCache[userId]) {
     return userCache[userId];
+  }
+
+  const teamMember = teamMembers.find(
+    (member) =>
+      member.id === userId ||
+      (member.email && member.email.toLowerCase() === userId.toLowerCase())
+  );
+
+  if (teamMember) {
+    const resolvedName = teamMember.name || teamMember.email || 'User';
+    setUserCache(prev => ({ ...prev, [userId]: resolvedName }));
+    return resolvedName;
   }
   
   try {
     setLoadingUsers(true);
-    const userRef = doc(db, "users", userId);
-    const userDoc = await getDoc(userRef);
-    
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      const userName = userData.displayName || userData.name || userData.email || 'User';
+
+    const fetchUserData = async (collectionName) => {
+      // Try by document ID first
+      const userRef = doc(db, collectionName, userId);
+      const userDoc = await getDoc(userRef);
+      if (userDoc.exists()) return userDoc.data();
+
+      // If the ID looks like an email, try querying by email as well
+      if (userId.includes('@')) {
+        const emailQuery = query(
+          collection(db, collectionName),
+          where('email', '==', userId.toLowerCase())
+        );
+        const emailSnapshot = await getDocs(emailQuery);
+        if (!emailSnapshot.empty) {
+          return emailSnapshot.docs[0].data();
+        }
+      }
+
+      return null;
+    };
+
+    const userData = (await fetchUserData("users")) || (await fetchUserData("authorized_users"));
+
+    if (userData) {
+      const userName = userData.displayName || userData.name || userData.fullName || userData.email || 'User';
       
-      // Update the cache
       setUserCache(prev => ({
         ...prev,
         [userId]: userName
       }));
       
       return userName;
-    } else {
-      console.log(`User with ID ${userId} not found`);
-      return userId.slice(0, 8) + '...'; // Show truncated ID if user not found
     }
+
+    console.log(`User with ID ${userId} not found in users or authorized_users`);
+    return userId.slice(0, 8) + '...'; // Show truncated ID if user not found
   } catch (error) {
-    console.error("Error fetching user:", error);
+    console.warn("User lookup failed:", error?.message || error);
     return userId.slice(0, 8) + '...'; // Show truncated ID on error
   } finally {
     setLoadingUsers(false);
@@ -3663,16 +3975,15 @@ const getUserName = async (userId) => {
                         <div className="flex-1">
                           <label className="block text-sm font-medium text-gray-600 mb-2">{t.isVip}</label>
                           <div className="flex items-center">
-                            <input
-                              type="checkbox"
-                              name="isVip"
-                              checked={editClientData.isVip}
+                            <select
+                              name="clientType"
+                              value={editClientData.clientType}
                               onChange={handleEditChange}
-                              className="mr-2"
-                            />
-                            <span className="text-sm text-gray-600">
-                              {editClientData.isVip ? t.yes : t.no}
-                            </span>
+                              className="w-full p-2.5 border border-gray-300 rounded-md text-sm bg-white"
+                            >
+                              <option value="regular">{t.regularClient || 'Client obișnuit'}</option>
+                              <option value="vip">{t.vipClient || 'Client VIP'}</option>
+                            </select>
                           </div>
                         </div>
                       </div>
@@ -3709,67 +4020,346 @@ const getUserName = async (userId) => {
                             onChange={handleEditChange}
                             className="w-full p-2.5 border border-gray-300 rounded-md text-sm bg-white"
                           >
-                            <option value="">-</option>
-                            <option value="ro">Română</option>
-                            <option value="en">English</option>
-                            <option value="fr">Français</option>
-                            <option value="de">Deutsch</option>
+                            <option value="">{t.selectOption || '-'}</option>
+                            <option value="Russian">{language === 'ro' ? 'Rusă' : 'Russian'}</option>
+                            <option value="English">English</option>
+                            <option value="Romanian">Română</option>
+                            <option value="Spanish">Español</option>
+                            <option value="French">Français</option>
+                            <option value="German">Deutsch</option>
+                            <option value="Italian">Italiano</option>
                           </select>
                         </div>
                       </div>
                     </div>
                     
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <h3 className="text-sm font-semibold text-gray-800 mb-4">{t.preferences}</h3>
-                      
-                      <div className="mb-4">
-                        <div className="w-full">
-                          <label className="block text-sm font-medium text-gray-600 mb-2">{t.dietaryRestrictions}</label>
-                          <input
-                            type="text"
-                            name="dietaryRestrictions"
-                            value={editClientData.dietaryRestrictions}
-                            onChange={handleEditChange}
-                            className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
-                          />
+                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-6">
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-800 mb-4">{t.leadInfo || 'Lead Information'}</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-2">{t.leadSource || 'Lead Source'}</label>
+                            <select
+                              name="leadSource"
+                              value={editClientData.leadSource}
+                              onChange={handleEditChange}
+                              className="w-full p-2.5 border border-gray-300 rounded-md text-sm bg-white"
+                            >
+                              <option value="">{t.selectOption || 'Select'}</option>
+                              <option value="website">{t.website || 'Website'}</option>
+                              <option value="referral">{t.referral || 'Referral'}</option>
+                              <option value="socialMedia">{t.socialMedia || 'Social Media'}</option>
+                              <option value="directContact">{t.directContact || 'Direct Contact'}</option>
+                              <option value="other">{t.other || 'Other'}</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-2">{t.leadStatus || 'Lead Status'}</label>
+                            <select
+                              name="leadStatus"
+                              value={editClientData.leadStatus}
+                              onChange={handleEditChange}
+                              className="w-full p-2.5 border border-gray-300 rounded-md text-sm bg-white"
+                            >
+                              <option value="new">{t.new || 'New'}</option>
+                              <option value="contacted">{t.contacted || 'Contacted'}</option>
+                              <option value="qualified">{t.qualified || 'Qualified'}</option>
+                              <option value="negotiation">{t.negotiation || 'Negotiation'}</option>
+                              <option value="lost">{t.lost || 'Lost'}</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-2">{t.assignedTo || 'Assigned To'}</label>
+                            <select
+                              name="assignedTo"
+                              value={editClientData.assignedTo}
+                              onChange={handleEditChange}
+                              className="w-full p-2.5 border border-gray-300 rounded-md text-sm bg-white"
+                            >
+                              <option value="">{t.selectOption || 'Select'}</option>
+                              {teamMembers.map(member => (
+                                <option key={member.id} value={member.id}>
+                                  {member.name || member.email || member.id}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-2">{t.followUpDate || 'Follow-up Date'}</label>
+                            <input
+                              type="date"
+                              name="followUpDate"
+                              value={editClientData.followUpDate}
+                              onChange={handleEditChange}
+                              className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-2">{t.conversionPotential || 'Conversion Potential'}</label>
+                            <select
+                              name="conversionPotential"
+                              value={editClientData.conversionPotential}
+                              onChange={handleEditChange}
+                              className="w-full p-2.5 border border-gray-300 rounded-md text-sm bg-white"
+                            >
+                              <option value="low">{t.low || 'Low'}</option>
+                              <option value="medium">{t.medium || 'Medium'}</option>
+                              <option value="high">{t.high || 'High'}</option>
+                              <option value="veryHigh">{t.veryHigh || 'Very High'}</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-2">{t.previousClient || 'Previous Client'}</label>
+                            <div className="flex items-center gap-4">
+                              <label className="flex items-center text-sm text-gray-700">
+                                <input
+                                  type="radio"
+                                  name="isPreviousClient"
+                                  value="true"
+                                  checked={editClientData.isPreviousClient === true}
+                                  onChange={(e) => setEditClientData(prev => ({ ...prev, isPreviousClient: e.target.value === 'true' }))}
+                                  className="mr-2"
+                                />
+                                {t.yes || 'Yes'}
+                              </label>
+                              <label className="flex items-center text-sm text-gray-700">
+                                <input
+                                  type="radio"
+                                  name="isPreviousClient"
+                                  value="false"
+                                  checked={editClientData.isPreviousClient === false}
+                                  onChange={(e) => setEditClientData(prev => ({ ...prev, isPreviousClient: e.target.value === 'false' }))}
+                                  className="mr-2"
+                                />
+                                {t.no || 'No'}
+                              </label>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      
-                      <div className="mb-4">
-                        <div className="w-full">
-                          <label className="block text-sm font-medium text-gray-600 mb-2">{t.transportPreferences}</label>
-                          <input
-                            type="text"
-                            name="transportPreferences"
-                            value={editClientData.transportPreferences}
-                            onChange={handleEditChange}
-                            className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
-                          />
+
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-800 mb-4">{t.interests || 'Interests'}</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-2">{t.budget || 'Budget'}</label>
+                            <input
+                              type="number"
+                              name="budget"
+                              value={editClientData.budget}
+                              onChange={handleEditChange}
+                              className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
+                              min="0"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-600 mb-2">{t.startDate || 'Start Date'}</label>
+                              <input
+                                type="date"
+                                name="startDate"
+                                value={editClientData.startDate}
+                                onChange={handleEditChange}
+                                className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-600 mb-2">{t.endDate || 'End Date'}</label>
+                              <input
+                                type="date"
+                                name="endDate"
+                                value={editClientData.endDate}
+                                onChange={handleEditChange}
+                                className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
+                              />
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      
-                      <div className="mb-4">
-                        <div className="w-full">
-                          <label className="block text-sm font-medium text-gray-600 mb-2">{t.specialRequests}</label>
-                          <input
-                            type="text"
-                            name="specialRequests"
-                            value={editClientData.specialRequests}
-                            onChange={handleEditChange}
-                            className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
-                          />
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <span className="block text-sm font-medium text-gray-600 mb-2">{t.propertyTypes || 'Property Types'}</span>
+                            <div className="flex flex-col gap-2">
+                              <label className="flex items-center text-sm text-gray-700">
+                                <input
+                                  type="checkbox"
+                                  name="propertyTypes.villas"
+                                  checked={editClientData.propertyTypes.villas}
+                                  onChange={handleEditPropertyTypeChange}
+                                  className="mr-2"
+                                />
+                                {t.villas || 'Villas'}
+                              </label>
+                              <label className="flex items-center text-sm text-gray-700">
+                                <input
+                                  type="checkbox"
+                                  name="propertyTypes.apartments"
+                                  checked={editClientData.propertyTypes.apartments}
+                                  onChange={handleEditPropertyTypeChange}
+                                  className="mr-2"
+                                />
+                                {t.apartments || 'Apartments'}
+                              </label>
+                              <label className="flex items-center text-sm text-gray-700">
+                                <input
+                                  type="checkbox"
+                                  name="propertyTypes.hotels"
+                                  checked={editClientData.propertyTypes.hotels}
+                                  onChange={handleEditPropertyTypeChange}
+                                  className="mr-2"
+                                />
+                                {t.hotels || 'Hotels'}
+                              </label>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-600 mb-2">{t.adults || 'Adults'}</label>
+                              <input
+                                type="number"
+                                name="adults"
+                                value={editClientData.adults}
+                                onChange={handleEditChange}
+                                className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
+                                min="0"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-600 mb-2">{t.children || 'Children'}</label>
+                              <input
+                                type="number"
+                                name="children"
+                                value={editClientData.children}
+                                onChange={handleEditChange}
+                                className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
+                                min="0"
+                              />
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      
-                      <div className="mb-4">
-                        <div className="w-full">
-                          <label className="block text-sm font-medium text-gray-600 mb-2">{t.notes}</label>
+                        <div className="mt-4">
+                          <label className="block text-sm font-medium text-gray-600 mb-2">{t.activities || 'Activities'}</label>
                           <textarea
-                            name="notes"
-                            value={editClientData.notes}
+                            name="activities"
+                            value={editClientData.activities}
                             onChange={handleEditChange}
                             className="w-full p-2.5 border border-gray-300 rounded-md text-sm resize-vertical min-h-20"
+                            placeholder={t.activityPlaceholder || ''}
                           ></textarea>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-800 mb-4">{t.preferences || 'Preferences'}</h3>
+                        
+                        <div className="mb-4">
+                          <div className="w-full">
+                            <label className="block text-sm font-medium text-gray-600 mb-2">{t.dietaryRestrictions}</label>
+                            <input
+                              type="text"
+                              name="dietaryRestrictions"
+                              value={editClientData.dietaryRestrictions}
+                              onChange={handleEditChange}
+                              className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="mb-4">
+                          <div className="w-full">
+                            <label className="block text-sm font-medium text-gray-600 mb-2">{t.transportPreferences}</label>
+                            <input
+                              type="text"
+                              name="transportPreferences"
+                              value={editClientData.transportPreferences}
+                              onChange={handleEditChange}
+                              className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="mb-4">
+                          <div className="w-full">
+                            <label className="block text-sm font-medium text-gray-600 mb-2">{t.specialRequests}</label>
+                            <input
+                              type="text"
+                              name="specialRequests"
+                              value={editClientData.specialRequests}
+                              onChange={handleEditChange}
+                              className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="mb-4">
+                          <div className="w-full">
+                            <label className="block text-sm font-medium text-gray-600 mb-2">{t.notes}</label>
+                            <textarea
+                              name="notes"
+                              value={editClientData.notes}
+                              onChange={handleEditChange}
+                              className="w-full p-2.5 border border-gray-300 rounded-md text-sm resize-vertical min-h-20"
+                            ></textarea>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-800 mb-4">{t.contactPersons || 'Contact Persons'}</h3>
+                        <div className="space-y-4">
+                          {editClientData.contactPersons.map((contact, index) => (
+                            <div key={index} className="p-3 bg-white border border-gray-200 rounded-md">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-600 mb-1">{t.contactName || 'Name'}</label>
+                                  <input
+                                    type="text"
+                                    name="name"
+                                    value={contact.name}
+                                    onChange={(e) => handleEditContactChange(index, e)}
+                                    className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-600 mb-1">{t.contactEmail || 'Email'}</label>
+                                  <input
+                                    type="email"
+                                    name="email"
+                                    value={contact.email}
+                                    onChange={(e) => handleEditContactChange(index, e)}
+                                    className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-600 mb-1">{t.contactPhone || 'Phone'}</label>
+                                  <input
+                                    type="text"
+                                    name="phone"
+                                    value={contact.phone}
+                                    onChange={(e) => handleEditContactChange(index, e)}
+                                    className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                                  />
+                                </div>
+                              </div>
+                              {editClientData.contactPersons.length > 1 && (
+                                <div className="text-right mt-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => removeEditContactPerson(index)}
+                                    className="text-sm text-red-500 hover:underline"
+                                  >
+                                    {t.removeContact || 'Remove'}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={addEditContactPerson}
+                            className="text-sm text-indigo-600 font-medium"
+                          >
+                            {t.addContact || 'Add Contact'}
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -3797,7 +4387,7 @@ const getUserName = async (userId) => {
               {/* Create Offer Modal */}
 {showCreateOffer && selectedClient && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div className={`bg-white rounded-lg shadow-xl ${isMobile ? 'w-full h-full m-0' : 'w-full max-w-5xl h-5/6 m-4'} flex flex-col`}>
+    <div className={`bg-white rounded-lg shadow-xl ${isMobile ? 'w-full h-full m-0' : 'w-full max-w-5xl h-5/6 m-4'} flex flex-col relative`}>
       
       {/* Header */}
       <div className={`flex justify-between items-center ${isMobile ? 'p-4' : 'p-6'} border-b border-gray-200 bg-gray-50 flex-shrink-0`}>
@@ -3830,6 +4420,121 @@ const getUserName = async (userId) => {
           </button>
         </div>
       </div>
+      {offerNotice && (
+        <div className="absolute top-4 right-4 bg-emerald-500 text-white text-sm px-4 py-2 rounded-md shadow-lg ring-2 ring-emerald-200 flex items-center gap-2 transition-opacity duration-200">
+          <span className="text-lg">✅</span>
+          <span className="font-semibold">{offerNotice}</span>
+        </div>
+      )}
+      {isMobile && customServiceOpen && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex items-end justify-center">
+          <div className="bg-white w-full rounded-t-2xl p-4 shadow-xl max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+                <span>➕</span> {t.addCustomService}
+              </h4>
+              <button
+                onClick={() => {
+                  setCustomServiceOpen(false);
+                  setPendingService(null);
+                }}
+                className="text-gray-500 text-lg"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-3">
+              <input
+                type="text"
+                name="name"
+                value={customService.name}
+                onChange={handleCustomServiceChange}
+                placeholder={t.customName}
+                className="w-full p-3 border border-gray-300 rounded text-sm"
+              />
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  name="price"
+                  value={customService.price}
+                  onChange={handleCustomServiceChange}
+                  placeholder={t.customPrice}
+                  className="w-1/2 p-3 border border-gray-300 rounded text-sm"
+                  min="0"
+                  step="0.01"
+                />
+                <input
+                  type="number"
+                  name="quantity"
+                  value={customService.quantity}
+                  onChange={handleCustomServiceChange}
+                  placeholder={t.customQuantity}
+                  className="w-1/2 p-3 border border-gray-300 rounded text-sm"
+                  min="1"
+                />
+              </div>
+              <div className="flex flex-wrap gap-3 text-sm text-gray-700">
+                <label className="flex items-center gap-1">
+                  <input
+                    type="radio"
+                    name="unit-mobile"
+                    value="service"
+                    checked={customServiceUnit === 'service'}
+                    onChange={() => setCustomServiceUnit('service')}
+                  />
+                  {t.unitService}
+                </label>
+                <label className="flex items-center gap-1">
+                  <input
+                    type="radio"
+                    name="unit-mobile"
+                    value="day"
+                    checked={customServiceUnit === 'day'}
+                    onChange={() => setCustomServiceUnit('day')}
+                  />
+                  {t.unitDay}
+                </label>
+                <label className="flex items-center gap-1">
+                  <input
+                    type="radio"
+                    name="unit-mobile"
+                    value="hour"
+                    checked={customServiceUnit === 'hour'}
+                    onChange={() => setCustomServiceUnit('hour')}
+                  />
+                  {t.unitHour}
+                </label>
+              </div>
+              <textarea
+                name="description"
+                value={customService.description}
+                onChange={handleCustomServiceChange}
+                placeholder={t.customDescription}
+                className="w-full p-3 border border-gray-300 rounded text-sm resize-vertical min-h-24"
+              ></textarea>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomServiceOpen(false);
+                    setPendingService(null);
+                  }}
+                  className="flex-1 py-3 rounded-md border border-gray-300 text-gray-700 text-sm font-semibold"
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddCustomService}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-md text-sm font-semibold"
+                >
+                  {t.addCustom}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Cart View */}
       {isMobile && currentView === 'cart' && (
@@ -4509,7 +5214,7 @@ const getUserName = async (userId) => {
   </div>
   
   <button 
-    onClick={() => handleAddToOffer(service)}
+    onClick={() => handleAddToOffer(service, true)}
     className={`bg-indigo-600 hover:bg-indigo-700 text-white ${isMobile ? 'text-xs py-2 px-3' : 'text-sm py-2 px-4'} rounded-lg transition-colors font-medium`}
   >
     {t.addToOffer}
@@ -4565,6 +5270,9 @@ const getUserName = async (userId) => {
                           <p className="text-xs text-gray-500 mb-2">
                             {item.selectedMonthLabel}
                           </p>
+                        )}
+                        {item.description && (
+                          <p className="text-xs text-gray-600 mb-2">{item.description}</p>
                         )}
                         
                         {/* Quantity Controls */}
@@ -4708,6 +5416,104 @@ const getUserName = async (userId) => {
                       </div>
                     ))}
                   </div>
+                )}
+              </div>
+              
+              {/* Custom Service */}
+              <div className="border-t border-gray-200 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                    <span>➕</span> {t.addCustomService}
+                  </h4>
+                  {!customServiceOpen && (
+                    <button
+                      type="button"
+                      onClick={() => setCustomServiceOpen(true)}
+                      className="text-xs text-indigo-600 font-medium"
+                    >
+                      {t.addCustom}
+                    </button>
+                  )}
+                </div>
+                
+                {customServiceOpen && (
+                  <>
+                    <input
+                      type="text"
+                      name="name"
+                      value={customService.name}
+                      onChange={handleCustomServiceChange}
+                      placeholder={t.customName}
+                      className="w-full p-2 border border-gray-300 rounded text-sm"
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        name="price"
+                        value={customService.price}
+                        onChange={handleCustomServiceChange}
+                        placeholder={t.customPrice}
+                        className="w-1/2 p-2 border border-gray-300 rounded text-sm"
+                        min="0"
+                        step="0.01"
+                      />
+                      <input
+                        type="number"
+                        name="quantity"
+                        value={customService.quantity}
+                        onChange={handleCustomServiceChange}
+                        placeholder={t.customQuantity}
+                        className="w-1/2 p-2 border border-gray-300 rounded text-sm"
+                        min="1"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <label className="flex items-center gap-1 text-xs text-gray-700">
+                        <input
+                          type="radio"
+                          name="unit"
+                          value="service"
+                          checked={customServiceUnit === 'service'}
+                          onChange={() => setCustomServiceUnit('service')}
+                        />
+                        {t.unitService}
+                      </label>
+                      <label className="flex items-center gap-1 text-xs text-gray-700">
+                        <input
+                          type="radio"
+                          name="unit"
+                          value="day"
+                          checked={customServiceUnit === 'day'}
+                          onChange={() => setCustomServiceUnit('day')}
+                        />
+                        {t.unitDay}
+                      </label>
+                      <label className="flex items-center gap-1 text-xs text-gray-700">
+                        <input
+                          type="radio"
+                          name="unit"
+                          value="hour"
+                          checked={customServiceUnit === 'hour'}
+                          onChange={() => setCustomServiceUnit('hour')}
+                        />
+                        {t.unitHour}
+                      </label>
+                    </div>
+                    <textarea
+                      name="description"
+                      value={customService.description}
+                      onChange={handleCustomServiceChange}
+                      placeholder={t.customDescription}
+                      className="w-full p-2 border border-gray-300 rounded text-sm resize-vertical min-h-20"
+                    ></textarea>
+                    <button
+                      type="button"
+                      onClick={handleAddCustomService}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-md text-sm font-semibold"
+                    >
+                      {t.addCustom}
+                    </button>
+                  </>
                 )}
               </div>
               
@@ -5487,26 +6293,6 @@ const getUserName = async (userId) => {
                         ></textarea>
                       </div>
                       
-                      <div className="w-full mb-4">
-                        <label className="block text-sm font-medium text-gray-600 mb-2">
-                          {t.paymentStatus}
-                        </label>
-                        <select
-                          name="paymentStatus"
-                          value={reservationFromOffer.reservationData.paymentStatus || 'unpaid'}
-                          onChange={handleReservationFromOfferChange}
-                          className={`
-                            w-full p-2.5 border border-gray-300 rounded-md
-                            text-sm bg-white
-                            ${isMobile ? 'min-h-11' : ''}
-                          `}
-                        >
-                          <option value="unpaid">{t.unpaid}</option>
-                          <option value="partially_paid">{t.depositPaid}</option>
-                          <option value="paid">{t.fullyPaid}</option>
-                        </select>
-                      </div>
-                      
                       {/* Payment Method Dropdown */}
                       <div className="w-full mb-4">
                         <label className="block text-sm font-medium text-gray-600 mb-2">
@@ -5699,7 +6485,7 @@ const getUserName = async (userId) => {
                             {loadingUsers ? (
                               <span className="inline-block w-4 h-4 border-2 border-gray-200 border-t-indigo-600 rounded-full animate-spin"></span>
                             ) : (
-                              assignedUserName
+                              selectedClient.assignedToName || assignedUserName
                             )}
                           </p>
                         </div>
@@ -5938,17 +6724,20 @@ const getUserName = async (userId) => {
                           {t.noPreviousOffers}
                         </div>
                       ) : (
-                        <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3'} gap-4`}>
+                        <div
+                          className="grid gap-4"
+                          style={{ gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(280px, 1fr))' }}
+                        >
                           {offersHistory.map(offer => (
-                            <div key={offer.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                              <div className="p-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                            <div key={offer.id} className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm translate-y-0 hover:-translate-y-0.5 transition-transform min-h-[320px]">
+                              <div className="p-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center min-h-[60px]">
                                 <div>
                                   <div className="text-xs font-semibold text-gray-600">#{offer.id.slice(-5)}</div>
                                   <div className="text-xs text-gray-500 mt-1">{offer.createdAt}</div>
                                 </div>
                                 {renderOfferStatusBadge(offer.status)}
                               </div>
-                              <div className="p-3">
+                              <div className="p-3 space-y-3">
                                 <div className="flex justify-between mb-2">
                                   <span className="text-xs text-gray-500">{t.offerTotal}</span>
                                   <span className="text-sm font-medium text-gray-900">€ {offer.totalValue.toFixed(2)}</span>
@@ -5963,7 +6752,7 @@ const getUserName = async (userId) => {
                                   <div className="text-xs text-gray-500 mb-2">
                                     Top services:
                                   </div>
-                                  <ul className="m-0 p-0 list-none text-xs">
+                                  <ul className="m-0 p-0 list-none text-xs space-y-1">
                                     {offer.items.slice(0, 3).map((item, idx) => (
                                       <li key={idx} className="flex justify-between py-1">
                                         <span className={`text-gray-700 ${item.discountValue ? 'font-semibold' : ''}`}>
@@ -5993,36 +6782,38 @@ const getUserName = async (userId) => {
                                   </ul>
                                 </div>
                               </div>
-                              <div className="flex justify-end gap-2 p-3 bg-gray-50 border-t border-gray-200">
-                                <button 
-                                  onClick={() => handleViewOfferDetails(offer)} 
-                                  className="text-gray-600 hover:text-gray-900 text-xs underline py-1 px-2 bg-transparent border-none cursor-pointer"
-                                >
-                                  {t.viewOfferDetails}
-                                </button>
-                                {offer.status !== 'booked' && (
-                                  <>
+                                <div className="flex flex-wrap justify-between gap-2 p-3 bg-gray-50 border-t border-gray-200">
+                                  <button 
+                                    onClick={() => handleViewOfferDetails(offer)} 
+                                    className="text-indigo-700 hover:text-indigo-900 text-xs font-semibold underline py-1.5 px-2 bg-indigo-50 border border-indigo-200 rounded transition-colors"
+                                  >
+                                    {t.viewOfferDetails}
+                                  </button>
+                                  <div className="flex gap-2">
+                                    {offer.status !== 'booked' && (
+                                      <>
+                                        <button 
+                                          onClick={() => handleConvertOfferToReservation(offer)} 
+                                          className="bg-green-600 text-white text-xs font-medium py-1.5 px-2 rounded border-none cursor-pointer"
+                                        >
+                                          {t.convertToBooking}
+                                        </button>
+                                        <button 
+                                          onClick={() => handleDeleteOffer(offer)}
+                                          className="bg-red-100 text-red-600 text-xs font-medium py-1.5 px-2 rounded border-none cursor-pointer"
+                                        >
+                                          {t.deleteOffer}
+                                        </button>
+                                      </>
+                                    )}
                                     <button 
-                                      onClick={() => handleConvertOfferToReservation(offer)} 
-                                      className="bg-green-600 text-white text-xs font-medium py-1.5 px-2 rounded border-none cursor-pointer"
+                                      onClick={() => handleGeneratePdf(offer)}
+                                      className="bg-gray-100 text-gray-600 text-xs font-medium py-1 px-2 rounded border-none cursor-pointer"
                                     >
-                                      {t.convertToBooking}
+                                      {t.generatePdf}
                                     </button>
-                                    <button 
-                                      onClick={() => handleDeleteOffer(offer)}
-                                      className="bg-red-100 text-red-600 text-xs font-medium py-1.5 px-2 rounded border-none cursor-pointer"
-                                    >
-                                      {t.deleteOffer}
-                                    </button>
-                                  </>
-                                )}
-                                <button 
-                                  onClick={() => handleGeneratePdf(offer)}
-                                  className="bg-gray-100 text-gray-600 text-xs font-medium py-1 px-2 rounded border-none cursor-pointer"
-                                >
-                                  {t.generatePdf}
-                                </button>
-                              </div>
+                                  </div>
+                                </div>
                             </div>
                           ))}
                         </div>

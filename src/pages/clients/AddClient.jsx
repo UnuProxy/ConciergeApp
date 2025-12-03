@@ -32,6 +32,9 @@ const translations = {
     address: 'Address',
     nationality: 'Nationality',
     preferredLanguage: 'Preferred Language',
+    clientType: 'Client Type',
+    vipClient: 'VIP Client',
+    regularClient: 'Normal Client',
     selectLanguage: 'Select Language',
     selectOption: 'Select...',
     notes: 'Notes',
@@ -100,6 +103,9 @@ const translations = {
     address: 'Adresă',
     nationality: 'Naționalitate',
     preferredLanguage: 'Limba Preferată',
+    clientType: 'Tip client',
+    vipClient: 'Client VIP',
+    regularClient: 'Client obișnuit',
     selectLanguage: 'Selectează Limba',
     selectOption: 'Selectează...',
     notes: 'Observații',
@@ -196,6 +202,9 @@ function AddClient() {
     address: '',
     nationality: '',
     preferredLanguage: '',
+    clientType: 'regular',
+    assignedToName: '',
+    isVip: false,
     
     // Lead information
     leadSource: '',
@@ -260,9 +269,10 @@ function AddClient() {
       
       querySnapshot.forEach((doc) => {
         const userData = doc.data();
+        const displayName = (userData.name || userData.displayName || '').trim();
         members.push({
           id: doc.id,
-          name: userData.name || userData.displayName || userData.email || doc.id,
+          name: displayName || userData.email || 'Team member',
           email: userData.email || '',
           role: userData.role || ''
         });
@@ -356,9 +366,13 @@ function AddClient() {
     
     try {
       // Prepare client data with necessary fields
+      const selectedAssignee = teamMembers.find(member => member.id === clientData.assignedTo);
       const clientToSave = {
         ...clientData,
         type: 'lead', // Always 'lead' since we're only adding potential clients
+        clientType: clientData.clientType || 'regular',
+        isVip: clientData.clientType === 'vip',
+        assignedToName: selectedAssignee?.name || '',
         companyId: companyInfo.id,
         createdBy: currentUser.uid,
         createdAt: new Date(),
@@ -381,6 +395,9 @@ function AddClient() {
         address: '',
         nationality: '',
         preferredLanguage: '',
+        clientType: 'regular',
+        assignedToName: '',
+        isVip: false,
         leadSource: '',
         leadStatus: 'new',
         assignedTo: '',
@@ -555,12 +572,25 @@ function AddClient() {
                     className="w-full py-2.5 px-3 border border-gray-200 rounded-md text-base"
                   >
                     <option value="">{t.selectOption}</option>
+                    <option value="Russian">{language === 'ro' ? 'Rusă' : 'Russian'}</option>
                     <option value="English">English</option>
                     <option value="Romanian">Română</option>
                     <option value="Spanish">Español</option>
                     <option value="French">Français</option>
                     <option value="German">Deutsch</option>
                     <option value="Italian">Italiano</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block mb-1.5 font-medium text-gray-600">{t.clientType}:</label>
+                  <select
+                    name="clientType"
+                    value={clientData.clientType}
+                    onChange={handleChange}
+                    className="w-full py-2.5 px-3 border border-gray-200 rounded-md text-base"
+                  >
+                    <option value="vip">{t.vipClient}</option>
+                    <option value="regular">{t.regularClient}</option>
                   </select>
                 </div>
               </div>
@@ -612,7 +642,7 @@ function AddClient() {
                   >
                     <option value="">{t.selectOption}</option>
                     {teamMembers.map(member => (
-                      <option key={member.id} value={member.id}>{member.name}</option>
+                      <option key={member.id} value={member.id}>{member.name || member.email || member.id}</option>
                     ))}
                   </select>
                   
