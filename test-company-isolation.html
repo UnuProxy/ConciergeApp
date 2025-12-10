@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Company Isolation</title>
+</head>
+<body>
+  <h1>Testing Company Isolation</h1>
+  <div id="results"></div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+    import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+    import { getFirestore, collection, getDocs, query, where } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDr3H7TN5kHKGP08J0Qmyo9sFCXW1SdBEo",
+      authDomain: "conciergeapp-513ca.firebaseapp.com",
+      projectId: "conciergeapp-513ca",
+      storageBucket: "conciergeapp-513ca.firebasestorage.app",
+      messagingSenderId: "560470751810",
+      appId: "1:560470751810:web:d8c4e56fec1af7d56d0806",
+      measurementId: "G-62SDTQ9FQF"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const results = document.getElementById('results');
+
+    async function testCompanyIsolation() {
+      results.innerHTML = '<p>Testing company isolation...</p>';
+
+      try {
+        // Check all clients
+        results.innerHTML += '<h2>Checking all clients in database:</h2>';
+        const clientsRef = collection(db, 'clients');
+        const allClientsSnap = await getDocs(clientsRef);
+
+        results.innerHTML += `<p>Total clients in database: ${allClientsSnap.size}</p>`;
+
+        allClientsSnap.forEach(doc => {
+          const data = doc.data();
+          results.innerHTML += `<p>Client ID: ${doc.id}, CompanyId: ${data.companyId || 'MISSING'}, Name: ${data.clientName || data.name || 'N/A'}</p>`;
+        });
+
+        // Check all reservations
+        results.innerHTML += '<h2>Checking all reservations in database:</h2>';
+        const reservationsRef = collection(db, 'reservations');
+        const allReservationsSnap = await getDocs(reservationsRef);
+
+        results.innerHTML += `<p>Total reservations in database: ${allReservationsSnap.size}</p>`;
+
+        allReservationsSnap.forEach(doc => {
+          const data = doc.data();
+          results.innerHTML += `<p>Reservation ID: ${doc.id}, CompanyId: ${data.companyId || 'MISSING'}</p>`;
+        });
+
+        // Check all users
+        results.innerHTML += '<h2>Checking all users in database:</h2>';
+        const usersRef = collection(db, 'users');
+        const allUsersSnap = await getDocs(usersRef);
+
+        results.innerHTML += `<p>Total users in database: ${allUsersSnap.size}</p>`;
+
+        allUsersSnap.forEach(doc => {
+          const data = doc.data();
+          results.innerHTML += `<p>User ID: ${doc.id}, Email: ${data.email}, CompanyId: ${data.companyId || 'MISSING'}, Role: ${data.role}</p>`;
+        });
+
+      } catch (error) {
+        results.innerHTML += `<p style="color: red;">Error: ${error.message}</p>`;
+        console.error(error);
+      }
+    }
+
+    // Run test after a short delay
+    setTimeout(testCompanyIsolation, 1000);
+  </script>
+</body>
+</html>

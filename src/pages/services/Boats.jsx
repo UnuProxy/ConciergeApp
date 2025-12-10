@@ -4,6 +4,15 @@ import { collection, getDocs, addDoc, updateDoc, doc, deleteDoc } from 'firebase
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import { db, storage } from '../../firebase/config';
+import { useDatabase } from '../../context/DatabaseContext';
+
+  // Helper to safely read a boat photo URL (supports string or { url })
+const getBoatPhotoUrl = (boat) => {
+  if (!boat?.photos || boat.photos.length === 0) return null;
+  const first = boat.photos[0];
+  if (typeof first === 'string') return first;
+  return first?.url || null;
+};
 
 // Responsive styles with media queries
 const styles = {
@@ -608,6 +617,10 @@ const Icon = ({ name, size = 16, color = '#6b7280' }) => {
 };
 
 function Boats() {
+  // Get company context
+  const { companyInfo } = useDatabase();
+  const userCompanyId = companyInfo?.id;
+
   const [boats, setBoats] = useState([]);
   const [isAddingBoat, setIsAddingBoat] = useState(false);
   const [isEditingBoat, setIsEditingBoat] = useState(false);
@@ -618,13 +631,31 @@ function Boats() {
   const [previewUrls, setPreviewUrls] = useState([]);
   const [activeTab, setActiveTab] = useState('basic'); // For form navigation
   const [selectedBoat, setSelectedBoat] = useState(null);
-  
+  const [selectedBoatPhotoIndex, setSelectedBoatPhotoIndex] = useState(0);
+  const [successMessage, setSuccessMessage] = useState('');
+
   // Search and filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [lengthFilter, setLengthFilter] = useState({ min: '', max: '' });
   const [capacityFilter, setCapacityFilter] = useState({ min: '', max: '' });
   const [priceFilter, setPriceFilter] = useState({ min: '', max: '' });
+
+  // Helper function to get price range from monthly prices
+  const getPriceRange = (monthlyPrices) => {
+    if (!monthlyPrices) return null;
+
+    const prices = Object.values(monthlyPrices)
+      .map(p => parseFloat(p))
+      .filter(p => !isNaN(p) && p > 0);
+
+    if (prices.length === 0) return null;
+
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+
+    return { min, max, average: prices.reduce((a, b) => a + b, 0) / prices.length };
+  };
   
   // Inject responsive styles on component mount
   useEffect(() => {
@@ -654,11 +685,8 @@ function Boats() {
       cabins: '',
       crew: ''
     },
-    
-    // Standard daily price
-    priceDaily: '',
-    
-    // Monthly prices
+
+    // Monthly prices (day price is the monthly price for that specific month)
     monthlyPrices: {
       may: '',
       june: '',
@@ -789,14 +817,15 @@ function Boats() {
         }
       }
 
-      // Price filter (daily price)
+      // Price filter (use average of monthly prices)
       if (priceFilter.min || priceFilter.max) {
-        const boatPrice = parseFloat(boat.pricing?.daily) || 0;
-        
+        const priceRange = getPriceRange(boat.pricing?.monthly);
+        const boatPrice = priceRange ? priceRange.average : 0;
+
         if (priceFilter.min && boatPrice < parseFloat(priceFilter.min)) {
           return false;
         }
-        
+
         if (priceFilter.max && boatPrice > parseFloat(priceFilter.max)) {
           return false;
         }
@@ -961,9 +990,7 @@ function Boats() {
         cabins: '',
         crew: ''
       },
-      
-      priceDaily: '',
-      
+
       monthlyPrices: {
         may: '',
         june: '',
@@ -1076,51 +1103,37 @@ function Boats() {
     }
     
     setIsUploading(true);
-    const photoUrls = [];
     
-    for (let i = 0; i < photoFiles.length; i++) {
-      const file = photoFiles[i];
-      if (!(file instanceof File)) {
-        // Skip if it's a URL string and not a File object
-        continue;
-      }
+    // Upload all photos in parallel for maximum speed
+    const uploadPromises = photoFiles.map(async (file) => {
+      if (!(file instanceof File)) return null;
       
       const fileName = `boats/${Date.now()}_${file.name}`;
       const storageRef = ref(storage, fileName);
       
       try {
         const uploadTask = uploadBytesResumable(storageRef, file);
-        
-        // Create a promise for this upload
-        await new Promise((resolve, reject) => {
-          uploadTask.on(
-            'state_changed',
-            (snapshot) => {
-              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-              setUploadProgress(progress);
-            },
-            (error) => {
-              console.error("Upload error:", error);
-              reject(error);
-            },
-            async () => {
-              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-              photoUrls.push({
-                url: downloadURL,
-                path: fileName
-              });
-              resolve();
-            }
-          );
-        });
+        await uploadTask;
+        const downloadURL = await getDownloadURL(storageRef);
+        return {
+          url: downloadURL,
+          path: fileName
+        };
       } catch (error) {
         console.error("Error uploading photo:", error);
+        return null;
       }
+    });
+
+    try {
+      const results = await Promise.all(uploadPromises);
+      setIsUploading(false);
+      return results.filter(Boolean);
+    } catch (error) {
+      console.error("Error in parallel upload:", error);
+      setIsUploading(false);
+      return [];
     }
-    
-    setIsUploading(false);
-    setUploadProgress(0);
-    return photoUrls;
   };
   
   // Convert form data to structured format for database
@@ -1155,9 +1168,8 @@ function Boats() {
       // Detailed specs
       specs: formData.specs,
       
-      // Pricing
+      // Pricing - monthly prices only (day price is the monthly price for that specific month)
       pricing: {
-        daily: formData.priceDaily || '',
         monthly: formData.monthlyPrices
       },
       
@@ -1203,7 +1215,11 @@ function Boats() {
       // Save to Firestore
       const boatCollection = collection(db, "boats");
       await addDoc(boatCollection, boatData);
-      
+
+      // Show success message
+      setSuccessMessage(language === 'en' ? 'Boat successfully uploaded!' : 'Barca a fost încărcată cu succes!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+
       // Reset form and fetch updated data
       resetForm();
       setIsAddingBoat(false);
@@ -1243,6 +1259,10 @@ function Boats() {
       // Update in Firestore
       const boatDoc = doc(db, "boats", currentBoat.id);
       await updateDoc(boatDoc, boatData);
+
+      // Show success message
+      setSuccessMessage(language === 'en' ? 'Boat successfully updated!' : 'Barca a fost actualizată cu succes!');
+      setTimeout(() => setSuccessMessage(''), 3000);
       
       // Reset form and fetch updated data
       resetForm();
@@ -1329,14 +1349,14 @@ function Boats() {
     
     // Extract data to flat form structure
     setFormData({
-      name_en: boat.name?.en || '',
-      name_ro: boat.name?.ro || '',
+      name_en: typeof boat.name === 'string' ? boat.name : (boat.name?.en || ''),
+      name_ro: typeof boat.name === 'string' ? boat.name : (boat.name?.ro || ''),
       length: boat.length || '',
       capacity: boat.capacity || '',
-      cruisingArea_en: boat.cruisingArea?.en || '',
-      cruisingArea_ro: boat.cruisingArea?.ro || '',
-      description_en: boat.description?.en || '',
-      description_ro: boat.description?.ro || '',
+      cruisingArea_en: typeof boat.cruisingArea === 'string' ? boat.cruisingArea : (boat.cruisingArea?.en || ''),
+      cruisingArea_ro: typeof boat.cruisingArea === 'string' ? boat.cruisingArea : (boat.cruisingArea?.ro || ''),
+      description_en: typeof boat.description === 'string' ? boat.description : (boat.description?.en || ''),
+      description_ro: typeof boat.description === 'string' ? boat.description : (boat.description?.ro || ''),
       
       // Detailed specs
       specs: {
@@ -1351,7 +1371,6 @@ function Boats() {
       },
       
       // Pricing
-      priceDaily: boat.pricing?.daily || '',
       monthlyPrices: {
         may: boat.pricing?.monthly?.may || '',
         june: boat.pricing?.monthly?.june || '',
@@ -1411,16 +1430,16 @@ function Boats() {
         chef: boat.crew?.chef || false,
         deckhand: boat.crew?.deckhand || false,
         steward: boat.crew?.steward || false,
-        included_en: boat.crew?.included?.en || '',
-        included_ro: boat.crew?.included?.ro || ''
+        included_en: typeof boat.crew?.included === 'string' ? boat.crew.included : (boat.crew?.included?.en || ''),
+        included_ro: typeof boat.crew?.included === 'string' ? boat.crew.included : (boat.crew?.included?.ro || '')
       },
       
       // Contact info
       contactName: boat.contact?.name || '',
       contactPhone: boat.contact?.phone || '',
       contactEmail: boat.contact?.email || '',
-      bookingNotes_en: boat.bookingNotes?.en || '',
-      bookingNotes_ro: boat.bookingNotes?.ro || ''
+      bookingNotes_en: typeof boat.bookingNotes === 'string' ? boat.bookingNotes : (boat.bookingNotes?.en || ''),
+      bookingNotes_ro: typeof boat.bookingNotes === 'string' ? boat.bookingNotes : (boat.bookingNotes?.ro || '')
     });
     
     // Set existing photos
@@ -1440,14 +1459,13 @@ function Boats() {
       cruisingArea: "Cruising Area",
       description: "Description",
       price: {
-        daily: "Price per Day (€)",
-        monthly: "Monthly Prices",
-        may: "May Price (€)",
-        june: "June Price (€)",
-        july: "July Price (€)",
-        august: "August Price (€)",
-        september: "September Price (€)",
-        october: "October Price (€)"
+        monthly: "Day Price by Month",
+        may: "May - Price per Day (€)",
+        june: "June - Price per Day (€)",
+        july: "July - Price per Day (€)",
+        august: "August - Price per Day (€)",
+        september: "September - Price per Day (€)",
+        october: "October - Price per Day (€)"
       },
       specs: {
         title: "Specifications",
@@ -1573,14 +1591,13 @@ function Boats() {
       cruisingArea: "Zonă de Navigație",
       description: "Descriere",
       price: {
-        daily: "Preț pe Zi (€)",
-        monthly: "Prețuri Lunare",
-        may: "Preț Mai (€)",
-        june: "Preț Iunie (€)",
-        july: "Preț Iulie (€)",
-        august: "Preț August (€)",
-        september: "Preț Septembrie (€)",
-        october: "Preț Octombrie (€)"
+        monthly: "Preț pe Zi după Lună",
+        may: "Mai - Preț pe Zi (€)",
+        june: "Iunie - Preț pe Zi (€)",
+        july: "Iulie - Preț pe Zi (€)",
+        august: "August - Preț pe Zi (€)",
+        september: "Septembrie - Preț pe Zi (€)",
+        october: "Octombrie - Preț pe Zi (€)"
       },
       specs: {
         title: "Specificații",
@@ -1954,29 +1971,7 @@ function Boats() {
         return (
           <div>
             <h3 className="sectionTitle">{language === 'en' ? 'Pricing' : 'Prețuri'}</h3>
-            
-            <div style={{marginBottom: '1.25rem'}}>
-              <label className="formLabel">
-                {t.price.daily}
-              </label>
-              <div className="currencyInput">
-                <span className="currencySymbol">
-                  €
-                </span>
-                <input
-                  type="text"
-                  name="priceDaily"
-                  value={formData.priceDaily || ''}
-                  onChange={handleInputChange}
-                  className="currencyTextInput"
-                />
-              </div>
-            </div>
-            
-            <h4 className="sectionSubtitle">
-              {t.price.monthly}
-            </h4>
-            
+
             <div className="twoColumnGrid">
               <div>
                 <label className="formLabel">
@@ -2767,10 +2762,33 @@ function Boats() {
   
   return (
     <div className="container">
+      {/* Success Message Popup */}
+      {successMessage && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          backgroundColor: '#10b981',
+          color: 'white',
+          padding: '1rem 1.5rem',
+          borderRadius: '8px',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+          zIndex: 9999,
+          animation: 'slideInRight 0.3s ease-out'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span style={{ fontWeight: '500' }}>{successMessage}</span>
+          </div>
+        </div>
+      )}
+
       <div className="header">
         <h1 className="title">{t.boatList.title}</h1>
       </div>
-      
+
       {/* Add/Edit Forms */}
       {(isAddingBoat || isEditingBoat) && (
         <div className="card">
@@ -2833,7 +2851,7 @@ function Boats() {
                 {isUploading ? (
                   <div className="spinnerContainer">
                     <div className="spinner"></div>
-                    <span>{t.uploadingPhotos} {Math.round(uploadProgress)}%</span>
+                    <span>{t.uploadingPhotos}</span>
                   </div>
                 ) : (
                   <button
@@ -3286,232 +3304,347 @@ function Boats() {
               <p style={{color: '#6b7280'}}>{boats.length === 0 ? t.boatList.noBoats : `No boats match your filters.`}</p>
             </div>
           ) : (
-            <div className="boatListContainer">
-              {getFilteredBoats().map((boat) => (
-                <div key={boat.id} className="boatCard">
-                  {/* Boat image or placeholder */}
-                  <div className="boatImageContainer">
-                    {boat.photos && boat.photos.length > 0 ? (
-                      <img
-                        src={boat.photos[0].url}
-                        alt={getLocalizedContent(boat.name, language, t.noPhotos)}
-                        className="boatImage"
-                      />
-                    ) : (
-                      <div className="placeholderImage">
-                        {t.noPhotos}
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Boat details */}
-                  <div className="boatCardContent">
-                    <h3 className="boatCardTitle">
-                      {getLocalizedContent(boat.name, language)}
-                    </h3>
-                    
-                    <div className="boatCardDetails">
-                      <p style={{marginBottom: '0.25rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                        {boat.length ? `${boat.length}m` : ''}
-                        {boat.length && boat.capacity ? ' • ' : ''}
-                        {boat.capacity ? `${boat.capacity} ${language === 'en' ? 'people' : 'persoane'}` : ''}
-                      </p>
-                      <p style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                        {getLocalizedContent(boat.cruisingArea, language)}
-                      </p>
-                      {boat.pricing?.daily && (
-                        <p style={{marginTop: '0.5rem', fontWeight: '600', color: '#3b82f6'}}>
-                          €{boat.pricing.daily}/{language === 'en' ? 'day' : 'zi'}
-                        </p>
+            <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
+              {getFilteredBoats().map((boat) => {
+                const priceRange = getPriceRange(boat.pricing?.monthly);
+                const lengthLabel = boat.length ? `${boat.length}m` : null;
+                const capacityLabel = boat.capacity ? `${boat.capacity} ${language === 'en' ? 'people' : 'persoane'}` : null;
+                const rangeLabel = priceRange
+                  ? (priceRange.min === priceRange.max
+                      ? `€${priceRange.min.toFixed(0)}/${language === 'en' ? 'day' : 'zi'}`
+                      : `€${priceRange.min.toFixed(0)}-€${priceRange.max.toFixed(0)}/${language === 'en' ? 'day' : 'zi'}`)
+                  : null;
+
+                return (
+                  <div
+                    key={boat.id}
+                    className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition cursor-pointer flex flex-col"
+                    onClick={() => { setSelectedBoat(boat); setSelectedBoatPhotoIndex(0); }}
+                  >
+                    <div className="relative h-44 bg-gray-100">
+                      {boat.photos && boat.photos.length > 0 ? (
+                        <img
+                          src={boat.photos[0].url}
+                          alt={getLocalizedContent(boat.name, language, t.noPhotos)}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm">
+                          {t.noPhotos}
+                        </div>
+                      )}
+                      {(lengthLabel || capacityLabel) && (
+                        <div className="absolute bottom-2 left-2 flex gap-2">
+                          {lengthLabel && (
+                            <span className="bg-white/90 text-indigo-700 px-2 py-1 rounded text-xs font-medium shadow-sm">
+                              {lengthLabel}
+                            </span>
+                          )}
+                          {capacityLabel && (
+                            <span className="bg-white/90 text-indigo-700 px-2 py-1 rounded text-xs font-medium shadow-sm">
+                              {capacityLabel}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
-                    
-                    <div className="buttonRow">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedBoat(boat);
-                        }}
-                        className="btn-soft w-full sm:w-auto"
-                      >
-                        {t.view || 'View'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); startEditingBoat(boat); }}
-                        className="btn-soft w-full sm:w-auto"
-                      >
-                        {t.edit}
-                      </button>
-                      
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (window.confirm(language === 'en' ? 'Are you sure you want to delete this boat?' : 'Ești sigur că vrei să ștergi această barcă?')) {
-                            handleDeleteBoat(boat.id);
-                          }
-                        }}
-                        className="btn-soft btn-soft-danger w-full sm:w-auto"
-                      >
-                        {t.delete}
-                      </button>
+
+                    <div className="p-3 flex flex-col flex-grow">
+                      <h3 className="text-base font-semibold text-gray-900 mb-1 line-clamp-2">
+                        {getLocalizedContent(boat.name, language)}
+                      </h3>
+                      <p className="text-sm text-gray-600 truncate mb-2">
+                        {getLocalizedContent(boat.cruisingArea, language)}
+                      </p>
+                      {rangeLabel && (
+                        <p className="text-indigo-600 font-semibold text-sm mb-3">{rangeLabel}</p>
+                      )}
+
+                      <div className="flex gap-2 mt-auto">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setSelectedBoat(boat); setSelectedBoatPhotoIndex(0); }}
+                          className="flex-1 bg-indigo-50 text-indigo-700 rounded px-3 py-2 text-sm font-medium hover:bg-indigo-100 transition"
+                        >
+                          {t.view || 'View'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); startEditingBoat(boat); }}
+                          className="flex-1 bg-gray-100 text-gray-700 rounded px-3 py-2 text-sm font-medium hover:bg-gray-200 transition"
+                        >
+                          {t.edit}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(language === 'en' ? 'Are you sure you want to delete this boat?' : 'Ești sigur că vrei să ștergi această barcă?')) {
+                              handleDeleteBoat(boat.id);
+                            }
+                          }}
+                          className="flex-1 bg-red-50 text-red-600 rounded px-3 py-2 text-sm font-medium hover:bg-red-100 transition"
+                        >
+                          {t.delete}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       )}
 
-      {selectedBoat && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.45)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 60,
-          padding: '1rem'
-        }}>
-          <div style={{
-            width: '100%',
-            maxWidth: '960px',
-            background: '#fff',
-            borderRadius: '12px',
-            overflow: 'hidden',
-            boxShadow: '0 20px 45px rgba(0,0,0,0.18)'
-          }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '1rem 1.25rem',
-              borderBottom: '1px solid #e5e7eb'
-            }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#111827' }}>
-                  {getLocalizedContent(selectedBoat.name, language)}
-                </h2>
-                <p style={{ margin: 0, color: '#6b7280', fontSize: '0.95rem' }}>
-                  {getLocalizedContent(selectedBoat.cruisingArea, language)}
-                </p>
-              </div>
-              <button
-                onClick={() => setSelectedBoat(null)}
-                style={{
-                  border: '1px solid #d1d5db',
-                  background: '#f3f4f6',
-                  color: '#111827',
-                  borderRadius: '8px',
-                  padding: '0.45rem 0.75rem',
-                  cursor: 'pointer'
-                }}
-              >
-                ✕
-              </button>
-            </div>
+      {selectedBoat && (() => {
+        const photoUrls = (selectedBoat.photos || [])
+          .map(p => (typeof p === 'string' ? p : p?.url))
+          .filter(Boolean);
+        const activePhoto = photoUrls[selectedBoatPhotoIndex] || photoUrls[0] || getBoatPhotoUrl(selectedBoat);
+        const monthlyEntries = selectedBoat.pricing?.monthly
+          ? Object.entries(selectedBoat.pricing.monthly).filter(([, val]) => val)
+          : [];
+        
+        // Flatten amenities and features
+        const allAmenities = [];
+        
+        // Helper to add translated features
+        const addFeatures = (sourceObj, translationCategory) => {
+          if (!sourceObj || typeof sourceObj !== 'object') return;
+          Object.entries(sourceObj).forEach(([key, value]) => {
+            // Check if value is true (boolean) and we have a translation
+            if (value === true && t[translationCategory]?.[key]) {
+              allAmenities.push(t[translationCategory][key]);
+            }
+          });
+        };
 
-            {selectedBoat.photos && selectedBoat.photos.length > 0 && (
-              <div style={{ width: '100%', maxHeight: '360px', overflow: 'hidden' }}>
-                <img
-                  src={selectedBoat.photos[0].url}
-                  alt={getLocalizedContent(selectedBoat.name, language)}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              </div>
-            )}
+        addFeatures(selectedBoat.amenities, 'amenities');
+        addFeatures(selectedBoat.equipment, 'equipment');
+        addFeatures(selectedBoat.waterSports, 'waterSports');
 
-            <div style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e5e7eb' }}>
-                {selectedBoat.length && (
-                  <div style={{ color: '#374151', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Icon name="length" />
-                    <span>{selectedBoat.length}m</span>
-                  </div>
-                )}
-                {selectedBoat.capacity && (
-                  <div style={{ color: '#374151', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Icon name="people" />
-                    <span>{selectedBoat.capacity} {language === 'en' ? 'people' : 'persoane'}</span>
-                  </div>
-                )}
-                {selectedBoat.specs?.year && (
-                  <div style={{ color: '#374151', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Icon name="calendar" />
-                    <span>{language === 'en' ? 'Year' : 'An'}: {selectedBoat.specs.year}</span>
-                  </div>
-                )}
-                {selectedBoat.specs?.engine && (
-                  <div style={{ color: '#374151', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Icon name="engine" />
-                    <span>{language === 'en' ? 'Engine' : 'Motor'}: {selectedBoat.specs.engine}</span>
-                  </div>
-                )}
-                {selectedBoat.specs?.horsePower && (
-                  <div style={{ color: '#374151', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Icon name="hp" />
-                    <span>{selectedBoat.specs.horsePower} HP</span>
-                  </div>
-                )}
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b bg-white flex-shrink-0">
+                <button
+                  onClick={() => {
+                    setSelectedBoat(null);
+                    setSelectedBoatPhotoIndex(0);
+                  }}
+                  className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 text-sm font-semibold transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                  {language === 'en' ? 'Back' : 'Înapoi'}
+                </button>
+                <div className="flex items-center gap-3">
+                   <button
+                    onClick={() => {
+                      setSelectedBoat(null);
+                      setSelectedBoatPhotoIndex(0);
+                    }}
+                    className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
-              {(selectedBoat.pricing?.daily || selectedBoat.pricing?.weekly || selectedBoat.pricing?.monthly) && (
-                <div style={{ paddingBottom: '0.75rem', borderBottom: '1px solid #e5e7eb' }}>
-                  <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '1rem', fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <Icon name="pricing" />
-                    {language === 'en' ? 'Pricing' : 'Tarife'}
-                  </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', color: '#374151' }}>
-                    {selectedBoat.pricing?.daily && <span>€{selectedBoat.pricing.daily}/{language === 'en' ? 'day' : 'zi'}</span>}
-                    {selectedBoat.pricing?.weekly && <span>€{selectedBoat.pricing.weekly}/{language === 'en' ? 'week' : 'săptămână'}</span>}
-                    {selectedBoat.pricing?.monthly && typeof selectedBoat.pricing.monthly === 'object'
-                      ? Object.entries(selectedBoat.pricing.monthly)
-                          .filter(([, val]) => val)
-                          .map(([month, val]) => (
-                            <span key={month}>€{val} / {month}</span>
-                          ))
-                      : selectedBoat.pricing?.monthly
-                        ? <span>€{selectedBoat.pricing.monthly}/{language === 'en' ? 'month' : 'lună'}</span>
-                        : null}
+              {/* Scrollable Content */}
+              <div className="overflow-y-auto p-6 bg-gray-50 flex-grow">
+                {/* Title & Location */}
+                <div className="mb-6">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">{getLocalizedContent(selectedBoat.name, language)}</h1>
+                  {getLocalizedContent(selectedBoat.cruisingArea, language) && (
+                    <div className="flex items-center text-gray-600">
+                      <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      {getLocalizedContent(selectedBoat.cruisingArea, language)}
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  {/* Left Column */}
+                  <div className="col-span-1 lg:col-span-2 space-y-6">
+                    {/* Images */}
+                    {(() => {
+                      if (photoUrls.length === 0) return (
+                        <div className="bg-gray-200 rounded-lg h-64 flex items-center justify-center text-gray-400">
+                          {t.noPhotos}
+                        </div>
+                      );
+
+                      const activeUrl = photoUrls[selectedBoatPhotoIndex] || photoUrls[0];
+
+                      return (
+                        <div className="space-y-4">
+                          <div className="bg-gray-100 rounded-lg overflow-hidden relative shadow-md group">
+                            <img
+                              src={activeUrl}
+                              alt="Boat cover"
+                              className="w-full h-64 sm:h-96 object-cover"
+                            />
+                            
+                            {/* Navigation Arrows */}
+                            {photoUrls.length > 1 && (
+                              <>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const newIndex = selectedBoatPhotoIndex === 0 ? photoUrls.length - 1 : selectedBoatPhotoIndex - 1;
+                                    setSelectedBoatPhotoIndex(newIndex);
+                                  }}
+                                  className="absolute left-2 top-1/2 transform -translate-y-1/2 p-2 rounded-full bg-white/70 hover:bg-white shadow text-gray-800 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const newIndex = selectedBoatPhotoIndex === photoUrls.length - 1 ? 0 : selectedBoatPhotoIndex + 1;
+                                    setSelectedBoatPhotoIndex(newIndex);
+                                  }}
+                                  className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 rounded-full bg-white/70 hover:bg-white shadow text-gray-800 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                  </svg>
+                                </button>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Thumbnails */}
+                          {photoUrls.length > 1 && (
+                            <div className="flex space-x-2 overflow-x-auto pb-2 no-scrollbar">
+                              {photoUrls.map((url, idx) => (
+                                <button
+                                  key={`${url}-${idx}`}
+                                  onClick={() => setSelectedBoatPhotoIndex(idx)}
+                                  className={`flex-shrink-0 w-20 h-20 rounded-md overflow-hidden border-2 transition-all ${
+                                    idx === selectedBoatPhotoIndex ? 'border-indigo-600 ring-2 ring-indigo-100' : 'border-transparent opacity-70 hover:opacity-100'
+                                  }`}
+                                >
+                                  <img
+                                    src={url}
+                                    alt={`Thumbnail ${idx + 1}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Description */}
+                    <div className="bg-white rounded-lg shadow-md p-6">
+                      <h2 className="text-xl font-semibold text-gray-800 mb-4">{language === 'en' ? 'Description' : 'Descriere'}</h2>
+                      <div className="prose max-w-none text-gray-700 whitespace-pre-line">
+                        {getLocalizedContent(selectedBoat.description, language) || (
+                          <span className="text-gray-400 italic">No description available</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Features/Amenities */}
+                    {allAmenities.length > 0 && (
+                      <div className="bg-white rounded-lg shadow-md p-6">
+                        <h2 className="text-xl font-semibold text-gray-800 mb-4">{language === 'en' ? 'Amenities' : 'Facilități'}</h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                          {allAmenities.map((item, idx) => (
+                            <div key={idx} className="flex items-center p-2 bg-gray-50 rounded">
+                              <svg className="w-5 h-5 mr-2 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              <span className="text-gray-700 font-medium">{getLocalizedContent(item, language)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Column - Sticky Details */}
+                  <div className="col-span-1">
+                    <div className="bg-white rounded-lg shadow-md p-6 lg:sticky lg:top-6 space-y-6">
+                      {/* Price - Show range or 'from' if we have monthly prices */}
+                      <div>
+                        {monthlyEntries.length > 0 ? (
+                           <div>
+                              <div className="text-sm text-gray-500 mb-1">{language === 'en' ? 'Prices from' : 'Prețuri de la'}</div>
+                              <div className="text-3xl font-bold text-indigo-600">
+                                €{Math.min(...monthlyEntries.map(([,val]) => parseFloat(val) || Infinity))}
+                              </div>
+                              <div className="text-gray-500 text-sm">
+                                / {language === 'en' ? 'day' : 'zi'}
+                              </div>
+                           </div>
+                        ) : (
+                          <div className="text-gray-500 italic">
+                             {language === 'en' ? 'Contact for price' : 'Contactați pentru preț'}
+                          </div>
+                        )}
+                      </div>
+
+                      <hr className="border-gray-100" />
+
+                      {/* Key Specs */}
+                      <div className="space-y-3">
+                         {[
+                          { label: language === 'en' ? 'Year' : 'An', value: selectedBoat.year || selectedBoat.specs?.year },
+                          { label: language === 'en' ? 'Capacity' : 'Capacitate', value: selectedBoat.capacity ? `${selectedBoat.capacity} ${language === 'en' ? 'ppl' : 'pers'}` : null },
+                          { label: language === 'en' ? 'Length' : 'Lungime', value: selectedBoat.length ? `${selectedBoat.length}m` : null },
+                          { label: language === 'en' ? 'Engine' : 'Motor', value: selectedBoat.specs?.engine },
+                          { label: language === 'en' ? 'Cabins' : 'Cabine', value: selectedBoat.specs?.cabins },
+                          { label: language === 'en' ? 'Speed' : 'Viteză', value: selectedBoat.specs?.cruisingSpeed ? `${selectedBoat.specs.cruisingSpeed} kn` : null },
+                         ].filter(item => item.value).map((spec, idx) => (
+                           <div key={idx} className="flex justify-between items-center">
+                             <span className="text-gray-600">{spec.label}</span>
+                             <span className="font-medium text-gray-900 truncate max-w-[150px]">{spec.value}</span>
+                           </div>
+                         ))}
+                      </div>
+
+                      {/* Monthly Pricing */}
+                      {monthlyEntries.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                           <h3 className="font-medium text-gray-900 mb-3">{language === 'en' ? 'Pricing' : 'Prețuri'}</h3>
+                           <div className="space-y-2 text-sm">
+                              {monthlyEntries.map(([month, val]) => (
+                                <div key={month} className="flex justify-between">
+                                  <span className="text-gray-600 capitalize">
+                                    {month}
+                                  </span>
+                                  <span className="font-medium text-gray-900">
+                                    €{val} / {language === 'en' ? 'day' : 'zi'}
+                                  </span>
+                                </div>
+                              ))}
+                           </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              )}
-
-              {selectedBoat.amenities && selectedBoat.amenities.length > 0 && (
-                <div style={{ paddingBottom: '0.75rem', borderBottom: '1px solid #e5e7eb' }}>
-                  <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '1rem', fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <Icon name="amenities" />
-                    {language === 'en' ? 'Amenities' : 'Facilități'}
-                  </h4>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    {selectedBoat.amenities.map((a, idx) => (
-                      <span key={idx} style={{ padding: '0.35rem 0.6rem', background: '#f3f4f6', color: '#374151', borderRadius: '999px', fontSize: '0.85rem' }}>
-                        {getLocalizedContent(a, language)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedBoat.description && (
-                <div>
-                  <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '1rem', fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <Icon name="description" />
-                    {language === 'en' ? 'Description' : 'Descriere'}
-                  </h4>
-                  <p style={{ margin: 0, color: '#374151', lineHeight: 1.5 }}>
-                    {getLocalizedContent(selectedBoat.description, language)}
-                  </p>
-                </div>
-              )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

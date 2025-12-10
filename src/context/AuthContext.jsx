@@ -177,26 +177,47 @@ export function AuthProvider({ children }) {
   }
 
   // Check if a user is authorized
-  async function isAuthorizedUser(email) {
+  async function isAuthorizedUser(email, uid = null) {
     try {
       const normalizedEmail = email?.toLowerCase();
       console.log(`Checking if ${normalizedEmail} is authorized...`);
+
+      // First check authorized_users collection
       const authorizedUsersRef = collection(db, 'authorized_users');
       const q = query(authorizedUsersRef, where("email", "==", normalizedEmail));
       const snapshot = await getDocs(q);
-      
-      if (snapshot.empty) {
-        console.log(`User ${normalizedEmail} is not authorized`);
-        return { authorized: false };
-      } else {
+
+      if (!snapshot.empty) {
         const userData = snapshot.docs[0].data();
-        console.log(`User ${email} is authorized for company ${userData.companyId} with role ${userData.role}`);
-        return { 
-          authorized: true, 
+        console.log(`User ${email} found in authorized_users for company ${userData.companyId} with role ${userData.role}`);
+        return {
+          authorized: true,
           companyId: userData.companyId,
           role: userData.role
         };
       }
+
+      // If not in authorized_users, check users collection if uid is provided
+      if (uid) {
+        console.log(`User not in authorized_users, checking users collection with uid: ${uid}`);
+        const userDocRef = doc(db, 'users', uid);
+        const userDocSnap = await getDoc(userDocRef);
+
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          if (userData.email?.toLowerCase() === normalizedEmail) {
+            console.log(`User ${email} found in users collection for company ${userData.companyId} with role ${userData.role}`);
+            return {
+              authorized: true,
+              companyId: userData.companyId,
+              role: userData.role
+            };
+          }
+        }
+      }
+
+      console.log(`User ${normalizedEmail} is not authorized`);
+      return { authorized: false };
     } catch (error) {
       console.error("Error checking user authorization:", error);
       throw error;
@@ -213,10 +234,10 @@ export function AuthProvider({ children }) {
       const user = result.user;
       
       console.log("Google authentication successful for:", user.email);
-      
-      // Check if this email is authorized (now that the user is authenticated)
-      const { authorized, companyId, role } = await isAuthorizedUser(user.email);
-      
+
+      // Check if this email is authorized (check both authorized_users and users collections)
+      const { authorized, companyId, role } = await isAuthorizedUser(user.email, user.uid);
+
       if (!authorized) {
         // User is not authorized
         setError("You do not have permission to access this application.");
@@ -352,7 +373,7 @@ export function AuthProvider({ children }) {
         } else {
           // If no role, check authorized_users collection
           if (userData.email) {
-            const authData = await isAuthorizedUser(userData.email);
+            const authData = await isAuthorizedUser(userData.email, userId);
             if (authData.authorized && authData.role) {
               setUserRole(authData.role);
               console.log(`Set userRole from authorized_users to: ${authData.role}`);

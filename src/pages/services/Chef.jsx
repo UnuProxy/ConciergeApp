@@ -35,6 +35,9 @@ const translations = {
     addBtn: 'Add Chef',
     updateBtn: 'Update Chef',
     deleteConfirm: 'Are you sure you want to delete this chef?',
+    managePermission: 'You can only manage chefs for your company.',
+    manageOtherCompany: 'This chef profile belongs to another company.',
+    manageUnassigned: 'This profile is missing a company. Ask an admin to claim it before editing or deleting.',
     editButton: 'Edit',
     deleteButton: 'Delete'
   },
@@ -57,6 +60,9 @@ const translations = {
     addBtn: 'Adaugă bucătar',
     updateBtn: 'Actualizează bucătar',
     deleteConfirm: 'Sigur doriți să ștergeți acest bucătar?',
+    managePermission: 'Puteți gestiona bucătarii doar pentru compania dvs.',
+    manageOtherCompany: 'Acest profil aparține altei companii.',
+    manageUnassigned: 'Acest profil nu are companie. Un admin trebuie să îl atribuie înainte de editare sau ștergere.',
     editButton: 'Editează',
     deleteButton: 'Șterge'
   }
@@ -68,6 +74,7 @@ function Chef() {
   const t = translations[lang];
   const dbContext = useDatabase();
   const userCompanyId = dbContext?.companyId || dbContext?.companyInfo?.id || null;
+  const userRole = dbContext?.userRole || null;
 
   // Add event listener to update language when it changes globally
   useEffect(() => {
@@ -99,22 +106,29 @@ function Chef() {
     setLoading(true);
     setError(null);
     try {
-      const chefQuery = query(collection(db, 'chefs'), where('companyId', '==', userCompanyId));
-      const snap = await getDocs(chefQuery);
+      // Chefs are shared services - load all chefs for both companies
+      const snap = await getDocs(collection(db, 'chefs'));
       const raw = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       const withStats = await Promise.all(
         raw.map(async chef => {
-          // Assume reservations store chefId and totalAmount
-          const reservationSnap = await getDocs(
-            query(
-              collection(db, 'reservations'),
-              where('chefId', '==', chef.id),
-              where('status', '==', 'confirmed')
-            )
-          );
-          const bookings = reservationSnap.docs.map(d => d.data());
-          const totalRevenue = bookings.reduce((sum, r) => sum + (r.totalAmount || 0), 0);
-          return { ...chef, bookingCount: bookings.length, totalRevenue };
+          // Only query reservations for the user's company (company-private data)
+          try {
+            const reservationSnap = await getDocs(
+              query(
+                collection(db, 'reservations'),
+                where('companyId', '==', userCompanyId),
+                where('chefId', '==', chef.id),
+                where('status', '==', 'confirmed')
+              )
+            );
+            const bookings = reservationSnap.docs.map(d => d.data());
+            const totalRevenue = bookings.reduce((sum, r) => sum + (r.totalAmount || 0), 0);
+            return { ...chef, bookingCount: bookings.length, totalRevenue };
+          } catch (err) {
+            // If permission error, return chef without stats
+            console.warn('Could not load stats for chef:', chef.id, err.message);
+            return { ...chef, bookingCount: 0, totalRevenue: 0 };
+          }
         })
       );
       setChefs(withStats);
@@ -136,6 +150,20 @@ function Chef() {
     if (!search.trim()) setFiltered(chefs);
     else setFiltered(chefs.filter(c => c.name.toLowerCase().includes(search.toLowerCase())));
   }, [search, chefs]);
+
+  const canManage = chef => {
+    if (!userCompanyId) return false;
+    // Admins can claim legacy chef profiles that never had a companyId set
+    if (!chef?.companyId) return userRole === 'admin';
+    return chef.companyId === userCompanyId;
+  };
+
+  const manageReason = chef => {
+    if (!userCompanyId) return t.managePermission;
+    if (!chef?.companyId) return userRole === 'admin' ? '' : t.manageUnassigned;
+    if (chef.companyId !== userCompanyId) return t.manageOtherCompany;
+    return '';
+  };
 
   // Add or update chef
   const handleSubmit = async e => {
@@ -174,6 +202,10 @@ function Chef() {
 
   // Start editing
   const startEdit = c => {
+    if (!canManage(c)) {
+      setError(manageReason(c) || t.managePermission);
+      return;
+    }
     setForm({ name: c.name, email: c.email || '', phone: c.phone || '', rate: c.rate });
     setEditingId(c.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -186,12 +218,16 @@ function Chef() {
   };
 
   // Delete chef
-  const handleDelete = async id => {
+  const handleDelete = async chef => {
+    if (!canManage(chef)) {
+      setError(manageReason(chef) || t.managePermission);
+      return;
+    }
     if (!window.confirm(t.deleteConfirm)) return;
     setLoading(true);
     setError(null);
     try {
-      await deleteDoc(doc(db, 'chefs', id));
+      await deleteDoc(doc(db, 'chefs', chef.id));
       await loadChefs();
     } catch (err) {
       console.error(err);
@@ -306,8 +342,22 @@ function Chef() {
                     <td className="px-4 py-2 text-center text-sm">{c.bookingCount}</td>
                     <td className="px-4 py-2 text-right text-sm">€{c.totalRevenue.toFixed(2)}</td>
                     <td className="px-4 py-2 text-center space-x-2">
-                      <button onClick={()=>startEdit(c)} className="px-2 py-1 bg-yellow-400 text-white rounded hover:bg-yellow-500 transition text-xs">{t.editButton}</button>
-                      <button onClick={()=>handleDelete(c.id)} className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-xs">{t.deleteButton}</button>
+                      <button
+                        onClick={()=>startEdit(c)}
+                        disabled={!canManage(c)}
+                        title={manageReason(c)}
+                        className={`px-2 py-1 text-white rounded transition text-xs ${canManage(c) ? 'bg-yellow-400 hover:bg-yellow-500' : 'bg-gray-300 cursor-not-allowed'}`}
+                      >
+                        {t.editButton}
+                      </button>
+                      <button
+                        onClick={()=>handleDelete(c)}
+                        disabled={!canManage(c)}
+                        title={manageReason(c)}
+                        className={`px-2 py-1 text-white rounded transition text-xs ${canManage(c) ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-300 cursor-not-allowed'}`}
+                      >
+                        {t.deleteButton}
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -326,8 +376,22 @@ function Chef() {
                 <div className="flex justify-between items-center mb-2">
                   <h3 className="text-lg font-semibold">{c.name}</h3>
                   <div className="flex space-x-2">
-                    <button onClick={()=>startEdit(c)} className="px-2 py-1 bg-yellow-400 text-white rounded hover:bg-yellow-500 transition text-xs">{t.editButton}</button>
-                    <button onClick={()=>handleDelete(c.id)} className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-xs">{t.deleteButton}</button>
+                    <button
+                      onClick={()=>startEdit(c)}
+                      disabled={!canManage(c)}
+                      title={manageReason(c)}
+                      className={`px-2 py-1 text-white rounded transition text-xs ${canManage(c) ? 'bg-yellow-400 hover:bg-yellow-500' : 'bg-gray-300 cursor-not-allowed'}`}
+                    >
+                      {t.editButton}
+                    </button>
+                    <button
+                      onClick={()=>handleDelete(c)}
+                      disabled={!canManage(c)}
+                      title={manageReason(c)}
+                      className={`px-2 py-1 text-white rounded transition text-xs ${canManage(c) ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-300 cursor-not-allowed'}`}
+                    >
+                      {t.deleteButton}
+                    </button>
                   </div>
                 </div>
                 <p className="text-sm"><span className="font-medium">{t.email}:</span> {c.email||'—'}</p>
@@ -335,6 +399,7 @@ function Chef() {
                 <p className="text-sm"><span className="font-medium">{t.rate}:</span> {c.rate}{t.rateUnit}</p>
                 <p className="text-sm"><span className="font-medium">{t.bookings}:</span> {c.bookingCount}</p>
                 <p className="text-sm"><span className="font-medium">{t.revenue}:</span> €{c.totalRevenue.toFixed(2)}</p>
+                {manageReason(c) && <p className="text-xs text-gray-500 mt-2">{manageReason(c)}</p>}
               </div>
             ))
           ) : (

@@ -76,27 +76,32 @@ const normalizeVillaPhotos = (photos = []) => {
 
 const resolvePhotoDownloads = async (photos = [], storageInstance) => {
   const normalized = normalizeVillaPhotos(photos);
-  const results = [];
+  // If the URL is already a public download link, avoid extra round-trips.
+  const needsLookup = photo =>
+    photo?.url &&
+    !photo.url.includes('alt=media') &&
+    storageInstance &&
+    (photo.path || extractPathFromUrl(photo.url));
 
-  for (const photo of normalized) {
-    if (!photo?.url) continue;
+  const resolved = await Promise.all(
+    normalized.map(async photo => {
+      if (!photo?.url) return null;
+      if (!needsLookup(photo)) return photo;
 
-    const candidatePath = photo.path || extractPathFromUrl(photo.url);
-    if (!candidatePath) {
-      results.push(photo);
-      continue;
-    }
+      const candidatePath = photo.path || extractPathFromUrl(photo.url);
+      if (!candidatePath) return photo;
 
-    try {
-      const downloadUrl = await getDownloadURL(ref(storageInstance, candidatePath));
-      results.push({ ...photo, url: ensureStorageDownloadUrl(downloadUrl), path: candidatePath });
-    } catch (err) {
-      console.warn('Failed to fetch download URL for photo', candidatePath, err);
-      results.push(photo);
-    }
-  }
+      try {
+        const downloadUrl = await getDownloadURL(ref(storageInstance, candidatePath));
+        return { ...photo, url: ensureStorageDownloadUrl(downloadUrl), path: candidatePath };
+      } catch (err) {
+        console.warn('Failed to fetch download URL for photo', candidatePath, err);
+        return photo;
+      }
+    })
+  );
 
-  return results;
+  return resolved.filter(Boolean);
 };
 
 const readFileAsDataURL = (file) => {
@@ -137,6 +142,7 @@ function Villas() {
   const [isEditingVilla, setIsEditingVilla] = useState(false);
   const [currentVilla, setCurrentVilla] = useState(null);
   const [viewVilla, setViewVilla] = useState(null);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [photoFiles, setPhotoFiles] = useState([]);
@@ -148,6 +154,8 @@ function Villas() {
   const [bedroomFilter, setBedroomFilter] = useState('');
   const [bathroomFilter, setBathroomFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+
+  const [successMessage, setSuccessMessage] = useState('');
 
   const [formData, setFormData] = useState({
     name_en: '',
@@ -171,8 +179,8 @@ function Villas() {
   
   const [priceConfigs, setPriceConfigs] = useState([{
     id: Date.now(),
-    label_en: 'Standard Rate',
-    label_ro: 'Tarif Standard',
+    label_en: '',
+    label_ro: '',
     price: '',
     type: 'weekly',
     month: '',
@@ -210,6 +218,13 @@ function Villas() {
     };
     initAuth();
   }, []);
+
+  // Localized fallback helper: current language -> en -> ro -> string
+  const getLoc = (value) => {
+    if (!value) return '';
+    if (typeof value === 'string') return value;
+    return value[language] || value.en || value.ro || '';
+  };
 
   useEffect(() => {
     fetchVillas();
@@ -322,8 +337,8 @@ function Villas() {
   const addPriceConfiguration = () => {
     setPriceConfigs(prev => ([...prev, {
       id: Date.now(),
-      label_en: `Rate ${prev.length + 1}`,
-      label_ro: `Tarif ${prev.length + 1}`,
+      label_en: '',
+      label_ro: '',
       price: '',
       type: 'weekly',
       month: '',
@@ -354,8 +369,8 @@ function Villas() {
     });
     setPriceConfigs([{
       id: Date.now(),
-      label_en: 'Standard Rate',
-      label_ro: 'Tarif Standard',
+      label_en: '',
+      label_ro: '',
       price: '', type: 'weekly', month: '',
       dateRange_start: '', dateRange_end: '',
       conditions_minStay: '', conditions_minGuests: '', conditions_maxGuests: ''
@@ -522,6 +537,10 @@ function Villas() {
       };
       const villaCollection = collection(db, 'villas');
       await addDoc(villaCollection, villaData);
+      
+      setSuccessMessage(language === 'ro' ? 'Vila a fost adăugată cu succes!' : 'Villa successfully added!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+
       resetForm();
       setIsAddingVilla(false);
       fetchVillas();
@@ -539,7 +558,8 @@ function Villas() {
       }
       const newPhotoUrls = await uploadPhotos();
       const brochureDownload = await uploadBrochure();
-      const updatedPhotos = [...existingPhotos, ...newPhotoUrls];
+      // Place newly uploaded photos first so cover updates when editing
+      const updatedPhotos = newPhotoUrls.length ? [...newPhotoUrls, ...existingPhotos] : [...existingPhotos];
       const villaData = {
         ...prepareFormDataForSave(),
         photos: updatedPhotos,
@@ -549,6 +569,10 @@ function Villas() {
       };
       const villaDoc = doc(db, 'villas', currentVilla.id);
       await updateDoc(villaDoc, villaData);
+      
+      setSuccessMessage(language === 'ro' ? 'Vila a fost actualizată cu succes!' : 'Villa successfully updated!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+
       resetForm();
       setIsEditingVilla(false);
       setCurrentVilla(null);
@@ -616,17 +640,17 @@ function Villas() {
   const startEditingVilla = (villa) => {
     setCurrentVilla(villa);
     setFormData({
-      name_en: villa.name?.en || '',
-      name_ro: villa.name?.ro || '',
-      address_en: villa.address?.en || '',
-      address_ro: villa.address?.ro || '',
+      name_en: typeof villa.name === 'string' ? villa.name : (villa.name?.en || ''),
+      name_ro: typeof villa.name === 'string' ? villa.name : (villa.name?.ro || ''),
+      address_en: typeof villa.address === 'string' ? villa.address : (villa.address?.en || ''),
+      address_ro: typeof villa.address === 'string' ? villa.address : (villa.address?.ro || ''),
       bedrooms: villa.bedrooms || '',
       bathrooms: villa.bathrooms || '',
-      description_en: villa.description?.en || '',
-      description_ro: villa.description?.ro || '',
+      description_en: typeof villa.description === 'string' ? villa.description : (villa.description?.en || ''),
+      description_ro: typeof villa.description === 'string' ? villa.description : (villa.description?.ro || ''),
       propertyLink: villa.propertyLink || villa.property_link || '',
-      amenities_en: villa.amenities?.en || '',
-      amenities_ro: villa.amenities?.ro || '',
+      amenities_en: typeof villa.amenities === 'string' ? villa.amenities : (villa.amenities?.en || ''),
+      amenities_ro: typeof villa.amenities === 'string' ? villa.amenities : (villa.amenities?.ro || ''),
       owner_name: villa.owner?.name || '',
       owner_email: villa.owner?.email || '',
       owner_phone: villa.owner?.phone || '',
@@ -733,6 +757,16 @@ function Villas() {
 
   return (
     <div className="p-4">
+      {/* Success Message Popup */}
+      {successMessage && (
+        <div className="fixed top-5 right-5 bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg z-50 animate-slide-in flex items-center gap-2">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          <span className="font-medium">{successMessage}</span>
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">{t.title}</h1>
         <button
@@ -788,7 +822,10 @@ function Villas() {
                 </div>
                 <div className="p-4 border-t flex items-center gap-3">
                   <button
-                    onClick={() => setViewVilla(villa)}
+                    onClick={() => {
+                      setViewVilla({ ...villa, activePhotoIndex: 0 });
+                      setIsDescriptionExpanded(false);
+                    }}
                     className="flex-1 btn-soft bg-white border border-gray-200 text-gray-700 hover:border-indigo-200 hover:text-indigo-700"
                   >
                     {t.view}
@@ -879,15 +916,7 @@ function Villas() {
                 <div className="space-y-3">
                   {priceConfigs.map((config, index) => (
                     <div key={config.id} className="p-3 border rounded">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium">Label (EN)</label>
-                          <input name={`priceConfig_${index}_label_en`} value={config.label_en} onChange={handleInputChange} className="w-full border rounded px-2 py-1" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium">Label (RO)</label>
-                          <input name={`priceConfig_${index}_label_ro`} value={config.label_ro} onChange={handleInputChange} className="w-full border rounded px-2 py-1" />
-                        </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
                           <label className="block text-sm font-medium">Price</label>
                           <input name={`priceConfig_${index}_price`} value={config.price} onChange={handleInputChange} className="w-full border rounded px-2 py-1" />
@@ -1093,15 +1122,7 @@ function Villas() {
                 <div className="space-y-3">
                   {priceConfigs.map((config, index) => (
                     <div key={config.id} className="p-3 border rounded">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium">Label (EN)</label>
-                          <input name={`priceConfig_${index}_label_en`} value={config.label_en} onChange={handleInputChange} className="w-full border rounded px-2 py-1" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium">Label (RO)</label>
-                          <input name={`priceConfig_${index}_label_ro`} value={config.label_ro} onChange={handleInputChange} className="w-full border rounded px-2 py-1" />
-                        </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
                           <label className="block text-sm font-medium">Price</label>
                           <input name={`priceConfig_${index}_price`} value={config.price} onChange={handleInputChange} className="w-full border rounded px-2 py-1" />
@@ -1180,154 +1201,331 @@ function Villas() {
       )}
 
       {viewVilla && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-4 py-3 border-b">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b bg-white flex-shrink-0">
               <button
                 onClick={() => setViewVilla(null)}
-                className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 text-sm font-semibold"
+                className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 text-sm font-semibold transition-colors"
               >
-                ← {language === 'ro' ? 'Înapoi la Vile' : 'Back to Villas'}
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                {language === 'ro' ? 'Înapoi la Vile' : 'Back to Villas'}
               </button>
-              <button
-                onClick={() => setViewVilla(null)}
-                className="text-gray-500 hover:text-gray-700 p-1 rounded hover:bg-gray-100"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="flex justify-between items-start p-4 border-b">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">{viewVilla.name?.[language] || viewVilla.name?.en || viewVilla.name?.ro || viewVilla.name || 'Villa'}</h2>
-                <p className="text-sm text-gray-600">{viewVilla.address?.[language] || viewVilla.address?.en || viewVilla.address?.ro || viewVilla.address || ''}</p>
-              </div>
-            </div>
-
-            {viewVilla.photos && viewVilla.photos.length > 0 && (
-              <div className="w-full">
-                <img
-                  src={viewVilla.photos[0].url || viewVilla.photos[0]}
-                  alt="Villa cover"
-                  className="w-full h-72 object-cover"
-                />
-              </div>
-            )}
-
-            <div className="p-4 space-y-4">
-              <div className="flex flex-wrap gap-4 text-gray-700 text-sm pb-3 border-b">
-                <span>{viewVilla.bedrooms || '-'} {t.bedrooms}</span>
-                <span>{viewVilla.bathrooms || '-'} {t.bathrooms}</span>
-                <a
-                  href={
-                    (viewVilla.propertyLink && viewVilla.propertyLink.trim())
-                      ? viewVilla.propertyLink
-                      : `/services/properties-for-sale/${viewVilla.id}`
-                  }
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-indigo-600 hover:text-indigo-800"
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    setViewVilla(null);
+                    startEditingVilla(viewVilla);
+                  }}
+                  className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium transition-colors"
                 >
-                  {t.propertyLink}
-                </a>
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  {t.edit}
+                </button>
+                <button
+                  onClick={() => setViewVilla(null)}
+                  className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="overflow-y-auto p-6 bg-gray-50 flex-grow">
+              {/* Title & Location */}
+              <div className="mb-6">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">{getLoc(viewVilla.name) || 'Villa'}</h1>
+                <div className="flex items-center text-gray-600">
+                  <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  {getLoc(viewVilla.address)}
+                </div>
               </div>
 
-              {(viewVilla.priceConfigurations && viewVilla.priceConfigurations.length > 0) && (
-                <div className="pb-3 border-b">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-2">{t.standardRate}</h4>
-                  <div className="space-y-1 text-sm text-gray-700">
-                    {viewVilla.priceConfigurations.map((pc) => {
-                      const monthLabel = pc.month ? (monthLabels[pc.month.toLowerCase?.()] || pc.month) : null;
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Left Column */}
+                <div className="col-span-1 lg:col-span-2 space-y-6">
+                  {/* Images */}
+                  {(() => {
+                    const photoUrls = (viewVilla.photos || [])
+                      .map(p => (typeof p === 'string' ? p : p?.url))
+                      .filter(Boolean);
+                    
+                    if (photoUrls.length === 0) return (
+                      <div className="bg-gray-200 rounded-lg h-64 flex items-center justify-center text-gray-400">
+                        No photos available
+                      </div>
+                    );
+
+                    const activeIndex = viewVilla.activePhotoIndex || 0;
+                    const activeUrl = photoUrls[activeIndex] || photoUrls[0];
+
+                    return (
+                      <div className="space-y-4">
+                        <div className="bg-gray-100 rounded-lg overflow-hidden relative shadow-md group">
+                          <img
+                            src={activeUrl}
+                            alt="Villa cover"
+                            className="w-full h-64 sm:h-96 object-cover"
+                          />
+                          
+                          {/* Navigation Arrows */}
+                          {photoUrls.length > 1 && (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const newIndex = activeIndex === 0 ? photoUrls.length - 1 : activeIndex - 1;
+                                  setViewVilla(prev => ({ ...prev, activePhotoIndex: newIndex }));
+                                }}
+                                className="absolute left-2 top-1/2 transform -translate-y-1/2 p-2 rounded-full bg-white/70 hover:bg-white shadow text-gray-800 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const newIndex = activeIndex === photoUrls.length - 1 ? 0 : activeIndex + 1;
+                                  setViewVilla(prev => ({ ...prev, activePhotoIndex: newIndex }));
+                                }}
+                                className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 rounded-full bg-white/70 hover:bg-white shadow text-gray-800 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                              </button>
+                            </>
+                          )}
+                        </div>
+
+                        {/* Thumbnails */}
+                        {photoUrls.length > 1 && (
+                          <div className="flex space-x-2 overflow-x-auto pb-2 no-scrollbar">
+                            {photoUrls.map((url, idx) => (
+                              <button
+                                key={`${url}-${idx}`}
+                                onClick={() => setViewVilla(prev => ({ ...prev, activePhotoIndex: idx }))}
+                                className={`flex-shrink-0 w-20 h-20 rounded-md overflow-hidden border-2 transition-all ${
+                                  idx === activeIndex ? 'border-indigo-600 ring-2 ring-indigo-100' : 'border-transparent opacity-70 hover:opacity-100'
+                                }`}
+                              >
+                                <img
+                                  src={url}
+                                  alt={`Thumbnail ${idx + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Description */}
+                  <div className="bg-white rounded-lg shadow-md p-6">
+                    <h2 className="text-xl font-semibold text-gray-800 mb-4">{t.description || 'Description'}</h2>
+                    <div className="prose max-w-none text-gray-700 whitespace-pre-line">
+                      {(() => {
+                        const descriptionText = getLoc({ en: viewVilla.description_en, ro: viewVilla.description_ro }) || getLoc(viewVilla.description) || '';
+                        const MAX_LENGTH = 300;
+                        const shouldTruncate = descriptionText.length > MAX_LENGTH;
+                        const displayText = isDescriptionExpanded ? descriptionText : (shouldTruncate ? descriptionText.slice(0, MAX_LENGTH) + '...' : descriptionText);
+                        
+                        if (!descriptionText) {
+                          return <span className="text-gray-400 italic">No description available</span>;
+                        }
+
+                        return (
+                          <>
+                            {displayText}
+                            {shouldTruncate && (
+                              <button
+                                onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                                className="block mt-2 text-indigo-600 hover:text-indigo-800 font-medium text-sm focus:outline-none"
+                              >
+                                {isDescriptionExpanded 
+                                  ? (language === 'ro' ? 'Arată mai puțin' : 'Read Less') 
+                                  : (language === 'ro' ? 'Arată mai mult' : 'Read More')}
+                              </button>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Amenities */}
+                  {(() => {
+                    const rawAmenities =
+                      getLoc(viewVilla?.amenities) ||
+                      viewVilla?.amenities_en ||
+                      viewVilla?.amenities_ro ||
+                      viewVilla?.amenities;
+
+                    let amenitiesList = [];
+                    if (Array.isArray(rawAmenities)) {
+                      amenitiesList = rawAmenities;
+                    } else if (rawAmenities && typeof rawAmenities === 'object') {
+                      amenitiesList = Object.keys(rawAmenities).filter(key => rawAmenities[key]);
+                    } else if (typeof rawAmenities === 'string') {
+                      amenitiesList = rawAmenities.split(',').map(item => item.trim()).filter(Boolean);
+                    }
+
+                    if (amenitiesList.length > 0) {
                       return (
-                        <div key={pc.id || pc.label_en || pc.label_ro || pc.month}>
-                          {(pc.label_en || pc.label_ro || monthLabel || t.standardRate)}: €{pc.price} / {pc.type || 'week'}
+                        <div className="bg-white rounded-lg shadow-md p-6">
+                          <h2 className="text-xl font-semibold text-gray-800 mb-4">{t.amenities_en ? t.amenities_en : 'Amenities'}</h2>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            {amenitiesList.map((item, idx) => (
+                              <div key={idx} className="flex items-center p-2 bg-gray-50 rounded">
+                                <svg className="w-5 h-5 mr-2 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                <span className="text-gray-700 font-medium">{item}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       );
-                    })}
-                  </div>
-                </div>
-              )}
+                    }
+                    return null;
+                  })()}
 
-              {(viewVilla.description_en || viewVilla.description_ro) && (
-                <div className="pb-3 border-b">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-2">{t.description || 'Description'}</h4>
-                  <p className="text-sm text-gray-700">
-                    {viewVilla[`description_${language}`] || viewVilla.description_en || viewVilla.description_ro || ''}
-                  </p>
-                </div>
-              )}
-
-              {(() => {
-                const rawAmenities =
-                  viewVilla?.amenities?.[language] ||
-                  viewVilla?.amenities?.en ||
-                  viewVilla?.amenities?.ro ||
-                  viewVilla?.amenities_en ||
-                  viewVilla?.amenities_ro ||
-                  viewVilla?.amenities;
-
-                let amenitiesList = [];
-                if (Array.isArray(rawAmenities)) {
-                  amenitiesList = rawAmenities;
-                } else if (rawAmenities && typeof rawAmenities === 'object') {
-                  // object map of booleans
-                  amenitiesList = Object.keys(rawAmenities).filter(key => rawAmenities[key]);
-                } else if (typeof rawAmenities === 'string') {
-                  amenitiesList = rawAmenities.split(',').map(item => item.trim()).filter(Boolean);
-                }
-
-                if (amenitiesList.length === 0) return null;
-
-                return (
-                  <div className="pb-3 border-b">
-                    <h4 className="text-sm font-semibold text-gray-900 mb-2">{t.amenities_en ? t.amenities_en : 'Amenities'}</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-800">
-                      {amenitiesList.map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <span className="text-indigo-600">✓</span>
-                          <span>{item}</span>
+                  {/* Owner Info (Admin Only) */}
+                  {viewVilla.owner && (!viewVilla.owner.confidential || userRole === 'admin') && (
+                    <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-amber-400">
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-semibold text-gray-800">
+                          {language === 'ro' ? 'Proprietar / Manager' : 'Owner / Manager'}
+                        </h2>
+                        {viewVilla.owner.confidential && (
+                          <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-1 rounded-full">
+                            {language === 'ro' ? 'Confidențial (doar admin)' : 'Confidential (admin only)'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <p className="text-sm text-gray-500 mb-1">{language === 'ro' ? 'Nume proprietar' : 'Owner Name'}</p>
+                          <p className="font-medium text-gray-900">{getLoc(viewVilla.owner.name) || '-'}</p>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {viewVilla.owner && (!viewVilla.owner.confidential || userRole === 'admin') && (
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-base font-semibold text-gray-900">
-                      {language === 'ro' ? 'Proprietar / Manager' : 'Owner / Manager'}
-                    </h4>
-                    {viewVilla.owner.confidential && (
-                      <span className="text-xs text-amber-600 bg-amber-100 px-2 py-1 rounded-full">
-                        {language === 'ro' ? 'Confidențial (doar admin)' : 'Confidential (admin only)'}
-                      </span>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-800">
-                    <div>
-                      <div className="text-gray-600">{language === 'ro' ? 'Nume proprietar' : 'Owner Name'}</div>
-                      <div className="font-medium">{viewVilla.owner.name || '-'}</div>
-                    </div>
-                    <div>
-                      <div className="text-gray-600">{language === 'ro' ? 'Email proprietar' : 'Owner Email'}</div>
-                      <div className="font-medium break-all">{viewVilla.owner.email || '-'}</div>
-                    </div>
-                    <div>
-                      <div className="text-gray-600">{language === 'ro' ? 'Telefon proprietar' : 'Owner Phone'}</div>
-                      <div className="font-medium">{viewVilla.owner.phone || '-'}</div>
-                    </div>
-                    {viewVilla.owner.notes && (
-                      <div className="md:col-span-2">
-                        <div className="text-gray-600">{language === 'ro' ? 'Note proprietar' : 'Owner Notes'}</div>
-                        <div className="font-medium whitespace-pre-line">
-                          {viewVilla.owner.notes?.[language] || viewVilla.owner.notes?.en || viewVilla.owner.notes?.ro || ''}
+                        <div>
+                          <p className="text-sm text-gray-500 mb-1">{language === 'ro' ? 'Email proprietar' : 'Owner Email'}</p>
+                          <p className="font-medium text-gray-900 break-all">{getLoc(viewVilla.owner.email) || '-'}</p>
                         </div>
+                        <div>
+                          <p className="text-sm text-gray-500 mb-1">{language === 'ro' ? 'Telefon proprietar' : 'Owner Phone'}</p>
+                          <p className="font-medium text-gray-900">{getLoc(viewVilla.owner.phone) || '-'}</p>
+                        </div>
+                        {viewVilla.owner.notes && (
+                          <div className="md:col-span-2">
+                            <p className="text-sm text-gray-500 mb-1">{language === 'ro' ? 'Note proprietar' : 'Owner Notes'}</p>
+                            <div className="p-3 bg-gray-50 rounded text-sm text-gray-700 whitespace-pre-line border">
+                              {getLoc(viewVilla.owner.notes)}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Column - Sticky Details */}
+                <div className="col-span-1">
+                  <div className="bg-white rounded-lg shadow-md p-6 lg:sticky lg:top-6 space-y-6">
+                    {/* Price */}
+                    <div>
+                      <div className="text-3xl font-bold text-indigo-600 mb-1">
+                        €{viewVilla.priceConfigurations?.[0]?.price || viewVilla.price || '0'}
+                      </div>
+                      <div className="text-gray-500 text-sm">
+                        / {viewVilla.priceConfigurations?.[0]?.type || 'week'}
+                      </div>
+                    </div>
+
+                    <hr className="border-gray-100" />
+
+                    {/* Key Specs */}
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600">{t.bedrooms}</span>
+                        <span className="font-medium text-gray-900">{viewVilla.bedrooms || '-'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600">{t.bathrooms}</span>
+                        <span className="font-medium text-gray-900">{viewVilla.bathrooms || '-'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600">ID</span>
+                        <span className="font-medium text-gray-900 truncate max-w-[150px]">{viewVilla.id}</span>
+                      </div>
+                    </div>
+
+                    {/* Detailed Pricing */}
+                    {(viewVilla.priceConfigurations && viewVilla.priceConfigurations.length > 0) && (
+                      <div className="mt-4 pt-4 border-t border-gray-100">
+                         <h3 className="font-medium text-gray-900 mb-3">{t.standardRate}</h3>
+                         <div className="space-y-2 text-sm">
+                            {viewVilla.priceConfigurations.map((pc) => {
+                              const monthLabel = pc.month ? (monthLabels[pc.month.toLowerCase?.()] || pc.month) : null;
+                              return (
+                                <div key={pc.id || pc.label_en || pc.label_ro || pc.month} className="flex justify-between">
+                                  <span className="text-gray-600">
+                                    {(getLoc(pc.label) || pc.label_en || pc.label_ro || monthLabel || t.standardRate)}
+                                  </span>
+                                  <span className="font-medium text-gray-900">
+                                    €{pc.price} / {pc.type || 'week'}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                         </div>
                       </div>
                     )}
+
+                    {/* Action Buttons */}
+                    <div className="space-y-3 pt-4">
+                      {viewVilla.propertyLink && (
+                        <a 
+                          href={viewVilla.propertyLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="w-full py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center justify-center font-medium transition-colors"
+                        >
+                          {t.propertyLink}
+                        </a>
+                      )}
+                      
+                      {viewVilla.brochureUrl && (
+                         <a
+                           href={viewVilla.brochureUrl}
+                           target="_blank"
+                           rel="noreferrer"
+                           className="w-full py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 flex items-center justify-center font-medium transition-colors"
+                         >
+                           <svg className="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                           </svg>
+                           Download Brochure
+                         </a>
+                      )}
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>

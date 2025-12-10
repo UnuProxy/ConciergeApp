@@ -642,12 +642,12 @@ const PropertiesForSale = () => {
                   <div className="border-t border-gray-100 my-3" />
 
                   {/* Price and size section */}
-                  <div className="flex justify-between items-center mb-3 gap-2">
+                  <div className="flex flex-col gap-2 mb-3">
                     <div className="text-indigo-600 text-lg font-bold flex items-center min-w-0">
                       <span className="mr-1">€</span>
                       <span className="truncate">{formatPrice(prop.price)}</span>
                     </div>
-                    <div className="flex items-center text-gray-600 flex-shrink-0 gap-2 flex-wrap justify-end">
+                    <div className="flex items-center text-gray-600 gap-2 flex-wrap">
                       {prop.livingArea > 0 && (
                         <div className="flex items-center bg-indigo-50 text-indigo-700 rounded px-2 py-1 text-xs font-medium">
                           <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -35,6 +35,9 @@ const translations = {
     addBtn: 'Add Security',
     updateBtn: 'Update Security',
     deleteConfirm: 'Are you sure you want to delete this security person?',
+    managePermission: 'You can only manage security staff for your company.',
+    manageOtherCompany: 'This security profile belongs to another company.',
+    manageUnassigned: 'This profile is missing a company. Ask an admin to claim it before editing or deleting.',
     editButton: 'Edit',
     deleteButton: 'Delete'
   },
@@ -57,6 +60,9 @@ const translations = {
     addBtn: 'Adaugă securitate',
     updateBtn: 'Actualizează securitate',
     deleteConfirm: 'Sigur doriți să ștergeți această persoană?',
+    managePermission: 'Puteți gestiona personalul de securitate doar pentru compania dvs.',
+    manageOtherCompany: 'Acest profil aparține altei companii.',
+    manageUnassigned: 'Acest profil nu are companie. Un admin trebuie să îl atribuie înainte de editare sau ștergere.',
     editButton: 'Editează',
     deleteButton: 'Șterge'
   }
@@ -68,6 +74,7 @@ function Security() {
   const t = translations[lang];
   const dbContext = useDatabase();
   const userCompanyId = dbContext?.companyId || dbContext?.companyInfo?.id || null;
+  const userRole = dbContext?.userRole || null;
 
   // Add event listener to update language when it changes globally
   useEffect(() => {
@@ -99,21 +106,29 @@ function Security() {
     setLoading(true);
     setError(null);
     try {
-      const securityQuery = query(collection(db, 'security'), where('companyId', '==', userCompanyId));
-      const snap = await getDocs(securityQuery);
+      // Security is a shared service - load all security staff for both companies
+      const snap = await getDocs(collection(db, 'security'));
       const raw = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       const withStats = await Promise.all(
         raw.map(async s => {
-          const assignSnap = await getDocs(
-            query(
-              collection(db, 'reservations'),
-              where('securityId', '==', s.id),
-              where('status', '==', 'confirmed')
-            )
-          );
-          const assigns = assignSnap.docs.map(d => d.data());
-          const totalRevenue = assigns.reduce((sum, r) => sum + (r.totalAmount || 0), 0);
-          return { ...s, bookingCount: assigns.length, totalRevenue };
+          // Only query reservations for the user's company (company-private data)
+          try {
+            const assignSnap = await getDocs(
+              query(
+                collection(db, 'reservations'),
+                where('companyId', '==', userCompanyId),
+                where('securityId', '==', s.id),
+                where('status', '==', 'confirmed')
+              )
+            );
+            const assigns = assignSnap.docs.map(d => d.data());
+            const totalRevenue = assigns.reduce((sum, r) => sum + (r.totalAmount || 0), 0);
+            return { ...s, bookingCount: assigns.length, totalRevenue };
+          } catch (err) {
+            // If permission error, return security staff without stats
+            console.warn('Could not load stats for security staff:', s.id, err.message);
+            return { ...s, bookingCount: 0, totalRevenue: 0 };
+          }
         })
       );
       setStaff(withStats);
@@ -167,8 +182,26 @@ function Security() {
     } finally { setLoading(false); }
   };
 
+  const canManage = security => {
+    if (!userCompanyId) return false;
+    // Admins can claim legacy security profiles that never had a companyId set
+    if (!security?.companyId) return userRole === 'admin';
+    return security.companyId === userCompanyId;
+  };
+
+  const manageReason = security => {
+    if (!userCompanyId) return t.managePermission;
+    if (!security?.companyId) return userRole === 'admin' ? '' : t.manageUnassigned;
+    if (security.companyId !== userCompanyId) return t.manageOtherCompany;
+    return '';
+  };
+
   // Start editing
   const startEdit = s => {
+    if (!canManage(s)) {
+      setError(t.managePermission);
+      return;
+    }
     setForm({ name: s.name, email: s.email||'', phone: s.phone||'', rate: s.rate });
     setEditingId(s.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -178,11 +211,15 @@ function Security() {
   const cancelEdit = () => { setForm({ name:'', email:'', phone:'', rate:30 }); setEditingId(null); };
 
   // Delete
-  const handleDelete = async id => {
+  const handleDelete = async security => {
+    if (!canManage(security)) {
+      setError(manageReason(security) || t.managePermission);
+      return;
+    }
     if (!window.confirm(t.deleteConfirm)) return;
     setLoading(true); setError(null);
     try {
-      await deleteDoc(doc(db,'security',id));
+      await deleteDoc(doc(db,'security',security.id));
       await loadStaff();
     } catch(err) {
       console.error(err);
@@ -243,8 +280,20 @@ function Security() {
                   <td className="px-4 py-2 text-center text-sm">{s.bookingCount}</td>
                   <td className="px-4 py-2 text-right text-sm">€{s.totalRevenue.toFixed(2)}</td>
                   <td className="px-4 py-2 text-center space-x-2">
-                    <button onClick={()=>startEdit(s)} className="px-2 py-1 bg-yellow-400 text-white rounded hover:bg-yellow-500 transition text-xs">{t.editButton}</button>
-                    <button onClick={()=>handleDelete(s.id)} className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-xs">{t.deleteButton}</button>
+                    <button
+                      onClick={()=>startEdit(s)}
+                      disabled={!canManage(s)}
+                      className={`px-2 py-1 text-white rounded transition text-xs ${canManage(s) ? 'bg-yellow-400 hover:bg-yellow-500' : 'bg-gray-300 cursor-not-allowed'}`}
+                    >
+                      {t.editButton}
+                    </button>
+                    <button
+                      onClick={()=>handleDelete(s)}
+                      disabled={!canManage(s)}
+                      className={`px-2 py-1 text-white rounded transition text-xs ${canManage(s) ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-300 cursor-not-allowed'}`}
+                    >
+                      {t.deleteButton}
+                    </button>
                   </td>
                 </tr>
               )) : (
@@ -261,8 +310,22 @@ function Security() {
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-lg font-semibold">{s.name}</h3>
                 <div className="flex space-x-2">
-                  <button onClick={()=>startEdit(s)} className="px-2 py-1 bg-yellow-400 text-white rounded hover:bg-yellow-500 transition text-xs">{t.editButton}</button>
-                  <button onClick={()=>handleDelete(s.id)} className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-xs">{t.deleteButton}</button>
+                  <button
+                    onClick={()=>startEdit(s)}
+                    disabled={!canManage(s)}
+                    title={manageReason(s)}
+                    className={`px-2 py-1 text-white rounded transition text-xs ${canManage(s) ? 'bg-yellow-400 hover:bg-yellow-500' : 'bg-gray-300 cursor-not-allowed'}`}
+                  >
+                    {t.editButton}
+                  </button>
+                  <button
+                    onClick={()=>handleDelete(s)}
+                    disabled={!canManage(s)}
+                    title={manageReason(s)}
+                    className={`px-2 py-1 text-white rounded transition text-xs ${canManage(s) ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-300 cursor-not-allowed'}`}
+                  >
+                    {t.deleteButton}
+                  </button>
                 </div>
               </div>
               <p className="text-sm"><span className="font-medium">{t.email}:</span> {s.email||'—'}</p>
@@ -270,6 +333,7 @@ function Security() {
               <p className="text-sm"><span className="font-medium">{t.rate}:</span> {s.rate}{t.rateUnit}</p>
               <p className="text-sm"><span className="font-medium">{t.bookings}:</span> {s.bookingCount}</p>
               <p className="text-sm"><span className="font-medium">{t.revenue}:</span> €{s.totalRevenue.toFixed(2)}</p>
+              {manageReason(s) && <p className="text-xs text-gray-500 mt-2">{manageReason(s)}</p>}
             </div>
           )) : (
             <p className="text-center text-gray-500">{t.noFound}</p>
