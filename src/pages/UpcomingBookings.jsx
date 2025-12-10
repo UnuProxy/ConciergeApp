@@ -1115,22 +1115,24 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             {t.totalAmount || 'Total Amount*'}
           </label>
-          <div className="relative space-y-2">
-            <input
-              type="number"
-              inputMode="decimal"
-              value={shoppingData.price}
-              onChange={(e) => setShoppingData({...shoppingData, price: e.target.value})}
-              onFocus={(e) => {
-                if (e.target.value === '0') {
-                  setShoppingData(prev => ({ ...prev, price: '' }));
-                }
-              }}
-              className="w-full pl-8 p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
-              required
-            />
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span className="text-gray-500">€</span>
+          <div className="space-y-2">
+            <div className="relative">
+              <input
+                type="number"
+                inputMode="decimal"
+                value={shoppingData.price}
+                onChange={(e) => setShoppingData({...shoppingData, price: e.target.value})}
+                onFocus={(e) => {
+                  if (e.target.value === '0') {
+                    setShoppingData(prev => ({ ...prev, price: '' }));
+                  }
+                }}
+                className="w-full pl-8 p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
+                required
+              />
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <span className="text-gray-500">€</span>
+              </div>
             </div>
             <div className="flex gap-2">
               {[10, 20, 30].map(pct => (
@@ -2162,27 +2164,6 @@ useEffect(() => {
             };
           }
           
-          const baseTotalValue = booking.totalValue || booking.totalAmount || 0;
-          const paidAmount = booking.paidAmount || booking.totalPaid || 0;
-          
-          // Compute services total for this booking (fallback if total missing)
-          const serviceTotalForBooking = Array.isArray(booking.services)
-            ? booking.services.reduce((sum, svc) => {
-                const price = svc?.price || 0;
-                const qty = svc?.quantity || 1;
-                return sum + price * qty;
-              }, 0)
-            : 0;
-          
-          // Re-sync effective total so it never falls below services total or paid amount
-          const combinedTotal = Math.max(baseTotalValue, serviceTotalForBooking, paidAmount);
-          let effectiveTotalValue = combinedTotal > 0 ? combinedTotal : serviceTotalForBooking;
-          
-          // Ensure effective total is not below paid amount to keep ratios sane
-          if (effectiveTotalValue < paidAmount) {
-            effectiveTotalValue = paidAmount;
-          }
-          
           // Extract all payment history
           if (booking.paymentHistory && booking.paymentHistory.length > 0) {
             booking.paymentHistory.forEach(payment => {
@@ -2202,6 +2183,36 @@ useEffect(() => {
           const bookingServices = Array.isArray(booking.services)
             ? booking.services
             : (Array.isArray(booking.extras) ? booking.extras : []);
+          
+          // Compute services total for this booking (fallback if total missing)
+          const serviceTotalForBooking = bookingServices.reduce((sum, svc) => {
+            const price = svc?.price || 0;
+            const qty = svc?.quantity || 1;
+            return sum + price * qty;
+          }, 0);
+          
+          // Compute paid from history or per-service amounts to avoid false "paid"
+          const paymentHistoryTotal = Array.isArray(booking.paymentHistory)
+            ? booking.paymentHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
+            : 0;
+          const servicePaidTotal = bookingServices.reduce((sum, svc) => sum + (parseFloat(svc.amountPaid) || 0), 0);
+          const explicitPaid = booking.paidAmount || booking.totalPaid || 0;
+          const paidAmount = paymentHistoryTotal > 0
+            ? paymentHistoryTotal
+            : servicePaidTotal > 0
+              ? servicePaidTotal
+              : ((booking.lastPaymentDate || booking.lastPaymentMethod) ? explicitPaid : 0);
+
+          const baseTotalValue = booking.totalValue || booking.totalAmount || 0;
+          
+          // Re-sync effective total so it never falls below services total or paid amount
+          const combinedTotal = Math.max(baseTotalValue, serviceTotalForBooking, paidAmount);
+          let effectiveTotalValue = combinedTotal > 0 ? combinedTotal : serviceTotalForBooking;
+          
+          // Ensure effective total is not below paid amount to keep ratios sane
+          if (effectiveTotalValue < paidAmount) {
+            effectiveTotalValue = paidAmount;
+          }
           
           if (bookingServices.length > 0) {
             bookingServices.forEach((service, serviceIndex) => {
@@ -2891,8 +2902,21 @@ const renderMainContent = (filteredClients) => {
       if (bookingData.companyId !== userCompanyId) {
         throw new Error('You are not authorized to delete this booking');
       }
+
+      // 1. Delete associated finance records first
+      const financeQuery = query(
+        collection(db, 'financeRecords'),
+        where('bookingId', '==', booking.id)
+      );
+      const financeDocs = await getDocs(financeQuery);
       
-      // Delete the booking document from Firestore
+      if (!financeDocs.empty) {
+        console.log(`Deleting ${financeDocs.size} finance records for booking ${booking.id}`);
+        const deletePromises = financeDocs.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(deletePromises);
+      }
+
+      // 2. Delete the booking document from Firestore
       await deleteDoc(bookingRef);
       
       // Update local state: remove the booking from bookings array

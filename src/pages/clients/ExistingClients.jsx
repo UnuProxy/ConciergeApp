@@ -1709,6 +1709,30 @@ setAvailableServices(services);
     
     return total;
   };
+
+  // Calculate total from a flat services array
+  const calculateServicesArrayTotal = (items = []) => {
+    return items.reduce((sum, item) => {
+      if (!item.included) return sum;
+      if (item.discountValue) return sum + calculateItemPrice(item);
+      return sum + ((item.price || 0) * (item.quantity || 0));
+    }, 0);
+  };
+
+  // Keep only services that belong to the current offer (avoid leaking items from other offers)
+  const filterServicesForOffer = (services, offerId) => {
+    if (!services || !offerId) return {};
+    const filtered = {};
+    Object.entries(services).forEach(([category, items]) => {
+      const safeItems = items
+        .filter(item => !item.offerId || item.offerId === offerId)
+        .map(item => ({ ...item }));
+      if (safeItems.length) {
+        filtered[category] = safeItems;
+      }
+    });
+    return filtered;
+  };
   
   // Filter services by price
   const filteredServices = (availableServices[selectedCategory] || []).filter(service => {
@@ -1839,7 +1863,8 @@ const fetchCompanyAdminForPdf = async (companyId) => {
           paymentStatus: 'unpaid',
           amountPaid: 0,
           startDate: reservationData.checkIn,
-          endDate: reservationData.checkOut
+          endDate: reservationData.checkOut,
+          offerId: offer.id
         });
       });
       
@@ -1910,8 +1935,10 @@ const fetchCompanyAdminForPdf = async (companyId) => {
       let hasAccommodation = false;
       let totalPaid = 0;
       
-      if (services) {
-        Object.entries(services).forEach(([category, items]) => {
+      const servicesForThisOffer = filterServicesForOffer(services, offer.id);
+      
+      if (servicesForThisOffer && Object.keys(servicesForThisOffer).length) {
+        Object.entries(servicesForThisOffer).forEach(([category, items]) => {
           items.forEach(item => {
             if (item.included) {
               // Add payment information
@@ -1948,7 +1975,8 @@ const fetchCompanyAdminForPdf = async (companyId) => {
             startDate: reservationData.checkIn,
             endDate: reservationData.checkOut,
             paymentStatus: 'unpaid',
-            amountPaid: 0
+            amountPaid: 0,
+            offerId: offer.id
           });
           
           // Check if we have at least one accommodation
@@ -1982,13 +2010,16 @@ const fetchCompanyAdminForPdf = async (companyId) => {
       }
       
       // Determine overall payment status
-      const totalAmount = calculateServicesTotal(services);
+      // Total should reflect the services we are actually including in this booking
+      const totalAmount = calculateServicesArrayTotal(includedServices);
       let overallPaymentStatus = 'unpaid';
       
-      if (totalPaid >= totalAmount) {
-        overallPaymentStatus = 'paid';
-      } else if (totalPaid > 0) {
-        overallPaymentStatus = 'partially_paid';
+      if (totalAmount > 0) {
+        if (totalPaid >= totalAmount) {
+          overallPaymentStatus = 'paid';
+        } else if (totalPaid > 0) {
+          overallPaymentStatus = 'partially_paid';
+        }
       }
 
       // Build initial payment history entries based on pre-paid services (so per-service payments show up)
@@ -2235,6 +2266,31 @@ const handleSelectClient = async (client) => {
           throw new Error("Not authorized to delete this client");
         }
         
+        // 1. Find and delete all bookings for this client
+        const bookingsQuery = query(
+          collection(db, "reservations"),
+          where("clientId", "==", selectedClient.id)
+        );
+        const bookingsSnapshot = await getDocs(bookingsQuery);
+        
+        // For each booking, delete its finance records then the booking itself
+        const deleteBookingsPromises = bookingsSnapshot.docs.map(async (bookingDoc) => {
+          // Delete finance records for this booking
+          const financeQuery = query(
+            collection(db, "financeRecords"),
+            where("bookingId", "==", bookingDoc.id)
+          );
+          const financeSnapshot = await getDocs(financeQuery);
+          const deleteFinancePromises = financeSnapshot.docs.map(fDoc => deleteDoc(fDoc.ref));
+          await Promise.all(deleteFinancePromises);
+          
+          // Delete the booking
+          return deleteDoc(bookingDoc.ref);
+        });
+        
+        await Promise.all(deleteBookingsPromises);
+        
+        // 2. Delete the client document
         const clientRef = doc(db, "clients", selectedClient.id);
         await deleteDoc(clientRef);
         
@@ -6415,11 +6471,11 @@ const getUserName = async (userId) => {
                         <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2 md:grid-cols-3'} gap-4`}>
                           <div>
                             <p className="text-xs text-gray-500 font-medium mb-1">{t.email}</p>
-                            <p className="text-sm text-gray-900">{selectedClient.email || '-'}</p>
+                            <p className="text-sm text-gray-900 break-words">{selectedClient.email || '-'}</p>
                           </div>
                           <div>
                             <p className="text-xs text-gray-500 font-medium mb-1">{t.phone}</p>
-                            <p className="text-sm text-gray-900">{selectedClient.phone || '-'}</p>
+                            <p className="text-sm text-gray-900 break-words">{selectedClient.phone || '-'}</p>
                           </div>
                           <div>
                             <p className="text-xs text-gray-500 font-medium mb-1">{t.address}</p>

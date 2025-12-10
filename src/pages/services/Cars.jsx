@@ -6,6 +6,14 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { db, storage } from '../../firebase/config';
 import { getCurrentLanguage } from "../../utils/languageHelper";
 
+// Helper to safely read first photo url (string or {url})
+const getCarPhotoUrl = (car) => {
+  if (!car?.photos || car.photos.length === 0) return null;
+  const first = car.photos[0];
+  if (typeof first === 'string') return first;
+  return first?.url || null;
+};
+
 // Enhanced styles with mobile responsiveness and new filter styles
 const styles = {
   container: {
@@ -483,6 +491,7 @@ function Cars() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [imageErrors, setImageErrors] = useState({});
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 768);
+  const [successMessage, setSuccessMessage] = useState('');
   
   // NEW: Filter and search state
   const [searchTerm, setSearchTerm] = useState('');
@@ -584,6 +593,9 @@ function Cars() {
     bookingNotes_en: '',
     bookingNotes_ro: ''
   });
+
+  // Quick helper to drop a single month/price pair into monthlyPrices
+  const addSeasonPrice = () => {};
   
   // Photos array
   const [existingPhotos, setExistingPhotos] = useState([]);
@@ -1060,8 +1072,7 @@ function Cars() {
       pricing: {
         daily: formData.priceDaily || '',
         monthly: {
-          ...formData.monthlyPrices,
-          [(formData.priceMonth || 'may')]: formData.priceDaily || ''
+          ...formData.monthlyPrices
         }
       },
       // Features
@@ -1093,6 +1104,10 @@ function Cars() {
       const carCollection = collection(db, "cars");
       await addDoc(carCollection, carData);
       
+      // Show success message
+      setSuccessMessage(language === 'en' ? 'Car successfully added!' : 'Mașina a fost adăugată cu succes!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+
       // Reset form and fetch updated data
       resetForm();
       setIsAddingCar(false);
@@ -1131,6 +1146,10 @@ function Cars() {
       const carDoc = doc(db, "cars", currentCar.id);
       await updateDoc(carDoc, carData);
       
+      // Show success message
+      setSuccessMessage(language === 'en' ? 'Car successfully updated!' : 'Mașina a fost actualizată cu succes!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+
       // Reset form and fetch updated data
       resetForm();
       setIsEditingCar(false);
@@ -1224,8 +1243,8 @@ function Cars() {
       doors: car.doors || '',
       transmission: car.transmission || 'automatic',
       fuel: car.fuel || 'petrol',
-      description_en: car.description?.en || '',
-      description_ro: car.description?.ro || '',
+      description_en: typeof car.description === 'string' ? car.description : (car.description?.en || ''),
+      description_ro: typeof car.description === 'string' ? car.description : (car.description?.ro || ''),
       // Detailed specs
       specs: {
         engine: car.specs?.engine || '',
@@ -1271,10 +1290,10 @@ function Cars() {
       contactName: car.contact?.name || '',
       contactPhone: car.contact?.phone || '',
       contactEmail: car.contact?.email || '',
-      pickupLocation_en: car.pickupLocation?.en || '',
-      pickupLocation_ro: car.pickupLocation?.ro || '',
-      bookingNotes_en: car.bookingNotes?.en || '',
-      bookingNotes_ro: car.bookingNotes?.ro || ''
+      pickupLocation_en: typeof car.pickupLocation === 'string' ? car.pickupLocation : (car.pickupLocation?.en || ''),
+      pickupLocation_ro: typeof car.pickupLocation === 'string' ? car.pickupLocation : (car.pickupLocation?.ro || ''),
+      bookingNotes_en: typeof car.bookingNotes === 'string' ? car.bookingNotes : (car.bookingNotes?.en || ''),
+      bookingNotes_ro: typeof car.bookingNotes === 'string' ? car.bookingNotes : (car.bookingNotes?.ro || '')
     });
     
     // Set existing photos
@@ -1699,42 +1718,6 @@ function Cars() {
               <option value="hybrid">{t.fuelTypes.hybrid}</option>
               <option value="electric">{t.fuelTypes.electric}</option>
             </select>
-          </div>
-        </div>
-        <div style={gridStyle}>
-          <div>
-            <label style={styles.formLabel}>
-              {language === 'en' ? 'Month (season)' : 'Lună (sezon)'}
-            </label>
-            <select
-              name="priceMonth"
-              value={formData.priceMonth || 'may'}
-              onChange={handleInputChange}
-              style={styles.select}
-            >
-              {['may','june','july','august','september','october'].map(monthKey => (
-                <option key={monthKey} value={monthKey}>
-                  {monthLabels[monthKey] || monthKey}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label style={styles.formLabel}>
-              {t.price.daily}
-            </label>
-            <div style={styles.currencyInput}>
-              <span style={styles.currencySymbol}>
-                €
-              </span>
-              <input
-                type="text"
-                name="priceDaily"
-                value={formData.priceDaily || ''}
-                onChange={handleInputChange}
-                style={styles.currencyTextInput}
-              />
-            </div>
           </div>
         </div>
         <div style={styles.formSection}>
@@ -2648,6 +2631,27 @@ function Cars() {
   
   return (
     <div style={styles.container}>
+      {/* Success Message Popup */}
+      {successMessage && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          backgroundColor: '#10b981',
+          color: 'white',
+          padding: '1rem 1.5rem',
+          borderRadius: '8px',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+          zIndex: 9999,
+          animation: 'slideInRight 0.3s ease-out'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '1.2rem' }}>✓</span>
+            <span style={{ fontWeight: '500' }}>{successMessage}</span>
+          </div>
+        </div>
+      )}
+
       <div style={styles.header}>
         <h1 style={styles.title}>{t.carList.title}</h1>
       </div>
@@ -2863,79 +2867,251 @@ export default Cars;
 
 // View modal for cars (read-only overview)
 function CarViewModal({ car, onClose, language, t, getLocalizedContent }) {
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+
   if (!car) return null;
 
-  const specItem = (label, value) => (
-    value ? <div style={{ color: '#374151', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>{label}: {value}</div> : null
-  );
+  const photoUrls = [
+    ...(car.photos || []).map(p => (typeof p === 'string' ? p : p?.url)).filter(Boolean),
+    ...(car.photoUrl ? [car.photoUrl] : [])
+  ];
+
+  const monthlyEntries = car.pricing?.monthly
+    ? Object.entries(car.pricing.monthly).filter(([, val]) => val)
+    : [];
+
+  // Flatten features for display
+  const featuresList = [];
+  if (car.features) {
+    Object.entries(car.features).forEach(([key, value]) => {
+      if (value && t.features[key]) {
+        featuresList.push(t.features[key]);
+      }
+    });
+  }
+
+  const displayName = getLocalizedContent(car.name, language) || `${car.make || ''} ${car.model || ''}`;
+  const displayLocation = getLocalizedContent(car.pickupLocation, language);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: '1rem' }}>
-      <div style={{ width: '100%', maxWidth: '900px', background: '#fff', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 20px 45px rgba(0,0,0,0.18)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', borderBottom: '1px solid #e5e7eb' }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#111827' }}>
-              {getLocalizedContent(car.name, language) || `${car.make || ''} ${car.model || ''}`}
-            </h2>
-            <p style={{ margin: 0, color: '#6b7280', fontSize: '0.95rem' }}>
-              {car.make} {car.model} {car.year ? `(${car.year})` : ''}
-            </p>
-          </div>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-white flex-shrink-0">
           <button
             onClick={onClose}
-            style={{ border: '1px solid #d1d5db', background: '#f3f4f6', color: '#111827', borderRadius: '8px', padding: '0.45rem 0.75rem', cursor: 'pointer' }}
+            className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 text-sm font-semibold transition-colors"
           >
-            ✕
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            {t.navigation.back}
           </button>
+          <div className="flex items-center gap-3">
+             <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
-        {car.photoUrl && (
-          <div style={{ width: '100%', maxHeight: '360px', overflow: 'hidden' }}>
-            <img src={car.photoUrl} alt={car.make || car.model || t.unnamed} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        {/* Scrollable Content */}
+        <div className="overflow-y-auto p-6 bg-gray-50 flex-grow">
+          {/* Title & Location */}
+          <div className="mb-6">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">{displayName}</h1>
+            {displayLocation && (
+              <div className="flex items-center text-gray-600">
+                <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                {displayLocation}
+              </div>
+            )}
           </div>
-        )}
 
-        <div style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e5e7eb' }}>
-            {specItem(t.year || 'Year', car.year)}
-            {specItem(t.seats || 'Seats', car.seats)}
-            {specItem(t.doors || 'Doors', car.doors)}
-            {specItem(t.transmission || 'Transmission', car.transmission)}
-            {specItem(t.fuelType || 'Fuel', car.fuelType)}
-            {specItem(t.mileage || 'Mileage', car.mileage)}
-          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Left Column */}
+            <div className="col-span-1 lg:col-span-2 space-y-6">
+              {/* Images */}
+              {(() => {
+                if (photoUrls.length === 0) return (
+                  <div className="bg-gray-200 rounded-lg h-64 flex items-center justify-center text-gray-400">
+                    {t.noPhotos}
+                  </div>
+                );
 
-          {car.pricing?.daily && (
-            <div style={{ paddingBottom: '0.75rem', borderBottom: '1px solid #e5e7eb' }}>
-              <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '1rem', fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                {t.pricing || 'Pricing'}
-              </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', color: '#374151' }}>
-                <span>€{car.pricing.daily}/{language === 'en' ? 'day' : 'zi'}</span>
-                {car.pricing.weekly && <span>€{car.pricing.weekly}/{language === 'en' ? 'week' : 'săptămână'}</span>}
-                {car.pricing.monthly && typeof car.pricing.monthly === 'object'
-                  ? Object.entries(car.pricing.monthly)
-                      .filter(([, val]) => val)
-                      .map(([k, val]) => (
-                        <span key={k}>€{val} / {k}</span>
-                      ))
-                  : car.pricing.monthly
-                    ? <span>€{car.pricing.monthly}/{language === 'en' ? 'month' : 'lună'}</span>
-                    : null}
+                const activeUrl = photoUrls[activePhotoIndex] || photoUrls[0];
+
+                return (
+                  <div className="space-y-4">
+                    <div className="bg-gray-100 rounded-lg overflow-hidden relative shadow-md group">
+                      <img
+                        src={activeUrl}
+                        alt="Car cover"
+                        className="w-full h-64 sm:h-96 object-cover"
+                      />
+                      
+                      {/* Navigation Arrows */}
+                      {photoUrls.length > 1 && (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const newIndex = activePhotoIndex === 0 ? photoUrls.length - 1 : activePhotoIndex - 1;
+                              setActivePhotoIndex(newIndex);
+                            }}
+                            className="absolute left-2 top-1/2 transform -translate-y-1/2 p-2 rounded-full bg-white/70 hover:bg-white shadow text-gray-800 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const newIndex = activePhotoIndex === photoUrls.length - 1 ? 0 : activePhotoIndex + 1;
+                              setActivePhotoIndex(newIndex);
+                            }}
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 rounded-full bg-white/70 hover:bg-white shadow text-gray-800 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Thumbnails */}
+                    {photoUrls.length > 1 && (
+                      <div className="flex space-x-2 overflow-x-auto pb-2 no-scrollbar">
+                        {photoUrls.map((url, idx) => (
+                          <button
+                            key={`${url}-${idx}`}
+                            onClick={() => setActivePhotoIndex(idx)}
+                            className={`flex-shrink-0 w-20 h-20 rounded-md overflow-hidden border-2 transition-all ${
+                              idx === activePhotoIndex ? 'border-indigo-600 ring-2 ring-indigo-100' : 'border-transparent opacity-70 hover:opacity-100'
+                            }`}
+                          >
+                            <img
+                              src={url}
+                              alt={`Thumbnail ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Description */}
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-xl font-semibold text-gray-800 mb-4">{t.description}</h2>
+                <div className="prose max-w-none text-gray-700 whitespace-pre-line">
+                  {getLocalizedContent(car.description, language) || (
+                    <span className="text-gray-400 italic">No description available</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Features/Amenities */}
+              {featuresList.length > 0 && (
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <h2 className="text-xl font-semibold text-gray-800 mb-4">{t.features.title}</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    {featuresList.map((item, idx) => (
+                      <div key={idx} className="flex items-center p-2 bg-gray-50 rounded">
+                        <svg className="w-5 h-5 mr-2 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span className="text-gray-700 font-medium">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column - Sticky Details */}
+            <div className="col-span-1">
+              <div className="bg-white rounded-lg shadow-md p-6 lg:sticky lg:top-6 space-y-6">
+                {/* Price */}
+                <div>
+                  <div className="text-3xl font-bold text-indigo-600 mb-1">
+                    €{car.pricing?.daily || '0'}
+                  </div>
+                  <div className="text-gray-500 text-sm">
+                    / {language === 'en' ? 'day' : 'zi'}
+                  </div>
+                </div>
+
+                <hr className="border-gray-100" />
+
+                {/* Key Specs */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">{t.seats}</span>
+                    <span className="font-medium text-gray-900">{car.seats || '-'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">{t.doors}</span>
+                    <span className="font-medium text-gray-900">{car.doors || '-'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">{t.transmission}</span>
+                    <span className="font-medium text-gray-900">{t.transmissionTypes[car.transmission] || car.transmission || '-'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">{t.fuel}</span>
+                    <span className="font-medium text-gray-900">{t.fuelTypes[car.fuel] || car.fuel || '-'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">{t.year}</span>
+                    <span className="font-medium text-gray-900">{car.year || '-'}</span>
+                  </div>
+                </div>
+
+                {/* Monthly Pricing */}
+                {monthlyEntries.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                     <h3 className="font-medium text-gray-900 mb-3">{t.price.monthly}</h3>
+                     <div className="space-y-2 text-sm">
+                        {monthlyEntries.map(([month, val]) => (
+                          <div key={month} className="flex justify-between">
+                            <span className="text-gray-600 capitalize">
+                              {month}
+                            </span>
+                            <span className="font-medium text-gray-900">
+                              €{val} / {language === 'en' ? 'day' : 'zi'}
+                            </span>
+                          </div>
+                        ))}
+                     </div>
+                  </div>
+                )}
+                
+                {/* Contact Info if available */}
+                {(car.contact?.name || car.contact?.phone || car.contact?.email) && (
+                   <div className="mt-4 pt-4 border-t border-gray-100">
+                     <h3 className="font-medium text-gray-900 mb-3">{t.contact.title}</h3>
+                     <div className="text-sm space-y-1">
+                        {car.contact.name && <p><span className="text-gray-600">{t.contact.name}:</span> {car.contact.name}</p>}
+                        {car.contact.phone && <p><span className="text-gray-600">{t.contact.phone}:</span> {car.contact.phone}</p>}
+                        {car.contact.email && <p><span className="text-gray-600">{t.contact.email}:</span> {car.contact.email}</p>}
+                     </div>
+                   </div>
+                )}
               </div>
             </div>
-          )}
-
-          {car.description && (
-            <div>
-              <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '1rem', fontWeight: 600, color: '#111827' }}>
-                {t.description || 'Description'}
-              </h4>
-              <p style={{ margin: 0, color: '#374151', lineHeight: 1.5 }}>
-                {getLocalizedContent(car.description, language)}
-              </p>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
