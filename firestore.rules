@@ -204,7 +204,9 @@ service cloud.firestore {
       allow read: if matchesCompany(resource.data.companyId);
       allow create: if canCreateForCompany(request.resource.data.companyId);
       allow update: if canUpdateForCompany(resource.data.companyId);
-      allow delete: if canDeleteForCompany(resource.data.companyId);
+      // Some legacy records may lack companyId; allow admins of their own company to clean them up
+      allow delete: if canDeleteForCompany(resource.data.companyId) ||
+                    (resource.data.companyId == null && isAdmin());
     }
   }
 }

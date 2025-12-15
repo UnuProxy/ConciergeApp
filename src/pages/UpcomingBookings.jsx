@@ -245,6 +245,7 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [serviceSearch, setServiceSearch] = useState('');
   
   // Form state for custom service
   const [serviceData, setServiceData] = useState({
@@ -256,7 +257,9 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
     unit: 'hourly',
     date: new Date().toISOString().split('T')[0],
     status: 'confirmed',
-    notes: ''
+    notes: '',
+    selectedMonth: '',
+    monthlyOptions: []
   });
 
   // Fetch categories first
@@ -356,9 +359,11 @@ const getServiceThumbnail = (service) => {
         };
         
         serviceSnapshot.forEach(doc => {
+          const data = doc.data();
           servicesData.push({
             id: doc.id,
-            ...doc.data()
+            ...data,
+            priceConfigurations: data.priceConfigurations || []
           });
         });
         
@@ -417,6 +422,7 @@ const getServiceThumbnail = (service) => {
                 category: selectedCategory.id,
                 price: price,
                 unit: resolvedUnit,
+                priceConfigurations: data.priceConfigurations || [],
                 brand: data.brand || '',
                 model: data.model || '',
                 bedrooms: data.bedrooms || '',
@@ -474,6 +480,7 @@ const getServiceThumbnail = (service) => {
   const handleCategorySelect = (category) => {
     setSelectedCategory(category);
     setServiceData(prev => ({ ...prev, category: category.id }));
+    setServiceSearch('');
     
     if (category.id === 'custom') {
       setStep('custom');
@@ -483,19 +490,36 @@ const getServiceThumbnail = (service) => {
   };
 
   const handleServiceSelect = (service) => {
+    const monthlyOptions = Array.isArray(service.priceConfigurations)
+      ? service.priceConfigurations
+          .filter((pc) => pc && pc.price)
+          .map((pc) => ({
+            month: pc.month || '',
+            price: parseFloat(pc.price) || 0,
+            type: pc.type || service.unit || 'service'
+          }))
+      : [];
+    const defaultMonthly = monthlyOptions[0] || null;
+    const resolvedPrice = service.price && Number(service.price) > 0
+      ? service.price
+      : (defaultMonthly ? defaultMonthly.price : 0);
+    const resolvedUnit = defaultMonthly?.type || service.unit || 'hourly';
+
     setServiceData({
       ...serviceData,
       name: typeof service.name === 'object' ? service.name.en : service.name,
       description: typeof service.description === 'object' ? service.description.en : service.description || '',
       category: selectedCategory.id,
-      price: service.price || 0,
-      unit: service.unit || 'hourly',
+      price: resolvedPrice || 0,
+      unit: resolvedUnit,
       date: new Date().toISOString().split('T')[0],
       brand: service.brand || '',
       model: service.model || '',
       quantity: 1,
       status: 'confirmed',
-      templateId: service.id
+      templateId: service.id,
+      selectedMonth: defaultMonthly?.month || '',
+      monthlyOptions
     });
     
     setStep('details');
@@ -513,6 +537,7 @@ const getServiceThumbnail = (service) => {
       name: serviceData.name,
       description: serviceData.description || '',
       date: serviceData.date,
+      month: serviceData.selectedMonth || null,
       price: serviceData.price,
       quantity: serviceData.quantity,
       unit: serviceData.unit,
@@ -569,6 +594,17 @@ const renderServicesList = () => (
           </svg>
         </button>
       </div>
+
+      <div className="mb-3">
+        <label className="block text-sm text-gray-700 mb-1">{t.search || 'Search'}</label>
+        <input
+          type="text"
+          value={serviceSearch}
+          onChange={(e) => setServiceSearch(e.target.value)}
+          placeholder={t.searchServices || 'Search services...'}
+          className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
+        />
+      </div>
       
       {loading ? (
         <div className="flex justify-center py-8">
@@ -578,7 +614,17 @@ const renderServicesList = () => (
         <>
           {services.length > 0 ? (
             <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-              {services.map((service, index) => {
+              {services
+                .filter((service) => {
+                  if (!serviceSearch.trim()) return true;
+                  const q = serviceSearch.toLowerCase();
+                  const name = (service.displayName || service.name || '').toString().toLowerCase();
+                  const desc = (service.description || '').toString().toLowerCase();
+                  const brand = (service.brand || '').toString().toLowerCase();
+                  const model = (service.model || '').toString().toLowerCase();
+                  return name.includes(q) || desc.includes(q) || brand.includes(q) || model.includes(q);
+                })
+                .map((service, index) => {
                 const displayName = (() => {
                   if (service.displayName) return service.displayName;
                   if (typeof service.name === 'object') {
@@ -595,9 +641,21 @@ const renderServicesList = () => (
                       ? service.model
                       : (typeof service.description === 'object' ? (service.description.en || service.description.ro) : service.description);
 
+                const priceOptions = Array.isArray(service.priceConfigurations)
+                  ? service.priceConfigurations.filter((pc) => pc && pc.price)
+                  : [];
+                const cheapestMonthly = priceOptions.reduce((min, pc) => {
+                  const priceVal = parseFloat(pc.price);
+                  if (Number.isNaN(priceVal)) return min;
+                  if (!min || priceVal < min.price) return { price: priceVal, unit: pc.type || service.unit || 'service' };
+                  return min;
+                }, null);
                 const hasPrice = service.price && Number(service.price) > 0;
-                const displayPrice = hasPrice
-                  ? `${Number(service.price).toLocaleString()} € / ${service.unit || 'item'}`
+                const effectivePrice = hasPrice
+                  ? { price: Number(service.price), unit: service.unit || 'item' }
+                  : cheapestMonthly;
+                const displayPrice = effectivePrice
+                  ? `${effectivePrice.price.toLocaleString()} € / ${effectivePrice.unit || 'item'}`
                   : (t.priceOnRequest || 'Price on request');
 
                 const descriptionSnippet = displayDesc && displayDesc.length > 120
@@ -695,6 +753,32 @@ const renderServicesList = () => (
             className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
           />
         </div>
+
+        {serviceData.monthlyOptions.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t.month || 'Month'}</label>
+            <select
+              value={serviceData.selectedMonth}
+              onChange={(e) => {
+                const month = e.target.value;
+                const picked = serviceData.monthlyOptions.find((opt) => opt.month === month);
+                setServiceData({
+                  ...serviceData,
+                  selectedMonth: month,
+                  price: picked ? picked.price : serviceData.price,
+                  unit: picked?.type || serviceData.unit
+                });
+              }}
+              className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
+            >
+              {serviceData.monthlyOptions.map((opt) => (
+                <option key={`${opt.month}-${opt.price}`} value={opt.month}>
+                  {(opt.month || t.month || 'Month')}: €{opt.price} / {opt.type || serviceData.unit}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -1637,29 +1721,51 @@ const UpcomingBookings = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [timeFilter, setTimeFilter] = useState(getStoredTimeFilter); // Default to showing active stays
   const [sortOption, setSortOption] = useState('date');
-  
-  const summaryStats = useMemo(() => {
+
+  const getTodayStart = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    return today;
+  };
+
+  const normalizeDateValue = (value) => {
+    if (!value) return null;
+    const date = value instanceof Date ? new Date(value) : new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    date.setHours(0, 0, 0, 0);
+    return date;
+  };
+
+  const isBookingInactive = (booking = {}) =>
+    booking?.status === 'cancelled' || booking?.cancelled === true || booking?.active === false;
+
+  const getBookingTimeBucket = (booking, today = getTodayStart()) => {
+    if (!booking || isBookingInactive(booking)) return null;
+    const checkIn = normalizeDateValue(booking.checkIn);
+    const checkOut = normalizeDateValue(booking.checkOut || booking.checkIn);
+    if (!checkIn || !checkOut) return null;
+    
+    if (checkIn > today) return 'upcoming';
+    if (checkIn <= today && checkOut >= today) return 'active';
+    if (checkOut < today) return 'past';
+    return null;
+  };
+  
+  const summaryStats = useMemo(() => {
+    const today = getTodayStart();
     
     let upcoming = 0;
     let active = 0;
     let past = 0;
+    const seenBookings = new Set();
     
     bookings.forEach(booking => {
-      if (!booking.checkIn) return;
-      const checkIn = new Date(booking.checkIn);
-      const checkOut = new Date(booking.checkOut || booking.checkIn);
-      checkIn.setHours(0, 0, 0, 0);
-      checkOut.setHours(0, 0, 0, 0);
-      
-      if (checkIn > today) {
-        upcoming += 1;
-      } else if (checkIn <= today && checkOut >= today) {
-        active += 1;
-      } else if (checkOut < today) {
-        past += 1;
-      }
+      if (!booking || seenBookings.has(booking.id)) return;
+      seenBookings.add(booking.id);
+      const bucket = getBookingTimeBucket(booking, today);
+      if (bucket === 'upcoming') upcoming += 1;
+      else if (bucket === 'active') active += 1;
+      else if (bucket === 'past') past += 1;
     });
     
     const totals = clientList.reduce(
@@ -1771,11 +1877,16 @@ const UpcomingBookings = () => {
   );
 
   const visibleBookingCount = useMemo(
-    () =>
-      filteredClients.reduce((total, client) => {
-        return total + (Array.isArray(client.bookings) ? client.bookings.length : 0);
-      }, 0),
-    [filteredClients]
+    () => {
+      const today = getTodayStart();
+      return filteredClients.reduce((total, client) => {
+        const bookingsForFilter = (client.bookings || []).filter(
+          (booking) => getBookingTimeBucket(booking, today) === timeFilter
+        );
+        return total + bookingsForFilter.length;
+      }, 0);
+    },
+    [filteredClients, timeFilter]
   );
   
   const todayLabel = useMemo(() => {
@@ -2398,41 +2509,15 @@ useEffect(() => {
   
   // Filter clients based on time and search filters
   function getFilteredClients() {
+    const today = getTodayStart();
+    const getBookingsForFilter = (client) =>
+      (client.bookings || []).filter(
+        (booking) => getBookingTimeBucket(booking, today) === timeFilter
+      );
+    
     return Object.values(clientGroups).filter(client => {
-      // Time filter
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      if (timeFilter === 'upcoming') {
-        // Show clients with check-in date today or in the future
-        const hasUpcomingBooking = client.bookings.some(booking => {
-          if (!booking.checkIn) return false;
-          const checkIn = new Date(booking.checkIn);
-          checkIn.setHours(0, 0, 0, 0);
-          return checkIn >= today;
-        });
-        if (!hasUpcomingBooking) return false;
-      } else if (timeFilter === 'active') {
-        // Show clients with active bookings (checked in but not checked out)
-        const hasActiveBooking = client.bookings.some(booking => {
-          if (!booking.checkIn || !booking.checkOut) return false;
-          const checkIn = new Date(booking.checkIn);
-          const checkOut = new Date(booking.checkOut);
-          checkIn.setHours(0, 0, 0, 0);
-          checkOut.setHours(0, 0, 0, 0);
-          return checkIn <= today && checkOut >= today;
-        });
-        if (!hasActiveBooking) return false;
-      } else if (timeFilter === 'past') {
-        // Show clients with past bookings
-        const hasPastBooking = client.bookings.some(booking => {
-          if (!booking.checkOut) return false;
-          const checkOut = new Date(booking.checkOut);
-          checkOut.setHours(0, 0, 0, 0);
-          return checkOut < today;
-        });
-        if (!hasPastBooking) return false;
-      }
+      const bookingsForFilter = getBookingsForFilter(client);
+      if (bookingsForFilter.length === 0) return false;
       
       // Search filter
       if (searchQuery) {
@@ -2440,7 +2525,7 @@ useEffect(() => {
         // Check if client name matches
         const nameMatch = safeRender(client.clientName).toLowerCase().includes(query);
         // Check if any booking details match
-        const bookingMatch = client.bookings.some(booking =>
+        const bookingMatch = bookingsForFilter.some(booking =>
           (booking.accommodationType && safeRender(booking.accommodationType).toLowerCase().includes(query)) ||
           (booking.status && booking.status.toLowerCase().includes(query))
         );
@@ -2459,12 +2544,14 @@ useEffect(() => {
       if (sortOption === 'date') {
         // Get earliest check-in date for each client
         const getEarliestDate = (client) => {
-          if (!client.bookings.length) return new Date(9999, 11, 31);
-          return client.bookings.reduce((earliest, booking) => {
-            if (!booking.checkIn) return earliest;
-            const checkIn = new Date(booking.checkIn);
-            return checkIn < earliest ? checkIn : earliest;
-          }, new Date(9999, 11, 31));
+          const bookingsForFilter = getBookingsForFilter(client);
+          if (!bookingsForFilter.length) return new Date(9999, 11, 31);
+          return bookingsForFilter.reduce((earliest, booking) => {
+            const checkIn = normalizeDateValue(booking.checkIn);
+            if (!checkIn) return earliest;
+            if (!earliest || checkIn < earliest) return checkIn;
+            return earliest;
+          }, null) || new Date(9999, 11, 31);
         };
         const dateA = getEarliestDate(a);
         const dateB = getEarliestDate(b);

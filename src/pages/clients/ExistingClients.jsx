@@ -6879,10 +6879,10 @@ const getUserName = async (userId) => {
                     {/* Action Buttons */}
                     <div className="flex justify-center mt-4 mb-6">
                       <button 
-                        onClick={handleShowCreateReservation}
+                        onClick={handleShowCreateOffer}
                         className="bg-indigo-600 text-white font-medium py-3 px-6 rounded-md shadow-sm hover:bg-indigo-700 transition-colors"
                       >
-                        {t.createReservation}
+                        {t.createNewOffer}
                       </button>
                     </div>
                   </div>

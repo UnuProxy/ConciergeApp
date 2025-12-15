@@ -154,6 +154,7 @@ function Villas() {
   const [bedroomFilter, setBedroomFilter] = useState('');
   const [bathroomFilter, setBathroomFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [expandedRates, setExpandedRates] = useState({});
 
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -194,6 +195,10 @@ function Villas() {
   const [existingPhotos, setExistingPhotos] = useState([]);
   const [language, setLanguage] = useState(() => localStorage.getItem('appLanguage') || 'ro');
   const [formLanguage, setFormLanguage] = useState(() => localStorage.getItem('appLanguage') || 'ro');
+
+  const toggleRates = (villaId) => {
+    setExpandedRates((prev) => ({ ...prev, [villaId]: !prev[villaId] }));
+  };
 
   useEffect(() => {
     const handleStorageChange = () => {
@@ -788,6 +793,15 @@ function Villas() {
             const standardRate = villa.priceConfigurations?.[0]?.price || villa.price || '';
             const bedrooms = villa.bedrooms || '-';
             const bathrooms = villa.bathrooms || '-';
+            const seasonalRates = Array.isArray(villa.priceConfigurations)
+              ? villa.priceConfigurations.slice(1).filter((pc) => pc.month)
+              : [];
+            const visibleRates = expandedRates[villa.id]
+              ? seasonalRates
+              : seasonalRates.slice(0, 2);
+            const extraCount = Math.max(0, seasonalRates.length - 2);
+            const showToggle = seasonalRates.length > 2;
+            const formatType = (pc) => (pc.type === 'monthly' ? t.monthly : pc.type || 'week');
 
             return (
               <div key={villa.id} className="bg-white rounded-lg shadow-sm border overflow-hidden flex flex-col">
@@ -808,15 +822,32 @@ function Villas() {
                   <div className="mt-2 text-sm text-gray-900 font-medium">
                     {t.standardRate}: €{standardRate} / {villa.priceConfigurations?.[0]?.type === 'monthly' ? t.monthly : 'week'}
                   </div>
-                  {Array.isArray(villa.priceConfigurations) && villa.priceConfigurations.length > 1 && (
-                    <div className="mt-1 text-xs text-gray-700 space-y-0.5">
-                      {villa.priceConfigurations
-                        .filter(pc => pc.month)
-                        .map((pc) => (
-                          <div key={pc.id || pc.month}>
-                            {monthLabels[pc.month?.toLowerCase?.()] || pc.month}: €{pc.price} / {pc.type || 'week'}
-                          </div>
+                  {seasonalRates.length > 0 && (
+                    <div className="mt-2">
+                      <div className="text-xs text-gray-500 mb-1">
+                        {language === 'ro' ? 'Tarife sezoniere' : 'Seasonal rates'}
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {visibleRates.map((pc) => (
+                          <span
+                            key={pc.id || pc.month}
+                            className="px-2 py-1 rounded-full border border-indigo-100 bg-indigo-50 text-indigo-700 text-xs"
+                          >
+                            {monthLabels[pc.month?.toLowerCase?.()] || pc.month}: €{pc.price} / {formatType(pc)}
+                          </span>
                         ))}
+                        {showToggle && (
+                          <button
+                            type="button"
+                            onClick={() => toggleRates(villa.id)}
+                            className="px-2 py-1 rounded-full border border-gray-200 text-gray-600 text-xs hover:border-indigo-200 hover:text-indigo-700"
+                          >
+                            {expandedRates[villa.id]
+                              ? language === 'ro' ? 'Ascunde' : 'Hide'
+                              : `+${extraCount} ${language === 'ro' ? 'încă' : 'more'}`}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1468,31 +1499,38 @@ function Villas() {
                         <span className="text-gray-600">{t.bathrooms}</span>
                         <span className="font-medium text-gray-900">{viewVilla.bathrooms || '-'}</span>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-600">ID</span>
-                        <span className="font-medium text-gray-900 truncate max-w-[150px]">{viewVilla.id}</span>
-                      </div>
                     </div>
 
                     {/* Detailed Pricing */}
                     {(viewVilla.priceConfigurations && viewVilla.priceConfigurations.length > 0) && (
                       <div className="mt-4 pt-4 border-t border-gray-100">
-                         <h3 className="font-medium text-gray-900 mb-3">{t.standardRate}</h3>
-                         <div className="space-y-2 text-sm">
-                            {viewVilla.priceConfigurations.map((pc) => {
-                              const monthLabel = pc.month ? (monthLabels[pc.month.toLowerCase?.()] || pc.month) : null;
-                              return (
-                                <div key={pc.id || pc.label_en || pc.label_ro || pc.month} className="flex justify-between">
-                                  <span className="text-gray-600">
-                                    {(getLoc(pc.label) || pc.label_en || pc.label_ro || monthLabel || t.standardRate)}
-                                  </span>
-                                  <span className="font-medium text-gray-900">
-                                    €{pc.price} / {pc.type || 'week'}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                         </div>
+                        <h3 className="font-medium text-gray-900 mb-3">{t.standardRate}</h3>
+                        <div className="space-y-2 text-sm">
+                          {viewVilla.priceConfigurations.map((pc, idx) => {
+                            const monthLabel = pc.month ? (monthLabels[pc.month.toLowerCase?.()] || pc.month) : null;
+                            const hasRange = pc.dateRange_start || pc.dateRange_end;
+                            const dateRangeLabel = hasRange
+                              ? `${pc.dateRange_start || '—'} → ${pc.dateRange_end || '—'}`
+                              : null;
+                            const typeLabel = pc.type === 'monthly' ? t.monthly : (pc.type || 'week');
+                            const friendlyLabel =
+                              monthLabel ||
+                              dateRangeLabel ||
+                              getLoc(pc.label) ||
+                              pc.label_en ||
+                              pc.label_ro ||
+                              (idx === 0 ? t.standardRate : `${t.standardRate} ${idx + 1}`);
+
+                            return (
+                              <div key={pc.id || pc.label_en || pc.label_ro || pc.month || idx} className="flex justify-between">
+                                <span className="text-gray-600">{friendlyLabel}</span>
+                                <span className="font-medium text-gray-900">
+                                  €{pc.price} / {typeLabel}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
 
