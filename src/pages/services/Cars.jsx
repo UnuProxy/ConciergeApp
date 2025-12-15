@@ -594,6 +594,19 @@ function Cars() {
     bookingNotes_ro: ''
   });
 
+  const getCheapestMonthlyPricing = (monthly = {}) => {
+    let best = { month: null, price: null };
+    Object.entries(monthly || {}).forEach(([month, val]) => {
+      const price = parseFloat(val);
+      if (!Number.isNaN(price) && price > 0) {
+        if (best.price === null || price < best.price) {
+          best = { month, price };
+        }
+      }
+    });
+    return best;
+  };
+
   // Quick helper to drop a single month/price pair into monthlyPrices
   const addSeasonPrice = () => {};
   
@@ -1036,11 +1049,14 @@ function Cars() {
   // Convert form data to structured format for database
   const prepareFormDataForSave = () => {
     const computedName = `${formData.make || ''} ${formData.model || ''}`.trim() || 'Car';
+    const { month: cheapestMonth, price: cheapestPrice } = getCheapestMonthlyPricing(formData.monthlyPrices);
+    const resolvedPriceMonth = formData.priceMonth || cheapestMonth || 'may';
+    const resolvedDaily = formData.priceDaily || (cheapestPrice !== null ? String(cheapestPrice) : '');
     return {
       // Basic company association
       companyId: 'just_enjoy_ibiza',
       companyName: 'Just Enjoy Ibiza',
-      priceMonth: formData.priceMonth || 'may',
+      priceMonth: resolvedPriceMonth,
       // Localized fields
       name: {
         en: computedName,
@@ -1070,7 +1086,7 @@ function Cars() {
       specs: formData.specs,
       // Pricing
       pricing: {
-        daily: formData.priceDaily || '',
+        daily: resolvedDaily,
         monthly: {
           ...formData.monthlyPrices
         }
@@ -1232,13 +1248,14 @@ function Cars() {
   // Start editing a car
   const startEditingCar = (car) => {
     setCurrentCar(car);
+    const { month: cheapestMonth, price: cheapestPrice } = getCheapestMonthlyPricing(car.pricing?.monthly || {});
     
     // Extract data to flat form structure
     setFormData({
       make: car.make || '',
       model: car.model || '',
       year: car.year || '',
-      priceMonth: Object.keys(car.pricing?.monthly || {}).find(m => car.pricing?.monthly?.[m]) || 'may',
+      priceMonth: car.priceMonth || Object.keys(car.pricing?.monthly || {}).find(m => car.pricing?.monthly?.[m]) || cheapestMonth || 'may',
       seats: car.seats || '',
       doors: car.doors || '',
       transmission: car.transmission || 'automatic',
@@ -1256,7 +1273,7 @@ function Cars() {
         luggage: car.specs?.luggage || ''
       },
       // Pricing
-      priceDaily: car.pricing?.daily || '',
+      priceDaily: car.pricing?.daily || (cheapestPrice !== null ? String(cheapestPrice) : ''),
       monthlyPrices: {
         may: car.pricing?.monthly?.may || '',
         june: car.pricing?.monthly?.june || '',
@@ -2810,11 +2827,24 @@ function Cars() {
                         {car.make} {car.model} {car.year && `(${car.year})`}
                       </p>
                       <p>{car.seats && `${car.seats} ${language === 'en' ? 'seats' : 'locuri'}`} • {car.transmission && t.transmissionTypes[car.transmission]}</p>
-                      {car.pricing?.daily && (
-                        <p style={{fontWeight: '600', color: '#1f2937', marginTop: '8px'}}>
-                          €{car.pricing.daily}/{language === 'en' ? 'day' : 'zi'}
-                        </p>
-                      )}
+                      {(() => {
+                        const monthlyEntries = car.pricing?.monthly
+                          ? Object.entries(car.pricing.monthly).filter(([, val]) => val)
+                          : [];
+                        const cheapestMonthlyPrice = monthlyEntries.reduce((min, [, val]) => {
+                          const price = parseFloat(val);
+                          if (Number.isNaN(price)) return min;
+                          if (min === null || price < min) return price;
+                          return min;
+                        }, null);
+                        const displayPrice = car.pricing?.daily || (cheapestMonthlyPrice !== null ? cheapestMonthlyPrice : null);
+                        if (!displayPrice) return null;
+                        return (
+                          <p style={{fontWeight: '600', color: '#1f2937', marginTop: '8px'}}>
+                            €{displayPrice}/{language === 'en' ? 'day' : 'zi'}
+                          </p>
+                        );
+                      })()}
                     </div>
                     <div style={styles.buttonRow}>
                       <button
@@ -2879,6 +2909,13 @@ function CarViewModal({ car, onClose, language, t, getLocalizedContent }) {
   const monthlyEntries = car.pricing?.monthly
     ? Object.entries(car.pricing.monthly).filter(([, val]) => val)
     : [];
+  const cheapestMonthlyPrice = monthlyEntries.reduce((min, [, val]) => {
+    const price = parseFloat(val);
+    if (Number.isNaN(price)) return min;
+    if (min === null || price < min) return price;
+    return min;
+  }, null);
+  const displayDailyPrice = car.pricing?.daily || (cheapestMonthlyPrice !== null ? cheapestMonthlyPrice : '0');
 
   // Flatten features for display
   const featuresList = [];
@@ -3046,7 +3083,7 @@ function CarViewModal({ car, onClose, language, t, getLocalizedContent }) {
                 {/* Price */}
                 <div>
                   <div className="text-3xl font-bold text-indigo-600 mb-1">
-                    €{car.pricing?.daily || '0'}
+                    €{displayDailyPrice || '0'}
                   </div>
                   <div className="text-gray-500 text-sm">
                     / {language === 'en' ? 'day' : 'zi'}

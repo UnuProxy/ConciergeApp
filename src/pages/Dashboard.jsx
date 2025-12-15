@@ -33,6 +33,8 @@ const DASHBOARD_TRANSLATIONS = {
       todayPerformance: "Today's performance",
       vipClients: 'VIP Clients',
       totalPortfolio: 'Total portfolio',
+      offersFollowup: 'Offers to follow up',
+      offersSubtitle: 'Follow up on pending offers',
       commandCenter: 'Command Center',
       administrator: 'Administrator',
       access: 'Access',
@@ -121,6 +123,8 @@ const DASHBOARD_TRANSLATIONS = {
       todayPerformance: 'Performanța de azi',
       vipClients: 'Clienți VIP',
       totalPortfolio: 'Portofoliu total',
+      offersFollowup: 'Oferte de urmărit',
+      offersSubtitle: 'Urmărește ofertele rămase în așteptare',
       commandCenter: 'Centru de comandă',
       administrator: 'Administrator',
       access: 'Acces',
@@ -209,7 +213,8 @@ function Dashboard() {
       totalClients: 0
     },
     recentActivity: [],
-    upcomingBookings: []
+    upcomingBookings: [],
+    offersToFollow: []
   });
 
   // Update time every minute
@@ -289,9 +294,9 @@ function Dashboard() {
       try {
     setLoading(true);
     
-    const reservationsQuery = query(
-      collection(db, 'reservations'),
-      where('companyId', '==', userCompanyId)
+        const reservationsQuery = query(
+          collection(db, 'reservations'),
+          where('companyId', '==', userCompanyId)
         );
         const reservationsSnapshot = await getDocs(reservationsQuery);
         const reservations = [];
@@ -321,6 +326,14 @@ function Dashboard() {
         );
         const clientsSnapshot = await getDocs(clientsQuery);
         const totalClients = clientsSnapshot.size;
+
+        const offersQuery = query(
+          collection(db, 'offers'),
+          where('companyId', '==', userCompanyId),
+          orderBy('createdAt', 'desc'),
+          limit(25)
+        );
+        const offersSnapshot = await getDocs(offersQuery);
 
         const recentActivity = [...reservations]
           .sort((a, b) => {
@@ -382,6 +395,25 @@ function Dashboard() {
           return createdAt >= weekAgo && (booking.status === 'confirmed' || booking.status === 'pending');
         }).length;
 
+        const offers = offersSnapshot.docs.map(doc => {
+          const data = doc.data();
+          const createdAt = data.createdAt?.toDate?.() || new Date(data.createdAt || Date.now());
+          const status = (data.status || '').toLowerCase();
+          const ageDays = Math.floor((today - createdAt) / (1000 * 60 * 60 * 24));
+          return {
+            id: doc.id,
+            clientName: data.clientName || t.misc.unknownClient,
+            totalValue: data.totalValue || 0,
+            status,
+            createdAt,
+            ageDays
+          };
+        });
+
+        const offersToFollow = offers
+          .filter(offer => offer.status !== 'booked' && offer.status !== 'converted' && offer.ageDays >= 2)
+          .slice(0, 6);
+
         setDashboardData({
           quickStats: {
             activeRequests,
@@ -390,7 +422,8 @@ function Dashboard() {
             totalClients
           },
           recentActivity,
-          upcomingBookings
+          upcomingBookings,
+          offersToFollow
         });
 
       } catch (error) {
@@ -399,7 +432,8 @@ function Dashboard() {
         setDashboardData({
           quickStats: { activeRequests: 0, pendingBookings: 0, todayRevenue: 0, totalClients: 0 },
           recentActivity: [],
-          upcomingBookings: []
+          upcomingBookings: [],
+          offersToFollow: []
         });
       } finally {
         setLoading(false);
@@ -685,6 +719,40 @@ function Dashboard() {
             <div className="text-gray-400 text-xs lg:text-sm">{t.labels.totalPortfolio}</div>
           </div>
         </div>
+
+        {/* Offers follow-up */}
+        {dashboardData.offersToFollow.length > 0 && (
+          <div className="mb-8 lg:mb-16">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-xl lg:text-2xl font-extralight text-gray-900">{t.labels.offersFollowup}</h3>
+                <p className="text-gray-500 text-sm">{t.labels.offersSubtitle}</p>
+              </div>
+              <div className="px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-700 text-sm font-medium">
+                {dashboardData.offersToFollow.length}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {dashboardData.offersToFollow.map((offer) => (
+                <div key={offer.id} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm hover:shadow-lg transition-all">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm font-medium text-gray-900 truncate">{offer.clientName}</div>
+                    <span className="text-xs px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                      {offer.ageDays}d
+                    </span>
+                  </div>
+                  <div className="text-gray-500 text-xs mb-3">
+                    {t.timeAgo.days.replace('{count}', offer.ageDays)} • {offer.status || 'pending'}
+                  </div>
+                  <div className="text-lg font-semibold text-gray-900">
+                    {offer.totalValue ? formatCurrency(offer.totalValue) : t.labels.pending}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">#{offer.id.slice(-6)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Mobile-Optimized Quick Actions */}
         <div className="mb-8 lg:mb-16">

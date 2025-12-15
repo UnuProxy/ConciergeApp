@@ -177,15 +177,15 @@ function Navbar({ sidebarOpen, setSidebarOpen }) {
         )}
         <div className="app-navbar__page">{getPageTitle()}</div>
         {!isMobile && getCompanyName() && (
-          <div className="app-navbar__company">
-            <strong>{getCompanyName()}</strong>
-            <span>{roleDisplay}</span>
+          <div className="app-navbar__company-pill">
+            <div className="app-navbar__company-name">{getCompanyName()}</div>
+            <div className="app-navbar__company-role">{roleDisplay}</div>
           </div>
         )}
         {!isMobile && (
-          <div className="pill">
+          <div className="app-navbar__status">
             <span className="status-dot" />
-            {userRole ? `${navbarStrings.synced} ${roleDisplay}` : navbarStrings.online}
+            <span>{userRole ? navbarStrings.synced : navbarStrings.online}</span>
           </div>
         )}
       </div>
@@ -221,9 +221,8 @@ function Navbar({ sidebarOpen, setSidebarOpen }) {
             )}
           </div>
           {!isMobile && (
-            <div>
-              <div style={{ fontWeight: 600 }}>{currentUser?.displayName || navbarStrings.roles.user}</div>
-              <small style={{ color: 'rgba(255,255,255,0.7)' }}>{currentUser?.email}</small>
+            <div className="app-navbar__user-label">
+              <div className="app-navbar__user-name">{currentUser?.displayName || navbarStrings.roles.user}</div>
             </div>
           )}
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16" style={{ opacity: 0.6 }}>
