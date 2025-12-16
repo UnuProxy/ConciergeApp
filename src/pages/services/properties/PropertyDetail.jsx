@@ -10,11 +10,13 @@ function PropertyDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const db = useDatabase();
+  const userRole = db?.userRole || null;
   
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [showOwnerInfo, setShowOwnerInfo] = useState(false);
   
   // Direct language handling
   const [language, setLanguage] = useState(() => {
@@ -66,6 +68,10 @@ function PropertyDetail() {
       contactAboutProperty: 'Contactează despre Proprietate',
       scheduleViewing: 'Programează o Vizionare',
       shareProperty: 'Distribuie Proprietatea',
+      ownerDetails: 'Detalii proprietar',
+      phone: 'Telefon',
+      email: 'Email',
+      name: 'Nume',
       confirmDeleteProperty: 'Sigur doriți să ștergeți această proprietate?',
       errorDeletingProperty: 'Eroare la ștergerea proprietății. Încercați din nou.'
     },
@@ -98,6 +104,10 @@ function PropertyDetail() {
       contactAboutProperty: 'Contact About Property',
       scheduleViewing: 'Schedule Viewing',
       shareProperty: 'Share Property',
+      ownerDetails: 'Owner Details',
+      phone: 'Phone',
+      email: 'Email',
+      name: 'Name',
       confirmDeleteProperty: 'Are you sure you want to delete this property?',
       errorDeletingProperty: 'Error deleting property. Please try again.'
     }
@@ -137,6 +147,10 @@ function PropertyDetail() {
             description: data.description?.en || data.description?.ro || '',
             images: data.photos || [],
             documents: data.documents || [],
+            owner: data.owner || null,
+            ownerName: data.owner?.name || data.ownerName || '',
+            ownerEmail: data.owner?.email || data.ownerEmail || '',
+            ownerPhone: data.owner?.phone || data.ownerPhone || '',
             
             // Villa-specific fields
             bedrooms: data.specs?.bedrooms ? parseInt(data.specs.bedrooms, 10) : null,
@@ -216,6 +230,16 @@ function PropertyDetail() {
       </div>
     );
   }
+
+  const normalizedRole = (userRole || '').toString().toLowerCase();
+  const isAdmin = normalizedRole.includes('admin');
+  const ownerInfo = property.owner || {
+    name: property.ownerName || '',
+    email: property.ownerEmail || '',
+    phone: property.ownerPhone || '',
+    confidential: property.owner?.confidential || false
+  };
+  const hasOwnerInfo = ownerInfo && (ownerInfo.name || ownerInfo.email || ownerInfo.phone);
   
   // Get amenity names from translation
   const getAmenityName = (amenityId) => {
@@ -366,7 +390,12 @@ function PropertyDetail() {
             <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">{t.description}</h2>
             <div className="prose max-w-none">
               {property.description ? (
-                <p className="text-gray-700">{property.description}</p>
+                <details className="group">
+                  <summary className="cursor-pointer text-indigo-600 hover:text-indigo-800 font-medium mb-2">
+                    {language === 'ro' ? 'Citește descrierea' : 'Read description'}
+                  </summary>
+                  <p className="text-gray-700 mt-2">{property.description}</p>
+                </details>
               ) : (
                 <p className="text-gray-500 italic">{t.noDescriptionAvailable}</p>
               )}
@@ -511,11 +540,47 @@ function PropertyDetail() {
             
             {/* Contact buttons - stacked on mobile, spacing adjusted */}
             <div className="mt-4 sm:mt-6 space-y-3">
-              <button className="w-full py-2 sm:py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center justify-center">
+              {isAdmin && hasOwnerInfo && showOwnerInfo && (
+                <div className="bg-indigo-50 border border-indigo-100 rounded-md p-3 text-sm text-indigo-900">
+                  <div className="font-semibold mb-2">{t.ownerDetails}</div>
+                  {ownerInfo.name && (
+                    <div className="flex justify-between">
+                      <span className="text-indigo-700">{t.name}</span>
+                      <span className="font-medium text-right">{ownerInfo.name}</span>
+                    </div>
+                  )}
+                  {ownerInfo.phone && (
+                    <div className="flex justify-between">
+                      <span className="text-indigo-700">{t.phone}</span>
+                      <span className="font-medium text-right">{ownerInfo.phone}</span>
+                    </div>
+                  )}
+                  {ownerInfo.email && (
+                    <div className="flex justify-between">
+                      <span className="text-indigo-700">{t.email}</span>
+                      <span className="font-medium text-right break-all">{ownerInfo.email}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              <button
+                className="w-full py-2 sm:py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center justify-center"
+                onClick={() => {
+                  if (isAdmin && hasOwnerInfo) {
+                    setShowOwnerInfo((prev) => !prev);
+                  } else if (!isAdmin) {
+                    alert(language === 'ro' ? 'Detalii vizibile doar pentru administratori.' : 'Owner details are visible only to admins.');
+                  }
+                }}
+              >
                 <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                 </svg>
-                {t.contactAboutProperty}
+                {isAdmin && hasOwnerInfo
+                  ? showOwnerInfo
+                    ? (language === 'ro' ? 'Ascunde detalii proprietar' : 'Hide owner details')
+                    : (language === 'ro' ? 'Detalii proprietar' : 'Show owner details')
+                  : t.contactAboutProperty}
               </button>
               
               <button className="w-full py-2 sm:py-3 border border-indigo-600 text-indigo-600 rounded-md hover:bg-indigo-50 flex items-center justify-center">
@@ -525,7 +590,67 @@ function PropertyDetail() {
                 {t.scheduleViewing}
               </button>
               
-              <button className="w-full py-2 sm:py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 flex items-center justify-center">
+              <button
+                className="w-full py-2 sm:py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 flex items-center justify-center"
+                onClick={() => {
+                  const win = window.open('', '_blank');
+                  if (!win) {
+                    alert(language === 'ro'
+                      ? 'Permite ferestre pop-up pentru a partaja proprietatea.'
+                      : 'Allow pop-ups to share the property.');
+                    return;
+                  }
+
+                  const mainImage = property.images && property.images.length > 0 ? property.images[0] : null;
+                  const currencyPrice = property.price ? `${property.price.toLocaleString()} €` : '';
+                  const amenityList = (property.amenities || []).join(', ');
+
+                  const html = `
+                    <html>
+                      <head>
+                        <meta charset="utf-8" />
+                        <title>${property.title}</title>
+                        <style>
+                          body { font-family: Arial, sans-serif; background:#f8fafc; margin:0; padding:0; color:#0f172a; }
+                          .wrap { max-width: 960px; margin: 24px auto; background:white; border-radius:16px; padding:24px; box-shadow:0 10px 30px rgba(15,23,42,0.08); }
+                          .hero { width:100%; border-radius:12px; overflow:hidden; margin-bottom:20px; }
+                          .hero img { width:100%; height:360px; object-fit:cover; display:block; }
+                          .title { font-size:28px; font-weight:700; margin:0 0 8px 0; }
+                          .meta { color:#475569; margin-bottom:16px; }
+                          .price { font-size:24px; font-weight:700; color:#1d4ed8; margin-bottom:16px; }
+                          .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:12px; margin-bottom:16px; }
+                          .card { background:#f1f5f9; border-radius:10px; padding:12px; }
+                          .card h4 { margin:0 0 6px 0; font-size:14px; color:#475569; text-transform:uppercase; letter-spacing:0.04em; }
+                          .card div { font-size:16px; font-weight:600; }
+                          .section-title { font-size:18px; font-weight:700; margin:18px 0 8px 0; }
+                          .description { line-height:1.6; color:#334155; }
+                        </style>
+                      </head>
+                      <body>
+                        <div class="wrap">
+                          ${mainImage ? `<div class="hero"><img src="${mainImage}" alt="${property.title}"></div>` : ''}
+                          <h1 class="title">${property.title}</h1>
+                          <div class="meta">${property.location || ''}</div>
+                          <div class="price">${currencyPrice}</div>
+                          <div class="grid">
+                            <div class="card"><h4>${t.propertyType}</h4><div>${property.type}</div></div>
+                            <div class="card"><h4>${t.totalSize}</h4><div>${property.size || property.buildableArea || ''} m²</div></div>
+                            ${property.bedrooms ? `<div class="card"><h4>${t.bedrooms}</h4><div>${property.bedrooms}</div></div>` : ''}
+                            ${property.bathrooms ? `<div class="card"><h4>${t.bathrooms}</h4><div>${property.bathrooms}</div></div>` : ''}
+                            ${property.yearBuilt ? `<div class="card"><h4>${t.yearBuilt}</h4><div>${property.yearBuilt}</div></div>` : ''}
+                          </div>
+                          ${property.description ? `<div class="section-title">${t.description}</div><div class="description">${property.description}</div>` : ''}
+                          ${amenityList ? `<div class="section-title">${t.amenities}</div><div class="description">${amenityList}</div>` : ''}
+                          <div class="section-title">${language === 'ro' ? 'Link complet' : 'Full link'}</div>
+                          <div class="description"><a href="${window.location.href}" target="_blank">${window.location.href}</a></div>
+                        </div>
+                      </body>
+                    </html>
+                  `;
+                  win.document.write(html);
+                  win.document.close();
+                }}
+              >
                 <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                 </svg>

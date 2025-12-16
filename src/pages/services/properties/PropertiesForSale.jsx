@@ -196,18 +196,28 @@ const PropertiesForSale = () => {
 
       // Bedroom filter (only for villas)
       if (bedroomFilter && property.type === 'villa') {
-        if (bedroomFilter === '5+') {
-          if (property.bedrooms < 5) return false;
-        } else if (property.bedrooms !== parseInt(bedroomFilter)) {
+        const beds = parseInt(property.bedrooms || '0', 10);
+        if (Number.isNaN(beds)) return false;
+
+        const threshold = parseInt(bedroomFilter, 10);
+        const isPlus = bedroomFilter.toString().includes('+');
+        if (isPlus) {
+          if (beds < threshold) return false;
+        } else if (beds !== threshold) {
           return false;
         }
       }
 
       // Bathroom filter (only for villas)
       if (bathroomFilter && property.type === 'villa') {
-        if (bathroomFilter === '4+') {
-          if (property.bathrooms < 4) return false;
-        } else if (property.bathrooms !== parseInt(bathroomFilter)) {
+        const baths = parseInt(property.bathrooms || '0', 10);
+        if (Number.isNaN(baths)) return false;
+
+        const threshold = parseInt(bathroomFilter, 10);
+        const isPlus = bathroomFilter.toString().includes('+');
+        if (isPlus) {
+          if (baths < threshold) return false;
+        } else if (baths !== threshold) {
           return false;
         }
       }
@@ -480,7 +490,7 @@ const PropertiesForSale = () => {
                     <option value="2">2</option>
                     <option value="3">3</option>
                     <option value="4">4</option>
-                    <option value="5">5+</option>
+                    <option value="5+">5+</option>
                   </select>
                 </div>
               )}
@@ -501,7 +511,7 @@ const PropertiesForSale = () => {
                     <option value="1">1</option>
                     <option value="2">2</option>
                     <option value="3">3</option>
-                    <option value="4">4+</option>
+                    <option value="4+">4+</option>
                   </select>
                 </div>
               )}
