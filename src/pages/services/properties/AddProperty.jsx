@@ -79,7 +79,7 @@ function AddProperty() {
       propertyTitle: 'Titlul Proprietății',
       location: 'Locație',
       price: 'Preț',
-      size: 'Mărime',
+      // size removed; rely on living/garden areas
       livingArea: 'Suprafață utilă',
       gardenArea: 'Suprafață curte/grădină',
       status: 'Status',
@@ -142,7 +142,7 @@ function AddProperty() {
       propertyTitle: 'Property Title',
       location: 'Location',
       price: 'Price',
-      size: 'Size',
+      // size removed; rely on living/garden areas
       livingArea: 'Living area',
       gardenArea: 'Garden/outdoor area',
       status: 'Status',
@@ -210,7 +210,6 @@ function AddProperty() {
       ro: ''
     }, // Initialize as an object with language keys
     price: '',
-    size: '',
     livingArea: '',
     gardenArea: '',
     status: 'available',
@@ -803,18 +802,6 @@ function AddProperty() {
           
           {/* Size with live formatting */}
           <div>
-            <label className="block text-gray-700 font-medium mb-2">{t.size} (m²) *</label>
-            <input
-              type="text"
-              name="size"
-              value={formData.size}
-              onChange={handleNumberChange}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="0.00"
-              inputMode="numeric"
-              autoComplete="off"
-            />
           </div>
 
           {/* Interior and garden sizes (villas) */}
