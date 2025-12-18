@@ -1996,9 +1996,11 @@ function Cars() {
         )}
 
         {/* Results Count */}
-        <div style={styles.resultsCount}>
-          {filteredCars.length} {t.search.resultsCount}
-        </div>
+        {filteredCars.length > 0 && (
+          <div style={styles.resultsCount}>
+            {filteredCars.length} {t.search.resultsCount}
+          </div>
+        )}
       </div>
     );
   };
@@ -2783,7 +2785,6 @@ function Cars() {
       {!isAddingCar && !isEditingCar && (
         <div>
           <div style={styles.headerRow}>
-            <h2 style={styles.subtitle}>{t.carList.subtitle}</h2>
             <button
               type="button"
               onClick={() => {

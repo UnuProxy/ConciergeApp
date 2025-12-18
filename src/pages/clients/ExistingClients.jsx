@@ -2269,19 +2269,30 @@ const handleSelectClient = async (client) => {
         // 1. Find and delete all bookings for this client
         const bookingsQuery = query(
           collection(db, "reservations"),
+          where("companyId", "==", companyInfo.id),
           where("clientId", "==", selectedClient.id)
         );
         const bookingsSnapshot = await getDocs(bookingsQuery);
         
         // For each booking, delete its finance records then the booking itself
         const deleteBookingsPromises = bookingsSnapshot.docs.map(async (bookingDoc) => {
+          // Skip bookings that don't belong to this company to avoid permission errors
+          const bookingData = bookingDoc.data();
+          if (bookingData?.companyId !== companyInfo.id) {
+            console.warn("Skipping booking from another company:", bookingDoc.id);
+            return null;
+          }
+          
           // Delete finance records for this booking
           const financeQuery = query(
             collection(db, "financeRecords"),
+            where("companyId", "==", companyInfo.id),
             where("bookingId", "==", bookingDoc.id)
           );
           const financeSnapshot = await getDocs(financeQuery);
-          const deleteFinancePromises = financeSnapshot.docs.map(fDoc => deleteDoc(fDoc.ref));
+          const deleteFinancePromises = financeSnapshot.docs
+            .filter(fDoc => fDoc.data()?.companyId === companyInfo.id)
+            .map(fDoc => deleteDoc(fDoc.ref));
           await Promise.all(deleteFinancePromises);
           
           // Delete the booking
