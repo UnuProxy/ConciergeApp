@@ -16,6 +16,7 @@ import {
 import { useDatabase } from "../../context/DatabaseContext";
 import { jsPDF } from "jspdf";
 import 'jspdf-autotable';
+import { drawServiceIcon } from '../../utils/pdfIconUtils';
 import { getCurrentLanguage } from "../../utils/languageHelper";
 
 // Helper function to safely render multilingual content
@@ -2944,20 +2945,27 @@ const generateOfferPdf = async (offer) => {
       
       // If no image was displayed, show the icon
       if (!imageDisplayed) {
-        // Display category icon
-        let icon = '✦'; // Default
-        if (item.category === 'villas') icon = '🏠';
-        else if (item.category === 'boats') icon = '🛥️';
-        else if (item.category === 'cars') icon = '🚗';
-        else if (item.category === 'concierge-core') icon = '⭐';
-        else if (item.category === 'security') icon = '🔒';
-        else if (item.category === 'nannies') icon = '👶';
-        else if (item.category === 'chefs') icon = '🍽️';
-        else if (item.category === 'excursions') icon = '🏔️';
+        // Draw elegant vector icon for the service category
+        const iconX = 25;
+        const iconY = currentY + 5;
+        const iconW = 50;
+        const iconH = 35;
         
-        doc.setFontSize(16);
-        doc.setTextColor(100, 100, 110);
-        doc.text(icon, 50, currentY + 25, { align: 'center' });
+        // Add subtle background
+        doc.setFillColor(245, 247, 250); 
+        doc.setDrawColor(220, 220, 230);
+        doc.roundedRect(iconX, iconY, iconW, iconH, 2, 2, 'FD');
+        
+        // Draw the category-specific icon
+        try {
+          drawServiceIcon(doc, iconX, iconY, iconW, iconH, item.category);
+        } catch (err) {
+          console.error('Error drawing icon:', err);
+          // Fallback just in case
+          doc.setFontSize(14);
+          doc.setTextColor(150, 150, 160);
+          doc.text("?", iconX + iconW/2, iconY + iconH/2, { align: 'center' });
+        }
       }
       
       // Service details

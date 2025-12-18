@@ -293,28 +293,75 @@ const Finance = () => {
     return fallback;
   };
 
-  // Remove finance records whose booking no longer exists
-  const pruneOrphanFinanceRecords = async (reservationsList, financeList) => {
-    const reservationIds = new Set(reservationsList.map(r => r.id));
-    const orphans = financeList.filter(r => r.bookingId && !reservationIds.has(r.bookingId));
+  // Remove finance records whose linked booking/client no longer exists.
+  // Also purge all finance records if both bookings and clients are empty for this company.
+  const pruneOrphanFinanceRecords = async (reservationsList, financeList, clientsList) => {
+    const reservationMap = new Map(reservationsList.map(r => [r.id, r]));
+    const clientIds = new Set(clientsList.map(c => c.id));
+    const hasBookings = reservationMap.size > 0;
+    const hasClients = clientIds.size > 0;
+
+    const orphans = financeList.filter((record) => {
+      // If we have absolutely no data, everything is an orphan
+      const wipeAll = !hasBookings && !hasClients;
+      if (wipeAll) return true;
+
+      // 1. Check if linked booking exists
+      if (record.bookingId && !reservationMap.has(record.bookingId)) {
+        return true; // Booking deleted
+      }
+
+      // 2. Check if linked client exists (direct check)
+      if (record.clientId && !clientIds.has(record.clientId)) {
+        return true; // Client deleted
+      }
+
+      // 3. Deep check: Check if the booking's client still exists
+      if (record.bookingId) {
+        const booking = reservationMap.get(record.bookingId);
+        if (booking && booking.clientId && !clientIds.has(booking.clientId)) {
+          return true; // Booking exists, but its client is deleted
+        }
+      }
+
+      return false;
+    });
+
     if (orphans.length === 0) return financeList;
+
     try {
+      console.log(`Pruning ${orphans.length} orphan finance records...`);
       await Promise.all(orphans.map(record => deleteDoc(doc(db, 'financeRecords', record.id))));
     } catch (error) {
       console.error('Error pruning orphan finance records:', error);
     }
-    return financeList.filter(r => !r.bookingId || reservationIds.has(r.bookingId));
+
+    // Return filtered list for UI
+    const orphanIds = new Set(orphans.map(o => o.id));
+    return financeList.filter(r => !orphanIds.has(r.id));
   };
 
   // Ensure each booking has a finance record with a pending provider cost
-  const syncFinanceRecords = async (reservationsList, existingFinanceRecords = []) => {
+  // Also updates existing records if the booking amount changed
+  const syncFinanceRecords = async (reservationsList, existingFinanceRecords = [], clientsList = []) => {
     if (!companyId || reservationsList.length === 0) return existingFinanceRecords;
-    const existingKeys = new Set(
-      existingFinanceRecords.map(r => `${r.bookingId || 'none'}::${r.serviceKey || r.service || 'Unknown'}`)
-    );
+    
+    const clientIds = new Set(clientsList.map(c => c.id));
+    
+    // Map existing records for quick lookup by key
+    const existingRecordMap = new Map();
+    existingFinanceRecords.forEach(r => {
+      const key = `${r.bookingId || 'none'}::${r.serviceKey || r.service || 'Unknown'}`;
+      existingRecordMap.set(key, r);
+    });
+
     const toCreate = [];
+    const toUpdate = [];
 
     reservationsList.forEach(booking => {
+      // Skip syncing if the client for this booking doesn't exist
+      if (booking.clientId && !clientIds.has(booking.clientId)) return;
+
       const servicesArray = Array.isArray(booking.services) && booking.services.length > 0
         ? booking.services
         : [null];
@@ -322,8 +369,7 @@ const Finance = () => {
       servicesArray.forEach((serviceItem, index) => {
         const serviceKey = serviceItem?.id || serviceItem?.serviceId || serviceItem?.type || serviceItem?.name || serviceItem?.title || `service-${index}`;
         const recordKey = `${booking.id || 'none'}::${serviceKey}`;
-        if (existingKeys.has(recordKey)) return;
-
+        
         const serviceLabel = getServiceLabel(
           serviceItem?.name || serviceItem?.title || serviceItem?.type || serviceItem?.serviceType || serviceItem?.service || booking.service || booking.accommodationType,
           'Unknown'
@@ -339,25 +385,50 @@ const Finance = () => {
         ].find(v => typeof v === 'number' && !Number.isNaN(v));
 
         const clientAmount = rawAmount ?? 0;
-
-        toCreate.push({
+        
+        // Calculate expected data
+        const payloadData = {
           bookingId: booking.id,
+          clientId: booking.clientId,
           bookingServiceKey: serviceKey,
           serviceKey,
           service: serviceLabel,
           clientAmount,
+          // Only take provider cost from booking if we don't already have a settled record
+          // (We trust Finance record's settled cost over booking default unless it's new)
           providerCost: serviceItem?.providerCost ?? null,
           status: serviceItem?.providerCost ? 'settled' : 'pending',
           date: booking.date || new Date().toISOString().split('T')[0],
           description: serviceItem?.description || booking.description || '',
-        });
+        };
+
+        if (existingRecordMap.has(recordKey)) {
+          // Check if update is needed (e.g. client price changed in booking)
+          const existing = existingRecordMap.get(recordKey);
+          
+          // Only update if critical financial info mismatch and record isn't manually locked/edited
+          // For now, we assume if clientAmount changed in booking, it should update in finance
+          if (existing.clientAmount !== clientAmount) {
+             toUpdate.push({
+               id: existing.id,
+               ...payloadData,
+               // Preserve existing provider cost/status if they were manually set in finance
+               providerCost: existing.providerCost,
+               status: existing.status
+             });
+          }
+        } else {
+          // New record needed
+          toCreate.push(payloadData);
+        }
       });
     });
 
-    if (toCreate.length === 0 || syncingFinance) return existingFinanceRecords;
+    if ((toCreate.length === 0 && toUpdate.length === 0) || syncingFinance) return existingFinanceRecords;
     
     setSyncingFinance(true);
     try {
+      // 1. Create new records
       const createdRecords = [];
       for (const payloadPartial of toCreate) {
         const payload = {
@@ -374,9 +445,32 @@ const Finance = () => {
           profit: (payload.clientAmount || 0) - (payload.providerCost || 0)
         });
       }
-      const updated = [...existingFinanceRecords, ...createdRecords];
-      setFinanceRecords(updated);
-      return updated;
+
+      // 2. Update existing records (if price changed)
+      const updatedIds = new Set();
+      for (const updateData of toUpdate) {
+        const { id, ...data } = updateData;
+        const recordRef = doc(db, 'financeRecords', id);
+        await updateDoc(recordRef, {
+          clientAmount: data.clientAmount,
+          service: data.service, // update name if changed
+          updatedAt: new Date()
+        });
+        updatedIds.add(id);
+      }
+
+      // Merge results
+      const updatedList = existingFinanceRecords.map(r => {
+        if (updatedIds.has(r.id)) {
+          const update = toUpdate.find(u => u.id === r.id);
+          return { ...r, clientAmount: update.clientAmount, service: update.service };
+        }
+        return r;
+      });
+
+      const final = [...updatedList, ...createdRecords];
+      setFinanceRecords(final);
+      return final;
     } catch (error) {
       console.error('Error syncing finance records:', error);
       return existingFinanceRecords;
@@ -468,25 +562,36 @@ const Finance = () => {
         const reservationsQuery = query(reservationsRef, where("companyId", "==", companyId));
         const reservationsSnapshot = await getDocs(reservationsQuery);
         
-        const reservationsList = reservationsSnapshot.docs.map(doc => {
-          const data = doc.data();
-          const createdAtDate = data.createdAt ? new Date(data.createdAt.seconds * 1000) : null;
-          const dateString = createdAtDate ? createdAtDate.toISOString().split('T')[0] : '';
-        const serviceLabel = getServiceLabel(data.accommodationType || data.serviceType || 'Booking');
-          return {
-            id: doc.id,
-            ...data,
-            createdBy: data.createdBy,
-            createdByEmail: data.createdByEmail,
-            clientIncome: data.paidAmount ?? data.totalValue ?? data.totalAmount ?? 0,
-            service: serviceLabel,
-            services: data.services || data.selectedServices || data.bookingServices || [],
-            date: dateString,
-            description: `${serviceLabel} - ${data.checkIn || data.startDate || 'N/A'} to ${data.checkOut || data.endDate || 'N/A'}`
-          };
-        }).filter(isOwnedByCurrentUser);
+        const reservationsList = reservationsSnapshot.docs
+          .map(doc => {
+            const data = doc.data();
+            const createdAtDate = data.createdAt ? new Date(data.createdAt.seconds * 1000) : null;
+            const dateString = createdAtDate ? createdAtDate.toISOString().split('T')[0] : '';
+            const serviceLabel = getServiceLabel(data.accommodationType || data.serviceType || 'Booking');
+            return {
+              id: doc.id,
+              ...data,
+              createdBy: data.createdBy,
+              createdByEmail: data.createdByEmail,
+              clientIncome: data.paidAmount ?? data.totalValue ?? data.totalAmount ?? 0,
+              service: serviceLabel,
+              services: data.services || data.selectedServices || data.bookingServices || [],
+              date: dateString,
+              description: `${serviceLabel} - ${data.checkIn || data.startDate || 'N/A'} to ${data.checkOut || data.endDate || 'N/A'}`
+            };
+          })
+          .filter(r => r.status !== 'cancelled' && r.status !== 'declined'); // Exclude cancelled/declined bookings
         
         setReservations(reservationsList);
+
+        // Fetch clients to validate finance records
+        const clientsRef = collection(db, 'clients');
+        const clientsQuery = query(clientsRef, where("companyId", "==", companyId));
+        const clientsSnapshot = await getDocs(clientsQuery);
+        const clientsList = clientsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
         
         // Fetch finance records for provider costs and profit tracking
         const financeRef = collection(db, 'financeRecords');
@@ -513,9 +618,9 @@ const Finance = () => {
             status,
             date: parsedDate
           };
-        }).filter(isOwnedByCurrentUser);
+        });
         
-        const cleanedFinance = await pruneOrphanFinanceRecords(reservationsList, financeList);
+        const cleanedFinance = await pruneOrphanFinanceRecords(reservationsList, financeList, clientsList);
         setFinanceRecords(cleanedFinance);
 
         // Fetch category payments (legacy support)
@@ -535,7 +640,7 @@ const Finance = () => {
             date: data.date ? new Date(data.date.seconds * 1000).toISOString().split('T')[0] : '',
             description: data.description || ''
           };
-        }).filter(isOwnedByCurrentUser);
+        });
         
         setCategoryPayments(paymentsList);
         
@@ -560,7 +665,7 @@ const Finance = () => {
         setExpenses(expensesList);
 
         // Backfill finance records for bookings that do not have one yet
-        await syncFinanceRecords(reservationsList, financeList);
+        await syncFinanceRecords(reservationsList, financeList, clientsList);
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -764,12 +869,52 @@ const Finance = () => {
     try {
       const profitValue = (record.clientAmount || 0) - numericCost;
       const recordRef = doc(db, 'financeRecords', recordId);
+      
+      // 1. Update the Finance Record
       await updateDoc(recordRef, {
         providerCost: numericCost,
         status: 'settled',
         profit: profitValue,
         updatedAt: new Date()
       });
+
+      // 2. Write-back to original Booking/Service if possible
+      // This ensures data consistency across the app
+      if (record.bookingId) {
+        try {
+           const bookingRef = doc(db, 'reservations', record.bookingId);
+           const bookingSnap = await getDoc(bookingRef);
+           
+           if (bookingSnap.exists()) {
+             const bookingData = bookingSnap.data();
+             
+             // If this finance record corresponds to a specific service in the booking array
+             if (record.serviceKey && Array.isArray(bookingData.services)) {
+               const updatedServices = bookingData.services.map(srv => {
+                 // Try to match the service
+                 const srvKey = srv.id || srv.serviceId || srv.type || srv.name || srv.title;
+                 // Simple match or fallback to index if key logic matches sync logic
+                 // For safety, we only update if we are reasonably sure
+                 if (srvKey && record.serviceKey.includes(srvKey)) {
+                   return { ...srv, providerCost: numericCost };
+                 }
+                 return srv;
+               });
+               
+               await updateDoc(bookingRef, { services: updatedServices });
+               console.log('Synced provider cost back to booking service:', record.bookingId);
+             } 
+             // If it's a simple single-service booking (legacy structure)
+             else if (!record.serviceKey || record.serviceKey === 'booking') {
+               await updateDoc(bookingRef, { providerCost: numericCost });
+               console.log('Synced provider cost back to booking root:', record.bookingId);
+             }
+           }
+        } catch (syncErr) {
+           console.warn('Failed to sync provider cost back to booking:', syncErr);
+           // Don't block the UI for this background sync
+        }
+      }
       
       setFinanceRecords(prev => prev.map(r => {
         if (r.id !== recordId) return r;
