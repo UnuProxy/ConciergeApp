@@ -2301,7 +2301,19 @@ const handleSelectClient = async (client) => {
         
         await Promise.all(deleteBookingsPromises);
         
-        // 2. Delete the client document
+        // 2. Delete any finance records directly tied to this client (safety cleanup)
+        const clientFinanceQuery = query(
+          collection(db, "financeRecords"),
+          where("companyId", "==", companyInfo.id),
+          where("clientId", "==", selectedClient.id)
+        );
+        const clientFinanceSnapshot = await getDocs(clientFinanceQuery);
+        const deleteClientFinancePromises = clientFinanceSnapshot.docs
+          .filter(fDoc => fDoc.data()?.companyId === companyInfo.id)
+          .map(fDoc => deleteDoc(fDoc.ref));
+        await Promise.all(deleteClientFinancePromises);
+        
+        // 3. Delete the client document
         const clientRef = doc(db, "clients", selectedClient.id);
         await deleteDoc(clientRef);
         
