@@ -2760,6 +2760,14 @@ function Boats() {
     }
   };
   
+  const filteredBoats = getFilteredBoats();
+  const hasActiveFilters = Boolean(
+    searchTerm ||
+    lengthFilter.min || lengthFilter.max ||
+    capacityFilter.min || capacityFilter.max ||
+    priceFilter.min || priceFilter.max
+  );
+  
   return (
     <div className="container">
       {/* Success Message Popup */}
@@ -2876,11 +2884,10 @@ function Boats() {
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
-            gap: '0.5rem',
-            marginBottom: '1rem',
-            flexWrap: 'wrap'
-          }}>
-            <h2 className="subtitle">{t.boatList.subtitle}</h2>
+          gap: '0.5rem',
+          marginBottom: '1rem',
+          flexWrap: 'wrap'
+        }}>
             <button
               type="button"
               onClick={() => {
@@ -2949,50 +2956,52 @@ function Boats() {
       </button>
 
       {/* Results Count and Clear Button */}
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        backgroundColor: '#f9fafb',
-        padding: '0.5rem 1rem',
-        borderRadius: '0.5rem',
-        border: '1px solid #e5e7eb',
-        width: '100%'
-      }}>
-        <span style={{ 
-          color: '#374151', 
-          fontSize: '0.875rem',
-          fontWeight: '500'
+      {filteredBoats.length > 0 && (
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          backgroundColor: '#f9fafb',
+          padding: '0.5rem 1rem',
+          borderRadius: '0.5rem',
+          border: '1px solid #e5e7eb',
+          width: '100%'
         }}>
-          {getFilteredBoats().length} {t.resultsFound}
-        </span>
-        
-        {(searchTerm || lengthFilter.min || lengthFilter.max || capacityFilter.min || capacityFilter.max || priceFilter.min || priceFilter.max) && (
-          <button
-            onClick={() => {
-              setSearchTerm('');
-              setLengthFilter({ min: '', max: '' });
-              setCapacityFilter({ min: '', max: '' });
-              setPriceFilter({ min: '', max: '' });
-            }}
-            style={{
-              backgroundColor: '#ef4444',
-              color: 'white',
-              padding: '0.375rem 0.75rem',
-              borderRadius: '0.375rem',
-              fontSize: '0.75rem',
-              fontWeight: '500',
-              border: 'none',
-              cursor: 'pointer',
-              transition: 'background-color 0.2s'
-            }}
-            onMouseOver={(e) => e.target.style.backgroundColor = '#dc2626'}
-            onMouseOut={(e) => e.target.style.backgroundColor = '#ef4444'}
-          >
-            ✕ {t.clearFilters}
-          </button>
-        )}
-      </div>
+          <span style={{ 
+            color: '#374151', 
+            fontSize: '0.875rem',
+            fontWeight: '500'
+          }}>
+            {filteredBoats.length} {t.resultsFound}
+          </span>
+          
+          {hasActiveFilters && (
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setLengthFilter({ min: '', max: '' });
+                setCapacityFilter({ min: '', max: '' });
+                setPriceFilter({ min: '', max: '' });
+              }}
+              style={{
+                backgroundColor: '#ef4444',
+                color: 'white',
+                padding: '0.375rem 0.75rem',
+                borderRadius: '0.375rem',
+                fontSize: '0.75rem',
+                fontWeight: '500',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseOver={(e) => e.target.style.backgroundColor = '#dc2626'}
+              onMouseOut={(e) => e.target.style.backgroundColor = '#ef4444'}
+            >
+              ✕ {t.clearFilters}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   </div>
 
@@ -3299,13 +3308,13 @@ function Boats() {
           )}
           
           {/* Boat Grid */}
-          {getFilteredBoats().length === 0 ? (
+          {filteredBoats.length === 0 ? (
             <div style={{textAlign: 'center', padding: '2.5rem 1rem', background: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'}}>
               <p style={{color: '#6b7280'}}>{boats.length === 0 ? t.boatList.noBoats : `No boats match your filters.`}</p>
             </div>
           ) : (
             <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
-              {getFilteredBoats().map((boat) => {
+              {filteredBoats.map((boat) => {
                 const priceRange = getPriceRange(boat.pricing?.monthly);
                 const lengthLabel = boat.length ? `${boat.length}m` : null;
                 const capacityLabel = boat.capacity ? `${boat.capacity} ${language === 'en' ? 'people' : 'persoane'}` : null;
