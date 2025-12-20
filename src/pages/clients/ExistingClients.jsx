@@ -1625,6 +1625,22 @@ setAvailableServices(services);
     fetchTeamMembers();
   }, [companyInfo]);
   
+  // Handle navigation from other pages with clientId in state
+  useEffect(() => {
+    if (location.state?.clientId && clients.length > 0 && !selectedClient) {
+      const clientToSelect = clients.find(c => c.id === location.state.clientId);
+      if (clientToSelect) {
+        handleSelectClient(clientToSelect);
+        // On mobile, navigate to details view
+        if (isMobile) {
+          setCurrentView('details');
+        }
+        // Clear the location state to prevent re-selection on component updates
+        window.history.replaceState({}, document.title);
+      }
+    }
+  }, [location.state, clients, selectedClient, isMobile]);
+  
   // Initialize edit client data when a client is selected
   useEffect(() => {
     if (selectedClient) {
@@ -2314,7 +2330,21 @@ const handleSelectClient = async (client) => {
           .map(fDoc => deleteDoc(fDoc.ref));
         await Promise.all(deleteClientFinancePromises);
         
-        // 3. Delete the client document
+        // 3. Delete all offers for this client
+        const offersQuery = query(
+          collection(db, "offers"),
+          where("companyId", "==", companyInfo.id),
+          where("clientId", "==", selectedClient.id)
+        );
+        const offersSnapshot = await getDocs(offersQuery);
+        const deleteOffersPromises = offersSnapshot.docs
+          .filter(oDoc => oDoc.data()?.companyId === companyInfo.id)
+          .map(oDoc => deleteDoc(oDoc.ref));
+        await Promise.all(deleteOffersPromises);
+        
+        console.log(`Deleted ${offersSnapshot.docs.length} offers for client ${selectedClient.name}`);
+        
+        // 4. Delete the client document
         const clientRef = doc(db, "clients", selectedClient.id);
         await deleteDoc(clientRef);
         
