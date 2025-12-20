@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
 import { useLanguage } from '../utils/languageHelper';
+import OffersOverview from '../components/OffersOverview';
 
 const DASHBOARD_TRANSLATIONS = {
   en: {
@@ -209,13 +210,13 @@ function Dashboard() {
     quickStats: {
       activeRequests: 0,
       pendingBookings: 0,
-      todayRevenue: 0,
-      totalClients: 0
+      todayRevenue: 0
     },
     recentActivity: [],
     upcomingBookings: [],
-    offersToFollow: []
+    offers: []
   });
+  const [offersLoading, setOffersLoading] = useState(true);
 
   // Update time every minute
   useEffect(() => {
@@ -286,13 +287,72 @@ function Dashboard() {
     }
   }, [userCompanyId]);
 
+  // Fetch offers data separately and validate clients exist
+  useEffect(() => {
+    if (!userCompanyId) return;
+
+    const fetchOffers = async () => {
+      try {
+        setOffersLoading(true);
+        
+        // Fetch all offers for this company
+        const offersQuery = query(
+          collection(db, 'offers'),
+          where('companyId', '==', userCompanyId)
+        );
+        const offersSnapshot = await getDocs(offersQuery);
+        const allOffers = offersSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        // Fetch all clients to validate offers
+        const clientsQuery = query(
+          collection(db, 'clients'),
+          where('companyId', '==', userCompanyId)
+        );
+        const clientsSnapshot = await getDocs(clientsQuery);
+        const clientIds = new Set(clientsSnapshot.docs.map(doc => doc.id));
+        
+        // Filter out offers from deleted clients
+        const validOffers = allOffers.filter(offer => 
+          offer.clientId && clientIds.has(offer.clientId)
+        );
+        
+        // Log orphaned offers for cleanup
+        const orphanedOffers = allOffers.filter(offer => 
+          !offer.clientId || !clientIds.has(offer.clientId)
+        );
+        
+        if (orphanedOffers.length > 0) {
+          console.log(`Found ${orphanedOffers.length} orphaned offers from deleted clients`);
+        }
+        
+        setDashboardData(prev => ({
+          ...prev,
+          offers: validOffers
+        }));
+      } catch (error) {
+        console.error('Error fetching offers:', error);
+        setDashboardData(prev => ({
+          ...prev,
+          offers: []
+        }));
+      } finally {
+        setOffersLoading(false);
+      }
+    };
+
+    fetchOffers();
+  }, [userCompanyId]);
+
   // Fetch dashboard data
   useEffect(() => {
     if (!userCompanyId) return;
 
     const fetchDashboardData = async () => {
       try {
-    setLoading(true);
+        setLoading(true);
     
         const reservationsQuery = query(
           collection(db, 'reservations'),
@@ -319,21 +379,6 @@ function Dashboard() {
             pendingCount++;
           }
         });
-
-        const clientsQuery = query(
-          collection(db, 'clients'),
-          where('companyId', '==', userCompanyId)
-        );
-        const clientsSnapshot = await getDocs(clientsQuery);
-        const totalClients = clientsSnapshot.size;
-
-        const offersQuery = query(
-          collection(db, 'offers'),
-          where('companyId', '==', userCompanyId),
-          orderBy('createdAt', 'desc'),
-          limit(25)
-        );
-        const offersSnapshot = await getDocs(offersQuery);
 
         const recentActivity = [...reservations]
           .sort((a, b) => {
@@ -371,7 +416,7 @@ function Dashboard() {
             const dateB = b.checkIn.toDate ? b.checkIn.toDate() : new Date(b.checkIn);
             return dateA - dateB;
           })
-          .slice(0, 4)
+          .slice(0, 3)
           .map(booking => {
             const checkInDate = booking.checkIn.toDate ? booking.checkIn.toDate() : new Date(booking.checkIn);
             const isToday = checkInDate.toDateString() === today.toDateString();
@@ -395,45 +440,23 @@ function Dashboard() {
           return createdAt >= weekAgo && (booking.status === 'confirmed' || booking.status === 'pending');
         }).length;
 
-        const offers = offersSnapshot.docs.map(doc => {
-          const data = doc.data();
-          const createdAt = data.createdAt?.toDate?.() || new Date(data.createdAt || Date.now());
-          const status = (data.status || '').toLowerCase();
-          const ageDays = Math.floor((today - createdAt) / (1000 * 60 * 60 * 24));
-          return {
-            id: doc.id,
-            clientName: data.clientName || t.misc.unknownClient,
-            totalValue: data.totalValue || 0,
-            status,
-            createdAt,
-            ageDays
-          };
-        });
-
-        const offersToFollow = offers
-          .filter(offer => offer.status !== 'booked' && offer.status !== 'converted' && offer.ageDays >= 2)
-          .slice(0, 6);
-
         setDashboardData({
           quickStats: {
             activeRequests,
             pendingBookings: pendingCount,
-            todayRevenue,
-            totalClients
+            todayRevenue
           },
           recentActivity,
-          upcomingBookings,
-          offersToFollow
+          upcomingBookings
         });
 
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
         // If permission or data issues, render an empty dashboard instead of a blank screen
         setDashboardData({
-          quickStats: { activeRequests: 0, pendingBookings: 0, todayRevenue: 0, totalClients: 0 },
+          quickStats: { activeRequests: 0, pendingBookings: 0, todayRevenue: 0 },
           recentActivity: [],
-          upcomingBookings: [],
-          offersToFollow: []
+          upcomingBookings: []
         });
       } finally {
         setLoading(false);
@@ -487,21 +510,9 @@ function Dashboard() {
     </svg>
   );
 
-  const IconFleetManagement = ({ className }) => (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-    </svg>
-  );
-
   const IconFinancialControl = ({ className }) => (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-    </svg>
-  );
-
-  const IconSystemControl = ({ className }) => (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
     </svg>
   );
 
@@ -520,27 +531,6 @@ function Dashboard() {
       action: () => navigate('/clients/existing'),
       icon: IconVIPClients,
       primary: true
-    },
-    {
-      title: t.actions.conciergeServices,
-      subtitle: t.actions.servicePortfolio,
-      action: () => navigate('/services/villas'),
-      icon: IconConciergeServices,
-      primary: false
-    },
-    {
-      title: t.actions.propertyPortfolio,
-      subtitle: t.actions.villasEstates,
-      action: () => navigate('/services/villas'),
-      icon: IconPropertyPortfolio,
-      primary: false
-    },
-    {
-      title: t.actions.fleetManagement,
-      subtitle: t.actions.yachtsVehicles,
-      action: () => navigate('/services/cars'),
-      icon: IconFleetManagement,
-      primary: false
     },
     {
       title: t.actions.financialControl,
@@ -571,13 +561,6 @@ function Dashboard() {
       subtitle: t.actions.serviceRequests,
       action: () => navigate('/services/villas'),
       icon: IconConciergeServices,
-      primary: false
-    },
-    {
-      title: t.actions.propertyPortfolio,
-      subtitle: t.actions.availableProperties,
-      action: () => navigate('/services/villas'),
-      icon: IconPropertyPortfolio,
       primary: false
     }
   ];
@@ -687,7 +670,7 @@ function Dashboard() {
         </div>
 
         {/* Mobile-First Statistics Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8 lg:mb-16">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 mb-8 lg:mb-16">
           <div className="bg-white rounded-2xl lg:rounded-3xl p-4 lg:p-8 shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300">
             <div className="text-gray-500 text-xs lg:text-sm font-medium mb-2 lg:mb-3 tracking-wide uppercase">{t.labels.activeRequests}</div>
             <div className="text-3xl lg:text-4xl font-extralight text-gray-900 mb-1 lg:mb-2">{dashboardData.quickStats.activeRequests}</div>
@@ -712,47 +695,7 @@ function Dashboard() {
             </div>
             <div className="text-amber-600 text-xs lg:text-sm">{t.labels.todayPerformance}</div>
           </div>
-          
-          <div className="bg-white rounded-2xl lg:rounded-3xl p-4 lg:p-8 shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300">
-            <div className="text-gray-500 text-xs lg:text-sm font-medium mb-2 lg:mb-3 tracking-wide uppercase">{t.labels.vipClients}</div>
-            <div className="text-3xl lg:text-4xl font-extralight text-gray-900 mb-1 lg:mb-2">{dashboardData.quickStats.totalClients}</div>
-            <div className="text-gray-400 text-xs lg:text-sm">{t.labels.totalPortfolio}</div>
-          </div>
         </div>
-
-        {/* Offers follow-up */}
-        {dashboardData.offersToFollow.length > 0 && (
-          <div className="mb-8 lg:mb-16">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-xl lg:text-2xl font-extralight text-gray-900">{t.labels.offersFollowup}</h3>
-                <p className="text-gray-500 text-sm">{t.labels.offersSubtitle}</p>
-              </div>
-              <div className="px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-700 text-sm font-medium">
-                {dashboardData.offersToFollow.length}
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {dashboardData.offersToFollow.map((offer) => (
-                <div key={offer.id} className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm hover:shadow-lg transition-all">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-sm font-medium text-gray-900 truncate">{offer.clientName}</div>
-                    <span className="text-xs px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                      {offer.ageDays}d
-                    </span>
-                  </div>
-                  <div className="text-gray-500 text-xs mb-3">
-                    {t.timeAgo.days.replace('{count}', offer.ageDays)} • {offer.status || 'pending'}
-                  </div>
-                  <div className="text-lg font-semibold text-gray-900">
-                    {offer.totalValue ? formatCurrency(offer.totalValue) : t.labels.pending}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">#{offer.id.slice(-6)}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Mobile-Optimized Quick Actions */}
         <div className="mb-8 lg:mb-16">
@@ -765,7 +708,7 @@ function Dashboard() {
             )}
           </div>
           
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-8">
             {quickActions.map((action, index) => {
               const IconComponent = action.icon;
               return (
@@ -793,54 +736,41 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* Executive Admin Panel - Mobile Optimized */}
-        {userInfo?.role === 'admin' && (
-          <div className="mb-8 lg:mb-16">
-            <div className="bg-gradient-to-r from-amber-500 to-amber-600 rounded-3xl p-6 lg:p-12 text-white shadow-xl">
-              <div className="flex items-center mb-6 lg:mb-10">
-                <div className="w-10 h-10 lg:w-12 lg:h-12 bg-white/20 rounded-2xl flex items-center justify-center mr-4 lg:mr-6 flex-shrink-0">
-                  <IconSystemControl className="w-5 h-5 lg:w-7 lg:h-7 text-white" />
-                </div>
-                <h2 className="text-2xl lg:text-3xl font-extralight text-white">{t.sections.executiveControl}</h2>
-              </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-8">
-                <button 
-                  onClick={() => navigate('/users/manage')}
-                  className="bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-2xl p-6 lg:p-8 border border-white/20 hover:border-white/30 transition-all duration-300 text-left group touch-manipulation"
-                >
-                  <div className="w-8 h-8 lg:w-10 lg:h-10 bg-white/20 rounded-xl flex items-center justify-center mb-4 lg:mb-6 group-hover:scale-110 transition-transform duration-300">
-                    <IconVIPClients className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
-                  </div>
-                  <h3 className="text-base lg:text-lg font-light text-white mb-1 lg:mb-2">{t.sections.userManagement}</h3>
-                  <p className="text-white/60 text-sm font-light">{t.sections.teamAccessControl}</p>
-                </button>
-                
-                <button 
-                  onClick={() => navigate('/finance')}
-                  className="bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-2xl p-6 lg:p-8 border border-white/20 hover:border-white/30 transition-all duration-300 text-left group touch-manipulation"
-                >
-                  <div className="w-8 h-8 lg:w-10 lg:h-10 bg-white/20 rounded-xl flex items-center justify-center mb-4 lg:mb-6 group-hover:scale-110 transition-transform duration-300">
-                    <IconFinancialControl className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
-                  </div>
-                  <h3 className="text-base lg:text-lg font-light text-white mb-1 lg:mb-2">{t.sections.financialOverview}</h3>
-                  <p className="text-white/60 text-sm font-light">{t.actions.revenueAnalytics}</p>
-                </button>
-                
-                <button 
-                  onClick={() => navigate('/settings')}
-                  className="bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-2xl p-6 lg:p-8 border border-white/20 hover:border-white/30 transition-all duration-300 text-left group touch-manipulation sm:col-span-2 lg:col-span-1"
-                >
-                  <div className="w-8 h-8 lg:w-10 lg:h-10 bg-white/20 rounded-xl flex items-center justify-center mb-4 lg:mb-6 group-hover:scale-110 transition-transform duration-300">
-                    <IconSystemControl className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
-                  </div>
-                  <h3 className="text-base lg:text-lg font-light text-white mb-1 lg:mb-2">{t.sections.systemControl}</h3>
-                  <p className="text-white/60 text-sm font-light">{t.sections.platformConfiguration}</p>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Offers Overview Section - Full Width */}
+        <div className="mb-8 lg:mb-16">
+          <OffersOverview 
+            offers={dashboardData.offers} 
+            loading={offersLoading}
+            language={language}
+            onRefresh={() => {
+              // Trigger offers refresh
+              const fetchOffers = async () => {
+                try {
+                  setOffersLoading(true);
+                  const offersQuery = query(
+                    collection(db, 'offers'),
+                    where('companyId', '==', userCompanyId)
+                  );
+                  const offersSnapshot = await getDocs(offersQuery);
+                  const offers = offersSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                  }));
+                  
+                  setDashboardData(prev => ({
+                    ...prev,
+                    offers
+                  }));
+                } catch (error) {
+                  console.error('Error fetching offers:', error);
+                } finally {
+                  setOffersLoading(false);
+                }
+              };
+              fetchOffers();
+            }}
+          />
+        </div>
 
         {/* Mobile-First Activity Feed */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-12">
@@ -850,7 +780,7 @@ function Dashboard() {
             
             <div className="space-y-4 lg:space-y-6">
               {dashboardData.recentActivity.length > 0 ? (
-                dashboardData.recentActivity.map((activity, index) => (
+                dashboardData.recentActivity.map((activity) => (
                   <div key={activity.id} className="flex items-center justify-between p-4 lg:p-6 bg-gray-50 rounded-2xl border border-gray-100 hover:border-gray-200 transition-all duration-300">
                     <div className="flex items-center flex-1 min-w-0">
                       <div className="w-10 h-10 lg:w-12 lg:h-12 bg-amber-100 rounded-xl flex items-center justify-center mr-4 lg:mr-6 flex-shrink-0">
@@ -900,7 +830,7 @@ function Dashboard() {
             
             <div className="space-y-4 lg:space-y-6">
               {dashboardData.upcomingBookings.length > 0 ? (
-                dashboardData.upcomingBookings.map((booking, index) => (
+                dashboardData.upcomingBookings.map((booking) => (
                   <div key={booking.id} className={`p-4 lg:p-6 rounded-2xl border-l-4 ${
                     booking.priority === 'urgent' ? 'bg-rose-50 border-rose-500' :
                     booking.priority === 'high' ? 'bg-amber-50 border-amber-500' :
