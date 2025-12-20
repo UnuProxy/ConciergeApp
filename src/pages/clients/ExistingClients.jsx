@@ -1641,6 +1641,148 @@ setAvailableServices(services);
     }
   }, [location.state, clients, selectedClient, isMobile]);
   
+  // Fetch real-time reservations and finances for the selected client
+  useEffect(() => {
+    const fetchClientReservationsAndFinances = async () => {
+      if (!selectedClient || !companyInfo) {
+        console.log("Skipping reservation fetch - missing client or company info");
+        return;
+      }
+      
+      try {
+        console.log("🔍 Fetching reservations for client:", selectedClient.name, selectedClient.id);
+        console.log("Company ID:", companyInfo.id);
+        
+        // Fetch all reservations for this client from the reservations collection
+        const reservationsQuery = query(
+          collection(db, "reservations"),
+          where("companyId", "==", companyInfo.id),
+          where("clientId", "==", selectedClient.id)
+        );
+        
+        const reservationsSnapshot = await getDocs(reservationsQuery);
+        console.log(`✅ Found ${reservationsSnapshot.docs.length} reservations for client ${selectedClient.name}`);
+        
+        if (reservationsSnapshot.docs.length > 0) {
+          console.log("Reservation data:", reservationsSnapshot.docs.map(doc => doc.data()));
+        }
+        
+        // If no reservations found with clientId, try alternative queries
+        let alternativeReservations = [];
+        if (reservationsSnapshot.docs.length === 0) {
+          console.log("🔍 No reservations found with clientId, trying alternative search by clientName...");
+          
+          // Try searching by clientName
+          const altQuery = query(
+            collection(db, "reservations"),
+            where("companyId", "==", companyInfo.id),
+            where("clientName", "==", selectedClient.name)
+          );
+          
+          const altSnapshot = await getDocs(altQuery);
+          console.log(`Found ${altSnapshot.docs.length} reservations by clientName`);
+          
+          if (altSnapshot.docs.length > 0) {
+            console.log("⚠️ Warning: Reservations found by clientName but not clientId. Update them to include clientId.");
+            alternativeReservations = altSnapshot.docs;
+          }
+        }
+        
+        const docsToProcess = reservationsSnapshot.docs.length > 0 
+          ? reservationsSnapshot.docs 
+          : alternativeReservations;
+        
+        const allReservations = docsToProcess.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        // Categorize reservations
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const upcomingReservations = [];
+        const pastStays = [];
+        let currentStay = null;
+        
+        allReservations.forEach(res => {
+          const checkIn = res.checkIn?.toDate ? res.checkIn.toDate() : new Date(res.checkIn);
+          const checkOut = res.checkOut?.toDate ? res.checkOut.toDate() : new Date(res.checkOut);
+          
+          // Current stay: check-in is in the past, check-out is in the future
+          if (checkIn <= today && checkOut >= today) {
+            currentStay = {
+              id: res.id,
+              checkIn: res.checkIn,
+              checkOut: res.checkOut,
+              accommodationType: res.accommodationType,
+              totalAmount: res.totalAmount || res.baseAmount,
+              paymentStatus: res.paymentStatus,
+              status: res.status
+            };
+          }
+          // Upcoming: check-in is in the future
+          else if (checkIn > today) {
+            upcomingReservations.push({
+              id: res.id,
+              checkIn: res.checkIn,
+              checkOut: res.checkOut,
+              accommodationType: res.accommodationType,
+              totalAmount: res.totalAmount || res.baseAmount,
+              paymentStatus: res.paymentStatus,
+              status: res.status
+            });
+          }
+          // Past: check-out is in the past
+          else if (checkOut < today) {
+            pastStays.push({
+              id: res.id,
+              checkIn: res.checkIn,
+              checkOut: res.checkOut,
+              accommodationType: res.accommodationType,
+              totalAmount: res.totalAmount || res.baseAmount,
+              paymentStatus: res.paymentStatus,
+              status: res.status
+            });
+          }
+        });
+        
+        // Sort upcoming by check-in date (ascending)
+        upcomingReservations.sort((a, b) => {
+          const dateA = a.checkIn?.toDate?.() || new Date(a.checkIn);
+          const dateB = b.checkIn?.toDate?.() || new Date(b.checkIn);
+          return dateA - dateB;
+        });
+        
+        // Sort past stays by check-out date (descending)
+        pastStays.sort((a, b) => {
+          const dateA = a.checkOut?.toDate?.() || new Date(a.checkOut);
+          const dateB = b.checkOut?.toDate?.() || new Date(b.checkOut);
+          return dateB - dateA;
+        });
+        
+        // Update the selected client with fresh reservation data
+        setSelectedClient(prev => ({
+          ...prev,
+          upcomingReservations,
+          pastStays,
+          currentStay
+        }));
+        
+        console.log("Updated client with reservations:", {
+          upcoming: upcomingReservations.length,
+          past: pastStays.length,
+          current: currentStay ? 'Yes' : 'No'
+        });
+        
+      } catch (error) {
+        console.error("Error fetching client reservations:", error);
+      }
+    };
+    
+    fetchClientReservationsAndFinances();
+  }, [selectedClient?.id, companyInfo?.id]);
+  
   // Initialize edit client data when a client is selected
   useEffect(() => {
     if (selectedClient) {
