@@ -232,26 +232,27 @@ const PaymentIcon = ({ type, size = "small" }) => {
 const getServicePaymentInfo = (service, payments = [], safeRenderFn = (v) => v) => {
   const total = ((parseFloat(service?.price || 0) * parseInt(service?.quantity || 1))) || 0;
   
-  // 1. If service has explicit payment data, use it as primary
-  if (service?.amountPaid !== undefined) {
-    const paid = parseFloat(service.amountPaid || 0);
-    const due = Math.max(0, total - paid);
-    return { total, paid, due };
-  }
-
-  // 2. Fallback to calculating from history only if explicit data is missing
-  let paid = 0;
-  const serviceId = service?.id || service?.templateId || null;
+  // ONLY use the stored amountPaid - this is set correctly when service is added or paid
+  // DO NOT use name matching - multiple services can have the same name!
+  const storedPaid = parseFloat(service?.amountPaid || 0);
   
-  if (serviceId) {
+  // Cross-check with payment history ONLY by unique service ID (never by name)
+  let paidFromHistory = 0;
+  const serviceId = service?.id || null;
+  
+  if (serviceId && Array.isArray(payments) && payments.length > 0) {
     payments.forEach((payment) => {
-      if (payment.serviceId === serviceId) {
-        paid += parseFloat(payment.amount || 0);
+      // STRICT: Only match by exact service ID - no name matching allowed
+      if (payment.serviceId && payment.serviceId === serviceId) {
+        paidFromHistory += parseFloat(payment.amount || 0);
       }
     });
   }
-  
+
+  // Use the HIGHER of stored vs calculated from history
+  const paid = Math.max(storedPaid, paidFromHistory);
   const due = Math.max(0, total - paid);
+  
   return { total, paid, due };
 };
 
@@ -943,7 +944,6 @@ const renderServicesList = () => (
                 <input
                   type="number"
                   min="0"
-                  max={serviceData.price * serviceData.quantity}
                   step="0.01"
                   value={serviceData.amountPaid}
                   onChange={(e) => {
@@ -956,10 +956,10 @@ const renderServicesList = () => (
                       return;
                     }
                     const value = parseFloat(rawValue);
-                    const maxAmount = serviceData.price * serviceData.quantity;
+                    // Allow any positive value - validation happens on submit
                     setServiceData({
                       ...serviceData, 
-                      amountPaid: isNaN(value) ? '' : Math.min(value, maxAmount)
+                      amountPaid: isNaN(value) ? '' : Math.max(0, value)
                     });
                   }}
                   onFocus={(e) => {
@@ -974,9 +974,16 @@ const renderServicesList = () => (
                   <span className="text-gray-500">€</span>
                 </div>
               </div>
-              <p className="text-xs text-gray-500 mt-1">
-                {t.remaining || 'Remaining'}: {((serviceData.price * serviceData.quantity) - (serviceData.amountPaid || 0)).toFixed(2)} €
-              </p>
+              {serviceData.price > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {t.remaining || 'Remaining'}: {Math.max(0, (serviceData.price * serviceData.quantity) - (parseFloat(serviceData.amountPaid) || 0)).toFixed(2)} €
+                </p>
+              )}
+              {serviceData.price <= 0 && (
+                <p className="text-xs text-amber-600 mt-1">
+                  {t.enterPriceFirst || 'Enter the service price first'}
+                </p>
+              )}
             </div>
           )}
           
@@ -1467,7 +1474,6 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
                 <input
                   type="number"
                   min="0"
-                  max={parseFloat(shoppingData.price) || 0}
                   step="0.01"
                   value={shoppingData.amountPaid}
                   onChange={(e) => {
@@ -1477,10 +1483,10 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
                       return;
                     }
                     const value = parseFloat(rawValue);
-                    const maxAmount = parseFloat(shoppingData.price) || 0;
+                    // Allow any positive value - validation happens on submit
                     setShoppingData({
                       ...shoppingData, 
-                      amountPaid: isNaN(value) ? '' : Math.min(value, maxAmount)
+                      amountPaid: isNaN(value) ? '' : Math.max(0, value)
                     });
                   }}
                   onFocus={(e) => {
@@ -1495,9 +1501,16 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
                   <span className="text-gray-500">€</span>
                 </div>
               </div>
-              <p className="text-xs text-gray-500 mt-1">
-                {t.remaining || 'Remaining'}: {((parseFloat(shoppingData.price) || 0) - (parseFloat(shoppingData.amountPaid) || 0)).toFixed(2)} €
-              </p>
+              {parseFloat(shoppingData.price) > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {t.remaining || 'Remaining'}: {Math.max(0, (parseFloat(shoppingData.price) || 0) - (parseFloat(shoppingData.amountPaid) || 0)).toFixed(2)} €
+                </p>
+              )}
+              {parseFloat(shoppingData.price) <= 0 && (
+                <p className="text-xs text-amber-600 mt-1">
+                  {t.enterPriceFirst || 'Enter the expense amount first'}
+                </p>
+              )}
             </div>
           )}
           
@@ -1632,7 +1645,13 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
       perMonth: "per month",
       perHour: "per hour",
       perService: "per service",
-      pricePerUnit: "Price"
+      pricePerUnit: "Price",
+      editDates: "Edit Dates",
+      editBooking: "Edit Booking",
+      editBookingDates: "Edit Booking Dates",
+      updateBooking: "Update Booking",
+      updatingBooking: "Updating booking...",
+      bookingUpdatedSuccess: "Booking updated successfully"
     },
     ro: {
       paid: "Plătit",
@@ -1658,7 +1677,13 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
       perMonth: "pe lună",
       perHour: "pe oră",
       perService: "pe serviciu",
-      pricePerUnit: "Preț"
+      pricePerUnit: "Preț",
+      editDates: "Editează Datele",
+      editBooking: "Editează Rezervarea",
+      editBookingDates: "Editează Datele Rezervării",
+      updateBooking: "Actualizează Rezervarea",
+      updatingBooking: "Se actualizează rezervarea...",
+      bookingUpdatedSuccess: "Rezervare actualizată cu succes"
     }
   };
   
@@ -1977,11 +2002,12 @@ const UpcomingBookings = () => {
   const [authError, setAuthError] = useState(null);
   
   // RECALCULATE FUNCTION - Strictly sums all services to fix broken balances
+  // NOW WITH DUPLICATE PAYMENT CLEANUP - removes duplicate payments that were created by bugs
   const handleRecalculateTotals = async (client) => {
     if (!client || !client.bookings || client.bookings.length === 0) return;
     
     try {
-      showNotificationMessage(t.recalculating || 'Recalculating totals...');
+      showNotificationMessage(t.recalculating || 'Recalculating and cleaning duplicates...');
       console.log("🔄 Recalculating Source of Truth for client:", client.clientName);
       
       const updatedBookings = await Promise.all(client.bookings.map(async (booking) => {
@@ -1992,33 +2018,96 @@ const UpcomingBookings = () => {
         
         const data = bookingSnap.data();
         const services = Array.isArray(data.services) ? [...data.services] : [];
-        const paymentHistory = Array.isArray(data.paymentHistory) ? [...data.paymentHistory] : [];
+        let paymentHistory = Array.isArray(data.paymentHistory) ? [...data.paymentHistory] : [];
+        
+        // STEP 0: CLEAN UP DUPLICATE PAYMENTS
+        // A duplicate is a payment with same serviceId AND same amount AND within 60 seconds of another
+        // We keep only one payment per service that covers the full service amount
+        const cleanedPaymentHistory = [];
+        const seenPayments = new Map(); // Key: serviceId+amount, Value: payment object
+        
+        paymentHistory.forEach(payment => {
+          const serviceId = payment.serviceId || 'general';
+          const amount = parseFloat(payment.amount || 0);
+          const paymentKey = `${serviceId}_${amount}`;
+          const paymentDate = payment.date?.toDate?.() || payment.date || new Date(payment.createdAt || 0);
+          
+          if (seenPayments.has(paymentKey)) {
+            // Check if this is a real duplicate (within 60 seconds)
+            const existing = seenPayments.get(paymentKey);
+            const existingDate = existing.date?.toDate?.() || existing.date || new Date(existing.createdAt || 0);
+            const timeDiff = Math.abs(new Date(paymentDate) - new Date(existingDate));
+            
+            // If within 60 seconds, it's likely a duplicate - skip it
+            if (timeDiff < 60000) {
+              console.log(`⚠️ Removing duplicate payment: ${amount}€ for service ${serviceId}`);
+              return; // Skip this duplicate
+            }
+          }
+          
+          // Not a duplicate - keep it
+          seenPayments.set(paymentKey, payment);
+          cleanedPaymentHistory.push(payment);
+        });
+        
+        const duplicatesRemoved = paymentHistory.length - cleanedPaymentHistory.length;
+        if (duplicatesRemoved > 0) {
+          console.log(`🧹 Removed ${duplicatesRemoved} duplicate payment(s) from booking ${booking.id}`);
+        }
+        
+        paymentHistory = cleanedPaymentHistory;
         
         // 1. CALCULATE TOTAL FROM SERVICES (The only source of truth for price)
         let totalValue = services.reduce((sum, s) => {
           return sum + (parseFloat(s.price || 0) * parseInt(s.quantity || 1));
         }, 0);
         
-        // 2. CALCULATE PAID FROM HISTORY (The only source of truth for money received)
+        // 2. CALCULATE PAID FROM CLEANED HISTORY (The only source of truth for money received)
         const totalPaidFromHistory = paymentHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
         
-        // 3. Update each service's payment status based on history
-        const updatedServices = services.map(s => {
+        // 3. Update each service's payment status based on history (STRICT ID-ONLY Allocation)
+        let remainingPayments = [...paymentHistory];
+        
+        const servicesWithExplicitPayments = services.map(s => {
+          const sId = s.id || null;
           const sTotal = (parseFloat(s.price || 0) * parseInt(s.quantity || 1));
-          let sPaid = 0;
-          if (s.id) {
-            paymentHistory.forEach(p => {
-              if (p.serviceId === s.id) sPaid += parseFloat(p.amount || 0);
-            });
-          }
           
-          let sStatus = 'unpaid';
-          if (sPaid >= sTotal && sTotal > 0) sStatus = 'paid';
-          else if (sPaid > 0) sStatus = 'partiallyPaid';
+          let sPaid = 0;
+          
+          remainingPayments = remainingPayments.filter(p => {
+            // ONLY match by exact service ID - never by name (services can share names!)
+            if (sId && p.serviceId && p.serviceId === sId) {
+              sPaid += parseFloat(p.amount || 0);
+              return false;
+            }
+            return true;
+          });
           
           return {
             ...s,
             amountPaid: sPaid,
+            sTotal
+          };
+        });
+
+        // Pass 3: Auto-allocation of Surplus
+        let surplusMoney = remainingPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+        
+        const updatedServices = servicesWithExplicitPayments.map(svc => {
+          const currentDue = Math.max(0, svc.sTotal - svc.amountPaid);
+          let autoAllocated = 0;
+          
+          if (surplusMoney > 0 && currentDue > 0) {
+            autoAllocated = Math.min(surplusMoney, currentDue);
+            surplusMoney -= autoAllocated;
+          }
+          
+          const finalPaid = svc.amountPaid + autoAllocated;
+          const sStatus = finalPaid >= svc.sTotal && svc.sTotal > 0 ? 'paid' : (finalPaid > 0 ? 'partiallyPaid' : 'unpaid');
+          
+          return {
+            ...svc,
+            amountPaid: finalPaid,
             paymentStatus: sStatus
           };
         });
@@ -2034,11 +2123,12 @@ const UpcomingBookings = () => {
           paidAmount: totalPaidFromHistory,
           paymentStatus,
           services: updatedServices,
+          paymentHistory: paymentHistory, // SAVE THE CLEANED PAYMENT HISTORY (duplicates removed)
           updatedAt: serverTimestamp()
         };
         
         await updateDoc(bookingRef, updateData);
-        return { ...data, id: booking.id, ...updateData };
+        return { ...data, id: booking.id, ...updateData, paymentHistory };
       }));
       
       // Update local state: bookings
@@ -2098,6 +2188,7 @@ const UpcomingBookings = () => {
 
         return {
           ...prev,
+          bookings: updatedBookings,
           services: allServices,
           paymentHistory: allPayments.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)),
           totalValue: totalVal,
@@ -2344,6 +2435,8 @@ const UpcomingBookings = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [selectedService, setSelectedService] = useState(null);
+  const [selectedBookingToEdit, setSelectedBookingToEdit] = useState(null);
+  const [editBookingDates, setEditBookingDates] = useState({ checkIn: '', checkOut: '' });
   const [paymentTargetService, setPaymentTargetService] = useState(null);
   const bottomSheetRef = useRef(null);
   const bookingListAnchorId = 'booking-results';
@@ -2743,40 +2836,40 @@ useEffect(() => {
           const paymentHistory = Array.isArray(booking.paymentHistory) ? booking.paymentHistory : [];
           const totalPaidFromHistory = paymentHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
           
-          // 3. MAP PAYMENTS TO SERVICES (By ID)
-          // We don't automatically allocate money here. 
-          // We only count payments that explicitly have this serviceId.
-          const servicesWithPayments = bookingServices.map(svc => {
-            const svcId = svc.id || svc.templateId;
-            let svcPaid = 0;
-            if (svcId) {
-              paymentHistory.forEach(p => {
-                if (p.serviceId === svcId) svcPaid += parseFloat(p.amount || 0);
-              });
-            }
-            // Preserve stored amountPaid if no history matches (for transition)
-            const finalSvcPaid = svcPaid > 0 ? svcPaid : (parseFloat(svc.amountPaid) || 0);
+          // 3. PRESERVE SERVICE PAYMENT DATA FROM DATABASE (Trust the stored values!)
+          // The database stores the correct amountPaid and paymentStatus for each service.
+          // We should NOT recalculate these on load - only trust what's stored.
+          const finalServices = bookingServices.map(svc => {
+            const svcTotal = parseFloat(svc.price || 0) * parseInt(svc.quantity || 1);
+            
+            // TRUST the stored amountPaid from database
+            const storedAmountPaid = parseFloat(svc.amountPaid || 0);
+            
+            // Derive status from stored data
+            let status = svc.paymentStatus || 'unpaid';
+            if (storedAmountPaid >= svcTotal && svcTotal > 0) status = 'paid';
+            else if (storedAmountPaid > 0) status = 'partiallyPaid';
+            else status = 'unpaid';
             
             return {
               ...svc,
-              amountPaid: finalSvcPaid,
-              paymentStatus: finalSvcPaid >= (parseFloat(svc.price || 0) * parseInt(svc.quantity || 1)) ? 'paid' : (finalSvcPaid > 0 ? 'partiallyPaid' : 'unpaid')
+              amountPaid: storedAmountPaid,
+              paymentStatus: status,
+              svcTotal
             };
           });
 
-          // 4. CALCULATE UNALLOCATED CREDIT
-          // This is money the client paid that isn't tied to any specific service yet
-          const allocatedPaid = servicesWithPayments.reduce((sum, s) => sum + (s.amountPaid || 0), 0);
-          const unallocatedCredit = Math.max(0, totalPaidFromHistory - allocatedPaid);
+          // 4. CALCULATE UNALLOCATED CREDIT (if total paid > total allocated to services)
+          const totalAllocatedToServices = finalServices.reduce((sum, s) => sum + (s.amountPaid || 0), 0);
+          const unallocatedCredit = Math.max(0, totalPaidFromHistory - totalAllocatedToServices);
 
           // 5. DEFINE BOOKING TOTALS
           const bookingTotalValue = serviceTotalForBooking || booking.totalValue || booking.totalAmount || 0;
           const bookingPaidAmount = totalPaidFromHistory;
           
-          // Add unallocated credit info to the booking object for UI
           const enrichedBooking = {
             ...booking,
-            services: servicesWithPayments,
+            services: finalServices,
             totalValue: bookingTotalValue,
             paidAmount: bookingPaidAmount,
             unallocatedCredit: unallocatedCredit
@@ -2788,7 +2881,7 @@ useEffect(() => {
           groups[clientId].bookings.push(enrichedBooking);
           
           if (bookingServices.length > 0) {
-            servicesWithPayments.forEach((service, serviceIndex) => {
+            finalServices.forEach((service, serviceIndex) => {
               groups[clientId].services.push({
                 ...service,
                 bookingId: booking.id
@@ -3015,7 +3108,7 @@ useEffect(() => {
   
   // Bottom sheet handling
 const showBottomSheetWithContent = (content, item, secondaryItem = null) => {
-  const allowedContent = ['client-details','quick-payment','edit-payment','add-service','edit-service','add-shopping'];
+  const allowedContent = ['client-details','quick-payment','edit-payment','add-service','edit-service','add-shopping', 'edit-booking'];
   if (!allowedContent.includes(content)) {
     console.warn('Attempted to open unsupported bottom sheet content:', content);
     return;
@@ -3054,6 +3147,12 @@ const showBottomSheetWithContent = (content, item, secondaryItem = null) => {
     });
   } else if (content === 'edit-service') {
     setSelectedService(secondaryItem);
+  } else if (content === 'edit-booking') {
+    setSelectedBookingToEdit(secondaryItem);
+    setEditBookingDates({
+      checkIn: secondaryItem?.checkIn || '',
+      checkOut: secondaryItem?.checkOut || ''
+    });
   } else if (content === 'quick-payment') {
     setPaymentData({
       amount: item?.dueAmount || 0,
@@ -3158,6 +3257,74 @@ const openEditServiceModal = (client, service) => {
   }
 };
 
+const openEditBookingModal = (client, booking) => {
+  console.log('openEditBookingModal called with:', { client, booking });
+  if (client && booking) {
+    showBottomSheetWithContent('edit-booking', client, booking);
+  } else {
+    console.error('Missing client or booking data');
+  }
+};
+
+const handleUpdateBookingDates = async () => {
+  if (!selectedBookingToEdit || !selectedItem) return;
+  
+  try {
+    showNotificationMessage(t.updatingBooking || 'Updating booking...');
+    
+    const bookingRef = doc(db, 'reservations', selectedBookingToEdit.id);
+    await updateDoc(bookingRef, {
+      checkIn: editBookingDates.checkIn,
+      checkOut: editBookingDates.checkOut,
+      updatedAt: serverTimestamp()
+    });
+    
+    // Update local state: bookings
+    setBookings(prev => prev.map(b => {
+      if (b.id === selectedBookingToEdit.id) {
+        return { ...b, checkIn: editBookingDates.checkIn, checkOut: editBookingDates.checkOut };
+      }
+      return b;
+    }));
+    
+    // Update local state: clientGroups
+    setClientGroups(prev => {
+      const clientId = selectedItem.clientId;
+      if (!prev[clientId]) return prev;
+      
+      const updatedGroup = { ...prev[clientId] };
+      updatedGroup.bookings = updatedGroup.bookings.map(b => {
+        if (b.id === selectedBookingToEdit.id) {
+          return { ...b, checkIn: editBookingDates.checkIn, checkOut: editBookingDates.checkOut };
+        }
+        return b;
+      });
+      
+      return { ...prev, [clientId]: updatedGroup };
+    });
+    
+    // Update local state: selectedItem (modal)
+    setSelectedItem(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        bookings: prev.bookings.map(b => {
+          if (b.id === selectedBookingToEdit.id) {
+            return { ...b, checkIn: editBookingDates.checkIn, checkOut: editBookingDates.checkOut };
+          }
+          return b;
+        })
+      };
+    });
+    
+    showNotificationMessage(t.bookingUpdatedSuccess || 'Booking updated successfully');
+    setBottomSheetContent('client-details'); // Go back to details
+  } catch (err) {
+    console.error('Error updating booking:', err);
+    showNotificationMessage('Failed to update booking', 'error');
+  }
+};
+
 const openAddShoppingModal = (client) => {
   console.log('openAddShoppingModal called with client:', client);
   if (client) {
@@ -3240,6 +3407,7 @@ const renderMainContent = (filteredClients) => {
             {bottomSheetContent === 'add-service' && (t.addService || 'Add Service')}
             {bottomSheetContent === 'edit-service' && (t.serviceDetails || 'Service Details')}
             {bottomSheetContent === 'add-shopping' && (t.addShoppingExpense || 'Add Shopping Expense')}
+            {bottomSheetContent === 'edit-booking' && (t.editBooking || 'Edit Booking')}
             {!bottomSheetContent && `Modal (Debug: content="${bottomSheetContent}")`}
           </h3>
           <button 
@@ -3589,13 +3757,48 @@ const renderMainContent = (filteredClients) => {
         ? bookingData.paymentHistory.filter(p => p.serviceId !== service.id)
         : [];
         
-      // 3. Recalculate totals from the new services and history
+      // 3. Recalculate totals and use Rocket Science Allocation for remaining services
       let newTotal = 0;
       services.forEach(s => {
         newTotal += (parseFloat(s.price || 0) * parseInt(s.quantity || 1));
       });
       
       const newPaidAmount = paymentHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+
+      // STRICT ID-ONLY matching for services - NO name matching (services can share names!)
+      let remainingPaymentsForAllocation = [...paymentHistory];
+      const servicesWithExplicitPayments = services.map(s => {
+        const sId = s.id || null;
+        const sTotal = (parseFloat(s.price || 0) * parseInt(s.quantity || 1));
+        
+        let sPaid = 0;
+        remainingPaymentsForAllocation = remainingPaymentsForAllocation.filter(p => {
+          // ONLY match by exact service ID
+          if (sId && p.serviceId && p.serviceId === sId) {
+            sPaid += parseFloat(p.amount || 0);
+            return false;
+          }
+          return true;
+        });
+        return { ...s, amountPaid: sPaid, sTotal };
+      });
+
+      // Pass 3: Auto-allocation of Surplus
+      let surplusMoney = remainingPaymentsForAllocation.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+      const updatedServices = servicesWithExplicitPayments.map(svc => {
+        const currentDue = Math.max(0, svc.sTotal - svc.amountPaid);
+        let autoAllocated = 0;
+        if (surplusMoney > 0 && currentDue > 0) {
+          autoAllocated = Math.min(surplusMoney, currentDue);
+          surplusMoney -= autoAllocated;
+        }
+        const finalPaid = svc.amountPaid + autoAllocated;
+        return {
+          ...svc,
+          amountPaid: finalPaid,
+          paymentStatus: finalPaid >= svc.sTotal && svc.sTotal > 0 ? 'paid' : (finalPaid > 0 ? 'partiallyPaid' : 'unpaid')
+        };
+      });
       
       let newPaymentStatus = 'notPaid';
       if (newPaidAmount >= newTotal && newTotal > 0) newPaymentStatus = 'paid';
@@ -3603,7 +3806,7 @@ const renderMainContent = (filteredClients) => {
       
       // 4. Update booking in Firestore
       await updateDoc(bookingRef, {
-        services,
+        services: updatedServices,
         paymentHistory,
         totalValue: newTotal,
         totalAmount: newTotal,
@@ -3692,12 +3895,33 @@ const renderMainContent = (filteredClients) => {
         const updatedPaymentHistory = (prev.paymentHistory || []).filter(p => {
           return p.serviceId !== service.id || p.bookingId !== service.bookingId;
         });
+
+        // Also update the specific booking inside selectedItem
+        const updatedBookings = (prev.bookings || []).map(b => {
+          if (b.id === service.bookingId) {
+            return {
+              ...b,
+              services: services,
+              paymentHistory: paymentHistory,
+              totalValue: newTotal,
+              paidAmount: newPaidAmount,
+              paymentStatus: newPaymentStatus
+            };
+          }
+          return b;
+        });
         
-        const totalVal = updatedServices.reduce((sum, s) => sum + (parseFloat(s.price || 0) * parseInt(s.quantity || 1)), 0);
-        const totalPaid = updatedPaymentHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+        // RECALCULATE TOTALS FROM BOOKINGS (Source of Truth)
+        let totalVal = 0;
+        let totalPaid = 0;
+        updatedBookings.forEach(b => {
+          totalVal += b.totalValue || 0;
+          totalPaid += b.paidAmount || 0;
+        });
         
         return {
           ...prev,
+          bookings: updatedBookings,
           services: updatedServices,
           paymentHistory: updatedPaymentHistory,
           totalValue: totalVal,
@@ -3866,21 +4090,14 @@ const renderMainContent = (filteredClients) => {
         let totalVal = 0;
         let totalPaid = 0;
         updatedGroup.bookings.forEach(b => {
-          globalTotalVal += b.totalValue || 0; // WAIT, there's a variable name conflict here in the previous version maybe? No, let me use local names.
+          totalVal += b.totalValue || 0;
+          totalPaid += b.paidAmount || 0;
         });
         
-        // Let's use clean local variables for clarity
-        let globalTotalValue = 0;
-        let globalTotalPaidAmount = 0;
-        updatedGroup.bookings.forEach(b => {
-          globalTotalValue += b.totalValue || 0;
-          globalTotalPaidAmount += b.paidAmount || 0;
-        });
-        
-        updatedGroup.totalValue = globalTotalValue;
-        updatedGroup.paidAmount = globalTotalPaidAmount;
-        updatedGroup.dueAmount = Math.max(0, globalTotalValue - globalTotalPaidAmount);
-        updatedGroup.paymentStatus = globalTotalPaidAmount >= globalTotalValue && globalTotalValue > 0 ? 'paid' : (globalTotalPaidAmount > 0 ? 'partiallyPaid' : 'notPaid');
+        updatedGroup.totalValue = totalVal;
+        updatedGroup.paidAmount = totalPaid;
+        updatedGroup.dueAmount = Math.max(0, totalVal - totalPaid);
+        updatedGroup.paymentStatus = totalPaid >= totalVal && totalVal > 0 ? 'paid' : (totalPaid > 0 ? 'partiallyPaid' : 'notPaid');
         
         updatedGroup.lastActivity = new Date();
         return { ...prev, [clientId]: updatedGroup };
@@ -3894,12 +4111,33 @@ const renderMainContent = (filteredClients) => {
         const updatedHistory = newService.amountPaid > 0 
           ? [{ ...paymentHistory[paymentHistory.length - 1], bookingId: targetBooking.id }, ...(prev.paymentHistory || [])]
           : (prev.paymentHistory || []);
+
+        // Also update the specific booking inside selectedItem
+        const updatedBookings = (prev.bookings || []).map(b => {
+          if (b.id === targetBooking.id) {
+            return {
+              ...b,
+              services,
+              paymentHistory,
+              totalValue: newTotal,
+              paidAmount: newPaidAmount,
+              paymentStatus: newPaymentStatus
+            };
+          }
+          return b;
+        });
           
-        const totalVal = updatedServices.reduce((sum, s) => sum + (parseFloat(s.price || 0) * parseInt(s.quantity || 1)), 0);
-        const totalPaid = updatedHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+        // RECALCULATE TOTALS FROM BOOKINGS (Source of Truth)
+        let totalVal = 0;
+        let totalPaid = 0;
+        updatedBookings.forEach(b => {
+          totalVal += b.totalValue || 0;
+          totalPaid += b.paidAmount || 0;
+        });
         
         return {
           ...prev,
+          bookings: updatedBookings,
           services: updatedServices,
           paymentHistory: updatedHistory,
           totalValue: totalVal,
@@ -4082,12 +4320,33 @@ const renderMainContent = (filteredClients) => {
         const updatedHistory = preparedService.amountPaid > 0 
           ? [{ ...paymentHistory[paymentHistory.length - 1], bookingId: targetBooking.id }, ...(prev.paymentHistory || [])]
           : (prev.paymentHistory || []);
+
+        // Also update the specific booking inside selectedItem
+        const updatedBookings = (prev.bookings || []).map(b => {
+          if (b.id === targetBooking.id) {
+            return {
+              ...b,
+              services,
+              paymentHistory,
+              totalValue: newTotal,
+              paidAmount: newPaidAmount,
+              paymentStatus: newPaymentStatus
+            };
+          }
+          return b;
+        });
           
-        const totalVal = updatedServices.reduce((sum, s) => sum + (parseFloat(s.price || 0) * parseInt(s.quantity || 1)), 0);
-        const totalPaid = updatedHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+        // RECALCULATE TOTALS FROM BOOKINGS (Source of Truth)
+        let totalVal = 0;
+        let totalPaid = 0;
+        updatedBookings.forEach(b => {
+          totalVal += b.totalValue || 0;
+          totalPaid += b.paidAmount || 0;
+        });
         
         return {
           ...prev,
+          bookings: updatedBookings,
           services: updatedServices,
           paymentHistory: updatedHistory,
           totalValue: totalVal,
@@ -4158,6 +4417,25 @@ async function handleShoppingFormSubmit(shoppingExpense) {
     // Find the specific service we're paying for
     const targetService = targetServiceOverride || paymentTargetService;
     
+    // SAFETY CHECK: If paying for a specific service, verify it's not already fully paid
+    if (targetService) {
+      const serviceTotal = (parseFloat(targetService.price || 0) * parseInt(targetService.quantity || 1));
+      const servicePaid = parseFloat(targetService.amountPaid || 0);
+      const serviceDue = Math.max(0, serviceTotal - servicePaid);
+      
+      if (serviceDue <= 0 && serviceTotal > 0) {
+        console.warn('⚠️ Attempted to pay for already-paid service:', targetService.name);
+        showNotificationMessage(t.serviceAlreadyPaid || 'This service is already fully paid', 'warning');
+        return;
+      }
+      
+      // Cap the payment at what's actually due
+      if (amount > serviceDue && serviceDue > 0) {
+        console.log(`📝 Capping payment from ${amount} to ${serviceDue} (what's actually due)`);
+        amount = serviceDue;
+      }
+    }
+    
     // Find the correct booking to update - preferably from the service itself
     const targetBookingId = targetService?.bookingId || (client.bookings[0]?.id);
     const targetBooking = client.bookings.find(b => b.id === targetBookingId) || client.bookings[0];
@@ -4212,48 +4490,44 @@ async function handleShoppingFormSubmit(shoppingExpense) {
       const paymentHistory = Array.isArray(bookingData.paymentHistory) ? [...bookingData.paymentHistory] : [];
       paymentHistory.push(payment);
       
-      // 3. Update Services with robust matching
+      // 3. Update Services with Rocket Science Allocation
       const services = Array.isArray(bookingData.services) ? [...bookingData.services] : [];
-      let updatedServices = services;
+      let remainingPayments = [...paymentHistory];
       
-      if (targetService) {
-        let serviceIndex = -1;
+      // STRICT ID-ONLY matching - NO name matching (services can share names!)
+      const servicesWithExplicitPayments = services.map(s => {
+        const sId = s.id || null;
+        const sTotal = (parseFloat(s.price || 0) * parseInt(s.quantity || 1));
         
-        // Match by ID
-        if (targetService.id) {
-          serviceIndex = services.findIndex(s => s.id === targetService.id);
-        }
+        let sPaid = 0;
+        remainingPayments = remainingPayments.filter(p => {
+          // ONLY match by exact service ID - never by name
+          if (sId && p.serviceId && p.serviceId === sId) {
+            sPaid += parseFloat(p.amount || 0);
+            return false; // Remove from pool so it's not double-counted
+          }
+          return true;
+        });
         
-        // Fallback match by name + properties
-        if (serviceIndex === -1) {
-          serviceIndex = services.findIndex(s => {
-            const sCreatedAt = s.createdAt?.toDate?.() ? s.createdAt.toDate() : s.createdAt;
-            const targetCreatedAt = targetService.createdAt instanceof Date ? targetService.createdAt : new Date(targetService.createdAt);
-            
-            return s.name === targetService.name && 
-                   ((sCreatedAt && targetCreatedAt && Math.abs(new Date(sCreatedAt).getTime() - targetCreatedAt.getTime()) < 5000) || 
-                    (s.type === targetService.type && s.price === targetService.price && s.quantity === targetService.quantity));
-          });
+        return { ...s, amountPaid: sPaid, sTotal };
+      });
+
+      // Pass 3: Auto-allocation of Surplus
+      let surplusMoney = remainingPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+      const updatedServices = servicesWithExplicitPayments.map(svc => {
+        const currentDue = Math.max(0, svc.sTotal - svc.amountPaid);
+        let autoAllocated = 0;
+        if (surplusMoney > 0 && currentDue > 0) {
+          autoAllocated = Math.min(surplusMoney, currentDue);
+          surplusMoney -= autoAllocated;
         }
-        
-        if (serviceIndex !== -1) {
-          const s = services[serviceIndex];
-          const currentServicePaid = parseFloat(s.amountPaid || 0);
-          const nextServicePaid = currentServicePaid + amount;
-          const serviceTotal = parseFloat(s.price || 0) * parseInt(s.quantity || 1);
-          
-          let nextServiceStatus = 'unpaid';
-          if (nextServicePaid >= serviceTotal && serviceTotal > 0) nextServiceStatus = 'paid';
-          else if (nextServicePaid > 0) nextServiceStatus = 'partiallyPaid';
-          
-          services[serviceIndex] = {
-            ...s,
-            amountPaid: nextServicePaid,
-            paymentStatus: nextServiceStatus
-          };
-          updatedServices = services;
-        }
-      }
+        const finalPaid = svc.amountPaid + autoAllocated;
+        return {
+          ...svc,
+          amountPaid: finalPaid,
+          paymentStatus: finalPaid >= svc.sTotal && svc.sTotal > 0 ? 'paid' : (finalPaid > 0 ? 'partiallyPaid' : 'unpaid')
+        };
+      });
 
       // Update Firestore
       await updateDoc(bookingRef, {
@@ -4344,14 +4618,6 @@ async function handleShoppingFormSubmit(shoppingExpense) {
       setSelectedItem(prev => {
         if (!prev || prev.clientId !== targetBooking.clientId) return prev;
         
-        const updatedPaid = (prev.paidAmount || 0) + payment.amount;
-        const updatedDue = Math.max(0, (prev.totalValue || 0) - updatedPaid);
-        const updatedStatus = updatedPaid >= (prev.totalValue || 0) && prev.totalValue > 0
-          ? 'paid'
-          : updatedPaid > 0
-            ? 'partiallyPaid'
-            : 'notPaid';
-            
         // CRITICAL: Update the services array in the selectedItem so the UI reflects the payment
         const updatedItemServices = (prev.services || []).map(s => {
           if (s.bookingId === targetBooking.id) {
@@ -4364,12 +4630,33 @@ async function handleShoppingFormSubmit(shoppingExpense) {
           return s;
         });
 
+        const updatedItemBookings = (prev.bookings || []).map(b => {
+          if (b.id === targetBooking.id) {
+            return {
+              ...b,
+              paidAmount: newPaidAmount,
+              paymentStatus: newPaymentStatus,
+              services: updatedServices
+            };
+          }
+          return b;
+        });
+
+        // RECALCULATE TOTALS FROM BOOKINGS (Source of Truth)
+        let totalVal = 0;
+        let totalPaid = 0;
+        updatedItemBookings.forEach(b => {
+          totalVal += b.totalValue || 0;
+          totalPaid += b.paidAmount || 0;
+        });
+
         return {
           ...prev,
+          bookings: updatedItemBookings,
           services: updatedItemServices,
-          paidAmount: updatedPaid,
-          dueAmount: updatedDue,
-          paymentStatus: updatedStatus,
+          paidAmount: totalPaid,
+          dueAmount: Math.max(0, totalVal - totalPaid),
+          paymentStatus: totalPaid >= totalVal && totalVal > 0 ? 'paid' : (totalPaid > 0 ? 'partiallyPaid' : 'notPaid'),
           lastPaymentDate: new Date(),
           paymentHistory: [{ ...payment, bookingId: targetBooking.id }, ...(prev.paymentHistory || [])]
         };
@@ -4590,162 +4877,220 @@ async function handleShoppingFormSubmit(shoppingExpense) {
               </div>
             </div>
             
-            {/* Bookings Section */}
-            <div className="space-y-3">
-              <h3 className="font-semibold text-gray-900">{t.bookings || 'Bookings'} ({selectedItem.bookings.length})</h3>
+            {/* Bookings & Associated Services Section */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-gray-900 border-b pb-2 flex justify-between items-center">
+                <span>{t.bookings || 'Bookings'} ({selectedItem.bookings.length})</span>
+              </h3>
+              
               {selectedItem.bookings.map((booking, idx) => (
-                <div key={idx} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <p className="font-medium text-gray-900">{safeRender(booking.accommodationType)}</p>
-                      <p className="text-sm text-gray-600">{formatShortDate(booking.checkIn)} - {formatShortDate(booking.checkOut)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium text-gray-900">{(booking.totalValue || 0).toLocaleString()} €</p>
-                      <div className={`px-2 py-0.5 rounded text-xs ${getStatusBadgeClass(booking.status)}`}>
-                        {getStatusText(booking.status)}
+                <div key={idx} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                  {/* Booking Header */}
+                  <div className="p-3 bg-gray-50 border-b border-gray-200">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-lg">🏠</span>
+                          <p className="font-bold text-gray-900">{safeRender(booking.accommodationType)}</p>
+                        </div>
+                        <p className="text-xs text-gray-600 font-medium bg-white px-2 py-1 rounded border inline-block">
+                          {formatShortDate(booking.checkIn)} - {formatShortDate(booking.checkOut)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-indigo-600 text-lg">{(booking.totalValue || 0).toLocaleString()} €</p>
+                        <div className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${getStatusBadgeClass(booking.status)}`}>
+                          {getStatusText(booking.status)}
+                        </div>
                       </div>
                     </div>
+                    
+                    {/* UNALLOCATED CREDIT DISPLAY */}
+                    {booking.unallocatedCredit > 0.01 && (
+                      <div className="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded text-xs flex justify-between items-center">
+                        <span className="text-emerald-700 font-medium">Overpayment (Credit):</span>
+                        <span className="text-emerald-800 font-bold">{booking.unallocatedCredit.toLocaleString()} €</span>
+                      </div>
+                    )}
                   </div>
-                  
-                  {/* UNALLOCATED CREDIT DISPLAY */}
-                  {booking.unallocatedCredit > 0 && (
-                    <div className="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded text-xs flex justify-between items-center">
-                      <span className="text-emerald-700 font-medium">Unallocated Balance (Credit):</span>
-                      <span className="text-emerald-800 font-bold">{booking.unallocatedCredit.toLocaleString()} €</span>
-                    </div>
-                  )}
 
-                  <button 
-                    className="w-full py-1 px-2 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 mt-2"
-                    onClick={() => handleDeleteBooking(selectedItem, booking)}
-                  >
-                    {t.deleteBooking || 'Delete Booking'}
-                  </button>
+                  {/* Services for THIS Booking */}
+                  <div className="p-3 space-y-3 bg-white">
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                      <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
+                      {t.servicesAndExtras || 'Services & Extras'}
+                    </h4>
+                    
+                    {(!booking.services || booking.services.length === 0) ? (
+                      <p className="text-xs text-gray-400 italic py-2 text-center bg-gray-50 rounded border border-dashed border-gray-200">
+                        {t.noAdditionalServices || 'No additional services for this booking'}
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {booking.services.map((service, sIdx) => {
+                          const ctx = getPaymentContext(selectedItem, service, selectedItem.paymentHistory || [], safeRender);
+                          const isPaidOut = ctx.due <= 0;
+                          const { total, paid, due } = getServicePaymentInfo(service, selectedItem.paymentHistory || [], safeRender);
+                          
+                          const status = due <= 0 ? 'paid' : (paid > 0 ? 'partial' : 'unpaid');
+                          const statusStyles = status === 'paid'
+                            ? 'bg-green-100 text-green-800 border-green-200'
+                            : status === 'partial'
+                              ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                              : 'bg-red-100 text-red-800 border-red-200';
+                          
+                          const statusLabel = status === 'paid' ? (t.paid || 'Paid') : (status === 'partial' ? (t.partiallyPaid || 'Partially Paid') : (t.notPaid || 'Not Paid'));
+
+                          return (
+                            <div key={sIdx} className="p-3 border border-gray-100 rounded-lg bg-gray-50/50 hover:bg-white hover:border-blue-200 transition-all group">
+                              <div className="flex justify-between items-start mb-2">
+                                <div>
+                                  <p className="font-semibold text-gray-900 text-sm group-hover:text-blue-700 transition-colors">{safeRender(service.name)}</p>
+                                  <p className="text-[10px] text-gray-500 flex items-center gap-1">
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16" />
+                                    </svg>
+                                    {formatShortDate(service.date)}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-bold text-gray-900 text-sm">{total.toLocaleString()} €</p>
+                                  <div className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold border ${statusStyles} uppercase tracking-tighter`}>
+                                    {statusLabel}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex justify-between items-center text-[10px] border-t border-gray-100 pt-2 mt-2">
+                                <span className="text-gray-500">{t.paid || 'Paid'}: <span className="text-green-700 font-bold">{paid.toLocaleString()} €</span></span>
+                                <span className={due <= 0 ? 'text-green-700 font-bold' : 'text-red-600 font-bold'}>
+                                  {t.amountDue || 'Due'}: {due.toLocaleString()} €
+                                </span>
+                              </div>
+
+                              {/* Service Actions */}
+                              <div className="flex gap-1.5 mt-3">
+                                <button
+                                  className="p-1.5 bg-white border border-gray-200 rounded shadow-sm text-gray-600 hover:text-blue-600 hover:border-blue-300 transition-all flex items-center justify-center flex-1"
+                                  title={t.editService || 'Edit'}
+                                  onClick={() => openEditServiceModal(selectedItem, { ...service, bookingId: booking.id })}
+                                >
+                                  <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                  <span className="text-[10px] font-bold uppercase">{t.edit || 'Edit'}</span>
+                                </button>
+                                
+                                {!isPaidOut && (
+                                  <button
+                                    className="p-1.5 bg-blue-50 border border-blue-200 rounded shadow-sm text-blue-700 hover:bg-blue-100 transition-all flex items-center justify-center flex-[2]"
+                                    onClick={() => {
+                                      if (ctx.due > 0) {
+                                        handleQuickPayment(selectedItem, ctx.due, { ...service, bookingId: booking.id }, { method: 'cash' });
+                                      }
+                                    }}
+                                  >
+                                    <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    <span className="text-[10px] font-bold uppercase">{t.markPaid || 'Paid'}</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Booking Footer Actions */}
+                  <div className="p-2 bg-gray-50/50 border-t border-gray-100 flex justify-end gap-2">
+                    <button 
+                      className="py-1.5 px-3 text-indigo-600 rounded text-[10px] font-bold hover:bg-indigo-50 uppercase tracking-tight flex items-center gap-1 transition-colors border border-indigo-100"
+                      onClick={() => openEditBookingModal(selectedItem, booking)}
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16" />
+                      </svg>
+                      {t.editDates || 'Edit Dates'}
+                    </button>
+                    <button 
+                      className="py-1.5 px-3 text-red-600 rounded text-[10px] font-bold hover:bg-red-50 uppercase tracking-tight flex items-center gap-1 transition-colors"
+                      onClick={() => handleDeleteBooking(selectedItem, booking)}
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      {t.deleteBooking || 'Delete Booking'}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
 
-            {/* Services Section */}
-            <div className="space-y-3">
-              <h3 className="font-semibold text-gray-900">{t.servicesAndExtras || 'Services & Extras'} ({selectedItem.services.length})</h3>
-              {selectedItem.services.length === 0 ? (
-                <div className="text-center py-4 bg-gray-50 rounded-lg">
-                  <p className="text-gray-500">{t.noAdditionalServices || 'No additional services'}</p>
-                </div>
-              ) : (
-                selectedItem.services.map((service, idx) => {
-                  const ctx = getPaymentContext(selectedItem, service, selectedItem.paymentHistory || [], safeRender);
-                  const isPaidOut = ctx.due <= 0;
-                  return (
-                  <div 
-                    key={idx} 
-                    className="p-3 bg-gray-50 rounded-lg"
-                  >
-                    {(() => {
+            {/* Orphan Services Section (Optional - only show if there are services not linked to a booking displayed above) */}
+            {(() => {
+              const bookingIds = selectedItem.bookings.map(b => b.id);
+              const orphanServices = selectedItem.services.filter(s => !s.bookingId || !bookingIds.includes(s.bookingId));
+              
+              if (orphanServices.length === 0) return null;
+              
+              return (
+                <div className="space-y-3 pt-2">
+                  <h3 className="font-semibold text-gray-900 border-b pb-2">{t.generalServices || 'General Services & Extras'} ({orphanServices.length})</h3>
+                  <div className="space-y-2">
+                    {orphanServices.map((service, idx) => {
+                      const ctx = getPaymentContext(selectedItem, service, selectedItem.paymentHistory || [], safeRender);
+                      const isPaidOut = ctx.due <= 0;
                       const { total, paid, due } = getServicePaymentInfo(service, selectedItem.paymentHistory || [], safeRender);
-                      const status =
-                        due <= 0 ? 'paid' :
-                        paid > 0 ? 'partial' : 'unpaid';
-                      const statusStyles = status === 'paid'
-                        ? 'bg-green-100 text-green-800 border-green-200'
-                        : status === 'partial'
-                          ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
-                          : 'bg-red-100 text-red-800 border-red-200';
-                      const statusLabel = status === 'paid'
-                        ? (t.paid || 'Paid')
-                        : status === 'partial'
-                          ? (t.partiallyPaid || 'Partially Paid')
-                          : (t.notPaid || 'Not Paid');
+                      
+                      const status = due <= 0 ? 'paid' : (paid > 0 ? 'partial' : 'unpaid');
+                      const statusStyles = status === 'paid' ? 'bg-green-100 text-green-800 border-green-200' : (status === 'partial' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : 'bg-red-100 text-red-800 border-red-200');
+                      const statusLabel = status === 'paid' ? (t.paid || 'Paid') : (status === 'partial' ? (t.partiallyPaid || 'Partially Paid') : (t.notPaid || 'Not Paid'));
+
                       return (
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-medium text-gray-900">{safeRender(service.name)}</p>
-                            <p className="text-sm text-gray-600">{formatShortDate(service.date)}</p>
-                          </div>
-                          <div className="text-right space-y-2">
-                            <p className="font-semibold text-gray-900">{total.toLocaleString()} €</p>
-                            <div className={`inline-block px-2 py-0.5 rounded-full text-xs border ${statusStyles}`}>
-                              {statusLabel}
+                        <div key={idx} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-medium text-gray-900 text-sm">{safeRender(service.name)}</p>
+                              <p className="text-xs text-gray-600">{formatShortDate(service.date)}</p>
                             </div>
-                            <p className="text-xs text-green-700">{t.paid || 'Paid'}: {paid.toLocaleString()} €</p>
-                            <p className={`text-xs ${due <= 0 ? 'text-green-700' : 'text-red-600'}`}>
-                              {t.amountDue || 'Due'}: {due.toLocaleString()} €
-                            </p>
+                            <div className="text-right">
+                              <p className="font-bold text-gray-900 text-sm">{total.toLocaleString()} €</p>
+                              <div className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusStyles}`}>
+                                {statusLabel}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Reuse Actions for Orphan Services */}
+                          <div className="flex gap-2 mt-3">
+                            <button className="flex-1 py-1.5 bg-white border border-gray-200 rounded text-xs text-gray-700" onClick={() => openEditServiceModal(selectedItem, { ...service, bookingId: service.bookingId })}>{t.edit || 'Edit'}</button>
+                            {!isPaidOut && (
+                              <button
+                                className="flex-[2] py-1.5 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 font-bold"
+                                onClick={() => {
+                                  if (ctx.due > 0) {
+                                    handleQuickPayment(selectedItem, ctx.due, { ...service, bookingId: service.bookingId }, { method: 'cash' });
+                                  }
+                                }}
+                              >
+                                {t.markPaid || 'Paid'}
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
-                    })()}
-                    <div className="flex justify-between items-center flex-wrap gap-2">
-                      {service.receiptAttachment && (
-                        <div className="flex items-center gap-2 text-xs text-gray-700 bg-gray-100 border border-gray-200 rounded px-2 py-1">
-                          <span className="font-medium">{t.receipt || 'Receipt'}:</span>
-                          <span className="truncate max-w-[140px]" title={service.receiptAttachment.name || 'receipt'}>
-                            {service.receiptAttachment.name || 'receipt'}
-                          </span>
-                          {service.receiptAttachment.dataUrl ? (
-                            <button
-                              className="px-2 py-0.5 bg-blue-50 border border-blue-200 rounded text-[11px] text-blue-700 hover:bg-blue-100"
-                              onClick={() => handleDownloadReceipt(service)}
-                            >
-                              {t.download || 'Download'}
-                            </button>
-                          ) : (
-                            <span className="text-red-600 text-[11px]">
-                              {t.receiptNotStored || 'Not stored (too large)'}
-                            </span>
-                          )}
-                          {service.receiptAttachment.truncated && service.receiptAttachment.dataUrl && (
-                            <span className="text-amber-600 text-[11px]">
-                              {t.receiptTruncated || 'Preview truncated due to size'}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      <div className="text-xs text-gray-500">
-                        {t.paymentStatus || 'Payment Status'}
-                      </div>
-                      <div className="flex gap-2 mt-3 w-full">
-                        <button
-                          className="flex-1 py-2 bg-white border border-gray-200 rounded text-sm text-gray-700 hover:border-gray-300"
-                          onClick={() => openEditServiceModal(selectedItem, service)}
-                        >
-                          {t.editService || 'Edit Service'}
-                        </button>
-                        <button
-                          className={`flex-1 py-2 border rounded text-sm ${
-                            isPaidOut
-                              ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-                              : 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
-                          }`}
-                          onClick={() => openPaymentModal(selectedItem, service)}
-                          disabled={isPaidOut}
-                        >
-                          {t.addPayment || 'Add Payment'}
-                        </button>
-                        {!isPaidOut && (
-                          <button
-                            className="flex-1 py-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700 hover:bg-blue-100"
-                            onClick={() => {
-                              if (ctx.due > 0) {
-                                handleQuickPayment(selectedItem, ctx.due, service, { method: 'cash' });
-                              }
-                            }}
-                          >
-                            {t.markPaid || 'Mark Paid'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                    })}
                   </div>
-                );
-                })
-              )}
-            </div>
+                </div>
+              );
+            })()}
 
             {/* Payment History Section */}
             <div className="space-y-3">
-              <h3 className="font-semibold text-gray-900">{t.paymentHistory || 'Payment History'} ({selectedItem.paymentHistory.length})</h3>
+              <h3 className="font-semibold text-gray-900 border-b pb-2">{t.paymentHistory || 'Payment History'} ({selectedItem.paymentHistory.length})</h3>
               {selectedItem.paymentHistory.length === 0 ? (
                 <div className="text-center py-4 bg-gray-50 rounded-lg">
                   <p className="text-gray-500">{t.noPaymentsRecorded || 'No payments recorded'}</p>
@@ -4755,24 +5100,27 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                   {selectedItem.paymentHistory.map((payment, idx) => (
                     <div 
                       key={idx} 
-                      className="p-3 bg-gray-50 rounded-lg"
+                      className="p-3 bg-gray-50 rounded-lg border border-gray-100"
                     >
                       <div className="flex justify-between items-center">
                         <div>
-                          <p className="font-medium text-gray-900">{(payment.amount || 0).toLocaleString()} €</p>
-                          <p className="text-sm text-gray-600">{formatLongDate(payment.date)}</p>
+                          <p className="font-bold text-gray-900">{(payment.amount || 0).toLocaleString()} €</p>
+                          <p className="text-[10px] text-gray-500">{formatLongDate(payment.date)}</p>
                           {payment.serviceName && (
-                            <p className="text-xs text-blue-600 mt-1">{safeRender(payment.serviceName)}</p>
+                            <p className="text-[10px] text-blue-600 font-medium mt-1 uppercase tracking-tight flex items-center gap-1">
+                              <span className="w-1 h-1 bg-blue-400 rounded-full"></span>
+                              {safeRender(payment.serviceName)}
+                            </p>
                           )}
                         </div>
-                        <span className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs">{payment.method}</span>
+                        <span className="px-2 py-1 bg-white border border-gray-200 text-gray-700 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm">{payment.method}</span>
                       </div>
                     </div>
                   ))}
-                  <div className="p-3 bg-green-50 rounded-lg border">
+                  <div className="p-3 bg-green-50 rounded-xl border border-green-100 mt-4 shadow-sm">
                     <div className="flex justify-between items-center">
-                      <span className="font-medium text-green-800">{t.paymentsTotal || 'Total Payments'}:</span>
-                      <span className="font-bold text-green-800">{selectedItem.paidAmount.toLocaleString()} €</span>
+                      <span className="font-bold text-green-800 text-sm uppercase tracking-wide">{t.paymentsTotal || 'Total Paid'}:</span>
+                      <span className="font-black text-green-800 text-lg">{selectedItem.paidAmount.toLocaleString()} €</span>
                     </div>
                   </div>
                 </div>
@@ -4780,9 +5128,9 @@ async function handleShoppingFormSubmit(shoppingExpense) {
             </div>
 
             {/* Action Buttons */}
-            <div className="grid grid-cols-2 gap-3 pt-4 border-t">
+            <div className="grid grid-cols-2 gap-3 pt-4 border-t sticky bottom-0 bg-white pb-2">
               <button 
-                className="py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600"
+                className="py-3 bg-blue-600 text-white rounded-xl font-bold shadow-md hover:bg-blue-700 active:transform active:scale-95 transition-all"
                 onClick={() => {
                   closeBottomSheet();
                   setTimeout(() => openAddServiceModal(selectedItem), 300);
@@ -4791,10 +5139,10 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                 {t.addService || 'Add Service'}
               </button>
               <button 
-                className={`py-3 rounded-lg font-medium ${
+                className={`py-3 rounded-xl font-bold shadow-md active:transform active:scale-95 transition-all ${
                   selectedItem.paymentStatus === 'paid'
-                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                    : 'bg-green-500 text-white hover:bg-green-600'
+                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed shadow-none'
+                    : 'bg-green-600 text-white hover:bg-green-700'
                 }`}
                 onClick={() => {
                   if (selectedItem.paymentStatus !== 'paid') {
@@ -4932,6 +5280,53 @@ async function handleShoppingFormSubmit(shoppingExpense) {
           </div>
         )}
         
+        {/* EDIT BOOKING DATES */}
+        {bottomSheetContent === 'edit-booking' && selectedItem && selectedBookingToEdit && (
+          <div className="p-4 bg-white space-y-4">
+            <div className="text-center border-b pb-4">
+              <h2 className="text-lg font-semibold text-gray-900">{t.editBookingDates || 'Edit Booking Dates'}</h2>
+              <p className="text-sm text-gray-600">{safeRender(selectedBookingToEdit.accommodationType)} - {safeRender(selectedItem.clientName)}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t.checkIn || 'Check-in'} *</label>
+                <input
+                  type="date"
+                  value={editBookingDates.checkIn}
+                  onChange={(e) => setEditBookingDates({...editBookingDates, checkIn: e.target.value})}
+                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t.checkOut || 'Check-out'} *</label>
+                <input
+                  type="date"
+                  value={editBookingDates.checkOut}
+                  onChange={(e) => setEditBookingDates({...editBookingDates, checkOut: e.target.value})}
+                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                />
+              </div>
+            </div>
+            
+            <div className="flex gap-3 pt-4">
+              <button
+                onClick={() => setBottomSheetContent('client-details')}
+                className="flex-1 py-3 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300"
+              >
+                {t.cancel || 'Cancel'}
+              </button>
+              <button
+                onClick={handleUpdateBookingDates}
+                disabled={!editBookingDates.checkIn || !editBookingDates.checkOut}
+                className="flex-2 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg font-medium shadow-md transition-all"
+              >
+                {t.updateBooking || 'Update Booking'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* SERVICE DETAILS */}
         {bottomSheetContent === 'edit-service' && selectedItem && selectedService && (
           <div className="p-4 bg-white space-y-4">
