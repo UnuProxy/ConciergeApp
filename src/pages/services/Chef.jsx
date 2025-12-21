@@ -180,6 +180,8 @@ function Chef() {
         email: form.email,
         phone: form.phone,
         rate: form.rate,
+        unit: 'hour',
+        category: 'chefs',
         companyId: userCompanyId,
         createdAt: Timestamp.now()
       };

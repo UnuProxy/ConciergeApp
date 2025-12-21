@@ -20,6 +20,7 @@ const Finance = () => {
   const [companyId, setCompanyId] = useState(null);
   const [userEmail, setUserEmail] = useState(null);
   const [userId, setUserId] = useState(null);
+  const [userRole, setUserRole] = useState(null);
   const [syncingFinance, setSyncingFinance] = useState(false);
   const [filters, setFilters] = useState({ service: 'all', startDate: '', endDate: '' });
   const [updatingRecord, setUpdatingRecord] = useState(null);
@@ -488,6 +489,7 @@ const Finance = () => {
         
         try {
           let resolvedCompanyId = null;
+          let resolvedUserRole = null;
 
           // Prefer the centralized authorized_users mapping used across the app
           const authorizedUsersRef = collection(db, 'authorized_users');
@@ -499,6 +501,7 @@ const Finance = () => {
             if (authorizedData.companyId) {
               resolvedCompanyId = authorizedData.companyId;
             }
+            resolvedUserRole = authorizedData.role || 'user';
           }
 
           // Fallback to companies collection using contactEmail (legacy behaviour)
@@ -513,7 +516,9 @@ const Finance = () => {
 
           if (resolvedCompanyId) {
             setCompanyId(resolvedCompanyId);
+            setUserRole(resolvedUserRole);
             setError(null);
+            console.log("User role:", resolvedUserRole);
           } else {
             setError(t.errorCompanyNotFound);
           }
@@ -525,6 +530,7 @@ const Finance = () => {
         setUserEmail(null);
         setUserId(null);
         setCompanyId(null);
+        setUserRole(null);
       }
 
       setAuthChecked(true);
@@ -545,6 +551,11 @@ const Finance = () => {
       }
 
       const isOwnedByCurrentUser = (record) => {
+        // Admins can see all records within their company
+        if (userRole === 'admin') {
+          return true;
+        }
+        
         const createdByMatch = record.createdBy && userId && record.createdBy === userId;
         const createdByEmailMatch = record.createdByEmail && userEmail && record.createdByEmail === userEmail;
         // Enforce ownership if metadata exists; allow legacy records without it

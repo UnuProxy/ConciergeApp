@@ -167,6 +167,8 @@ function Security() {
         email: form.email,
         phone: form.phone,
         rate: form.rate,
+        unit: 'hour',
+        category: 'security',
         companyId: userCompanyId,
         createdAt: Timestamp.now()
       };

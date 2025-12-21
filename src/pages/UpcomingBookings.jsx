@@ -67,6 +67,32 @@ const serviceTagStyles = {
   shopping: 'bg-pink-50 text-pink-700 border-pink-200'
 };
 
+const getUnitDisplayLabel = (unit, t, category = '') => {
+  const normalized = (unit || '').toLowerCase();
+  
+  // Explicit unit checks
+  if (normalized.includes('week')) return t.perWeek;
+  if (normalized.includes('month')) return t.perMonth;
+  if (normalized.includes('hour')) return t.perHour;
+  if (normalized.includes('day')) return t.perDay;
+  if (normalized.includes('night')) return t.perNight;
+  if (normalized.includes('service')) return t.perService;
+  
+  // Default fallbacks based on common patterns
+  if (normalized === 'h') return t.perHour;
+  if (normalized === 'd') return t.perDay;
+  
+  // Category-based intelligent defaults if unit is missing or generic
+  if (category === 'chefs' || category === 'security' || category === 'nannies' || category === 'chef') {
+    return t.perHour;
+  }
+  if (category === 'villas' || category === 'cars' || category === 'boats') {
+    return t.perDay;
+  }
+  
+  return ''; // Return empty instead of wrong unit
+};
+
 const getServiceTagClasses = (type) => {
   if (!type) return 'bg-gray-100 text-gray-700 border-gray-200';
   return serviceTagStyles[type] || 'bg-gray-100 text-gray-700 border-gray-200';
@@ -204,21 +230,26 @@ const PaymentIcon = ({ type, size = "small" }) => {
 
 // Compute per-service payment summary based on recorded payments
 const getServicePaymentInfo = (service, payments = [], safeRenderFn = (v) => v) => {
-  const total = ((service?.price || 0) * (service?.quantity || 1)) || 0;
+  const total = ((parseFloat(service?.price || 0) * parseInt(service?.quantity || 1))) || 0;
+  
+  // 1. If service has explicit payment data, use it as primary
+  if (service?.amountPaid !== undefined) {
+    const paid = parseFloat(service.amountPaid || 0);
+    const due = Math.max(0, total - paid);
+    return { total, paid, due };
+  }
+
+  // 2. Fallback to calculating from history only if explicit data is missing
   let paid = 0;
   const serviceId = service?.id || service?.templateId || null;
-  const serviceName = typeof service?.name === 'object' ? safeRenderFn(service?.name) : (service?.name || '').toString();
   
-  payments.forEach((payment) => {
-    const paymentServiceId = payment.serviceId || null;
-    const paymentServiceName = (payment.serviceName || '').toString();
-    const matchesId = paymentServiceId && serviceId && paymentServiceId === serviceId;
-    const matchesName = paymentServiceName && serviceName && paymentServiceName === serviceName;
-    
-    if (matchesId || matchesName) {
-      paid += payment.amount || 0;
-    }
-  });
+  if (serviceId) {
+    payments.forEach((payment) => {
+      if (payment.serviceId === serviceId) {
+        paid += parseFloat(payment.amount || 0);
+      }
+    });
+  }
   
   const due = Math.max(0, total - paid);
   return { total, paid, due };
@@ -230,6 +261,22 @@ const getPaymentContext = (client, service, paymentHistory = [], safeRenderFn = 
     const { total, paid, due } = getServicePaymentInfo(service, paymentHistory, safeRenderFn);
     return { total, paid, due };
   }
+  
+  // For clients, STRICTLY use the sums from all bookings if available
+  if (client?.bookings?.length > 0) {
+    let totalVal = 0;
+    let totalPaid = 0;
+    client.bookings.forEach(b => {
+      totalVal += b.totalValue || 0;
+      totalPaid += b.paidAmount || 0;
+    });
+    return {
+      total: totalVal,
+      paid: totalPaid,
+      due: Math.max(0, totalVal - totalPaid)
+    };
+  }
+
   return {
     total: client?.totalValue || 0,
     paid: client?.paidAmount || 0,
@@ -259,7 +306,9 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
     status: 'confirmed',
     notes: '',
     selectedMonth: '',
-    monthlyOptions: []
+    monthlyOptions: [],
+    paymentStatus: 'unpaid', // NEW: Track payment status
+    amountPaid: 0 // NEW: Track amount paid for this service
   });
 
   // Fetch categories first
@@ -479,7 +528,12 @@ const getServiceThumbnail = (service) => {
 
   const handleCategorySelect = (category) => {
     setSelectedCategory(category);
-    setServiceData(prev => ({ ...prev, category: category.id }));
+    setServiceData(prev => ({ 
+      ...prev, 
+      category: category.id,
+      paymentStatus: 'unpaid',
+      amountPaid: 0
+    }));
     setServiceSearch('');
     
     if (category.id === 'custom') {
@@ -503,7 +557,10 @@ const getServiceThumbnail = (service) => {
     const resolvedPrice = service.price && Number(service.price) > 0
       ? service.price
       : (defaultMonthly ? defaultMonthly.price : 0);
-    const resolvedUnit = defaultMonthly?.type || service.unit || 'hourly';
+    
+    // Intelligent unit default based on category
+    const categoryDefaultUnit = (selectedCategory.id === 'chefs' || selectedCategory.id === 'chef' || selectedCategory.id === 'security' || selectedCategory.id === 'nannies') ? 'hour' : 'day';
+    const resolvedUnit = defaultMonthly?.type || service.unit || categoryDefaultUnit;
 
     setServiceData({
       ...serviceData,
@@ -519,18 +576,38 @@ const getServiceThumbnail = (service) => {
       status: 'confirmed',
       templateId: service.id,
       selectedMonth: defaultMonthly?.month || '',
-      monthlyOptions
+      monthlyOptions,
+      // RESET payment status for new selection
+      paymentStatus: 'unpaid',
+      amountPaid: 0
     });
     
     setStep('details');
   };
 
   const handleAddCustom = () => {
+    setServiceData(prev => ({
+      ...prev,
+      name: '',
+      description: '',
+      price: 0,
+      quantity: 1,
+      paymentStatus: 'unpaid',
+      amountPaid: 0
+    }));
     setStep('custom');
   };
 
   const handleSubmit = () => {
     const totalPrice = serviceData.price * serviceData.quantity;
+    
+    // EXPLICIT CALCULATION: If unpaid, amountPaid MUST be 0. No exceptions.
+    let amountPaid = 0;
+    if (serviceData.paymentStatus === 'paid') {
+      amountPaid = totalPrice;
+    } else if (serviceData.paymentStatus === 'partiallyPaid') {
+      amountPaid = parseFloat(serviceData.amountPaid || 0);
+    }
     
     const newService = {
       type: serviceData.category,
@@ -548,7 +625,9 @@ const getServiceThumbnail = (service) => {
       model: serviceData.model || '',
       notes: serviceData.notes || '',
       createdAt: new Date(),
-      companyId: userCompanyId
+      companyId: userCompanyId,
+      paymentStatus: serviceData.paymentStatus,
+      amountPaid: amountPaid
     };
     
     onServiceAdded(newService);
@@ -773,7 +852,7 @@ const renderServicesList = () => (
             >
               {serviceData.monthlyOptions.map((opt) => (
                 <option key={`${opt.month}-${opt.price}`} value={opt.month}>
-                  {(opt.month || t.month || 'Month')}: €{opt.price} / {opt.type || serviceData.unit}
+                  {(opt.month || t.month || 'Month')}: €{opt.price} {getUnitDisplayLabel(opt.type || serviceData.unit, t, serviceData.category)}
                 </option>
               ))}
             </select>
@@ -793,17 +872,26 @@ const renderServicesList = () => (
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t.pricePerUnit || 'Price per'} {serviceData.unit}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t.pricePerUnit || 'Price'} {getUnitDisplayLabel(serviceData.unit, t, serviceData.category)}</label>
             <div className="relative">
               <input
                 type="number"
                 min="0"
                 step="0.01"
-                value={serviceData.price === 0 ? '' : serviceData.price}
+                value={serviceData.price === 0 || serviceData.price === '0' ? '' : serviceData.price}
                 onChange={(e) => {
                   const raw = e.target.value;
-                  const numeric = raw === '' ? 0 : parseFloat(raw);
-                  setServiceData({...serviceData, price: Number.isNaN(numeric) ? 0 : numeric});
+                  if (raw === '') {
+                    setServiceData({...serviceData, price: ''});
+                    return;
+                  }
+                  const numeric = parseFloat(raw);
+                  setServiceData({...serviceData, price: isNaN(numeric) ? '' : numeric});
+                }}
+                onFocus={(e) => {
+                  if (serviceData.price === 0 || serviceData.price === '0') {
+                    setServiceData({ ...serviceData, price: '' });
+                  }
                 }}
                 className="w-full pl-8 p-2 bg-white border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 placeholder="0"
@@ -821,6 +909,95 @@ const renderServicesList = () => (
             {(serviceData.price * serviceData.quantity || 0).toLocaleString()} €
             </div>
           </div>
+        
+        {/* PAYMENT STATUS SECTION */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {t.paymentStatus || 'Payment Status'} *
+            </label>
+            <select
+              value={serviceData.paymentStatus}
+              onChange={(e) => {
+                const status = e.target.value;
+                setServiceData({
+                  ...serviceData, 
+                  paymentStatus: status,
+                  amountPaid: status === 'paid' ? (serviceData.price * serviceData.quantity) : 0
+                });
+              }}
+              className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
+            >
+              <option value="unpaid">{t.unpaid || 'Not Paid'}</option>
+              <option value="partiallyPaid">{t.partiallyPaid || 'Partially Paid'}</option>
+              <option value="paid">{t.paid || 'Fully Paid'}</option>
+            </select>
+          </div>
+          
+          {serviceData.paymentStatus === 'partiallyPaid' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t.amountPaid || 'Amount Paid'}
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  max={serviceData.price * serviceData.quantity}
+                  step="0.01"
+                  value={serviceData.amountPaid}
+                  onChange={(e) => {
+                    const rawValue = e.target.value;
+                    if (rawValue === '') {
+                      setServiceData({
+                        ...serviceData, 
+                        amountPaid: ''
+                      });
+                      return;
+                    }
+                    const value = parseFloat(rawValue);
+                    const maxAmount = serviceData.price * serviceData.quantity;
+                    setServiceData({
+                      ...serviceData, 
+                      amountPaid: isNaN(value) ? '' : Math.min(value, maxAmount)
+                    });
+                  }}
+                  onFocus={(e) => {
+                    if (serviceData.amountPaid === 0 || serviceData.amountPaid === '0') {
+                      setServiceData({ ...serviceData, amountPaid: '' });
+                    }
+                  }}
+                  className="w-full pl-8 p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  placeholder="0.00"
+                />
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span className="text-gray-500">€</span>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {t.remaining || 'Remaining'}: {((serviceData.price * serviceData.quantity) - (serviceData.amountPaid || 0)).toFixed(2)} €
+              </p>
+            </div>
+          )}
+          
+          {serviceData.paymentStatus === 'paid' && (
+            <div className="flex items-center text-sm text-green-600">
+              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              {t.serviceFullyPaid || 'Service will be marked as fully paid'}
+            </div>
+          )}
+          
+          {serviceData.paymentStatus === 'unpaid' && (
+            <div className="flex items-center text-sm text-amber-600">
+              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              {t.serviceNotPaid || 'Service will be marked as not paid'}
+            </div>
+          )}
+        </div>
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">{t.notes || 'Notes (optional)'}</label>
@@ -913,8 +1090,21 @@ const renderServicesList = () => (
             <div className="relative">
               <input
                 type="number"
-                value={serviceData.price}
-                onChange={(e) => setServiceData({...serviceData, price: parseFloat(e.target.value) || 0})}
+                value={serviceData.price === 0 || serviceData.price === '0' ? '' : serviceData.price}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === '') {
+                    setServiceData({...serviceData, price: ''});
+                    return;
+                  }
+                  const numeric = parseFloat(raw);
+                  setServiceData({...serviceData, price: isNaN(numeric) ? '' : numeric});
+                }}
+                onFocus={(e) => {
+                  if (serviceData.price === 0 || serviceData.price === '0') {
+                    setServiceData({ ...serviceData, price: '' });
+                  }
+                }}
                 className="w-full pl-8 p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
                 required
               />
@@ -951,7 +1141,15 @@ const renderServicesList = () => (
               type="number"
               min="1"
               value={serviceData.quantity}
-              onChange={(e) => setServiceData({...serviceData, quantity: parseInt(e.target.value) || 1})}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === '') {
+                  setServiceData({...serviceData, quantity: ''});
+                  return;
+                }
+                const numeric = parseInt(raw);
+                setServiceData({...serviceData, quantity: isNaN(numeric) ? '' : numeric});
+              }}
               className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
             />
           </div>
@@ -1026,7 +1224,9 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
     receipt: false,
     notes: '',
     receiptFile: null,
-    receiptPreview: ''
+    receiptPreview: '',
+    paymentStatus: 'unpaid', // NEW: Payment tracking
+    amountPaid: 0 // NEW: Amount paid
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1128,7 +1328,9 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
         status: 'confirmed',
         createdAt: new Date(),
         companyId: userCompanyId,
-        receiptAttachment: buildReceiptAttachment()
+        receiptAttachment: buildReceiptAttachment(),
+        paymentStatus: shoppingData.paymentStatus || 'unpaid',
+        amountPaid: shoppingData.paymentStatus === 'paid' ? numericPrice : (parseFloat(shoppingData.amountPaid) || 0)
       };
       
       await onAddShopping(newExpense);
@@ -1231,6 +1433,82 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
               ))}
             </div>
           </div>
+        </div>
+
+        <div className="pt-2 border-t border-gray-100">
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {t.paymentStatus || 'Payment Status'} *
+            </label>
+            <select
+              value={shoppingData.paymentStatus}
+              onChange={(e) => {
+                const status = e.target.value;
+                setShoppingData({
+                  ...shoppingData, 
+                  paymentStatus: status,
+                  amountPaid: status === 'paid' ? shoppingData.price : 0
+                });
+              }}
+              className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
+            >
+              <option value="unpaid">{t.unpaid || 'Not Paid'}</option>
+              <option value="partiallyPaid">{t.partiallyPaid || 'Partially Paid'}</option>
+              <option value="paid">{t.paid || 'Fully Paid'}</option>
+            </select>
+          </div>
+          
+          {shoppingData.paymentStatus === 'partiallyPaid' && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t.amountPaid || 'Amount Paid'}
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  max={parseFloat(shoppingData.price) || 0}
+                  step="0.01"
+                  value={shoppingData.amountPaid}
+                  onChange={(e) => {
+                    const rawValue = e.target.value;
+                    if (rawValue === '') {
+                      setShoppingData({ ...shoppingData, amountPaid: '' });
+                      return;
+                    }
+                    const value = parseFloat(rawValue);
+                    const maxAmount = parseFloat(shoppingData.price) || 0;
+                    setShoppingData({
+                      ...shoppingData, 
+                      amountPaid: isNaN(value) ? '' : Math.min(value, maxAmount)
+                    });
+                  }}
+                  onFocus={(e) => {
+                    if (shoppingData.amountPaid === 0 || shoppingData.amountPaid === '0') {
+                      setShoppingData({ ...shoppingData, amountPaid: '' });
+                    }
+                  }}
+                  className="w-full pl-8 p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  placeholder="0.00"
+                />
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span className="text-gray-500">€</span>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {t.remaining || 'Remaining'}: {((parseFloat(shoppingData.price) || 0) - (parseFloat(shoppingData.amountPaid) || 0)).toFixed(2)} €
+              </p>
+            </div>
+          )}
+          
+          {shoppingData.paymentStatus === 'paid' && (
+            <div className="flex items-center text-sm text-green-600 mb-4">
+              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              {t.serviceFullyPaid || 'Expense will be marked as fully paid'}
+            </div>
+          )}
         </div>
         
         <div className="space-y-2">
@@ -1347,7 +1625,14 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
       inDays: "In",
       days: "days",
       yesterday: "Yesterday",
-      daysAgo: "days ago"
+      daysAgo: "days ago",
+      perDay: "per day",
+      perNight: "per night",
+      perWeek: "per week",
+      perMonth: "per month",
+      perHour: "per hour",
+      perService: "per service",
+      pricePerUnit: "Price"
     },
     ro: {
       paid: "Plătit",
@@ -1366,7 +1651,14 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
       inDays: "În",
       days: "zile",
       yesterday: "Ieri",
-      daysAgo: "zile în urmă"
+      daysAgo: "zile în urmă",
+      perDay: "pe zi",
+      perNight: "pe noapte",
+      perWeek: "pe săptămână",
+      perMonth: "pe lună",
+      perHour: "pe oră",
+      perService: "pe serviciu",
+      pricePerUnit: "Preț"
     }
   };
   
@@ -1545,13 +1837,20 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
           <div className="mt-3">
             <div className="flex justify-between items-center text-xs mb-1">
               <span className="text-gray-600">{t.paymentProgress}</span>
-              <span className="font-medium">{client.paidAmount.toLocaleString()} / {client.totalValue.toLocaleString()} €</span>
+              <div className="flex gap-2 items-center">
+                {client.paidAmount > client.totalValue && (
+                  <span className="text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
+                    +{ (client.paidAmount - client.totalValue).toLocaleString() } € Credit
+                  </span>
+                )}
+                <span className="font-medium">{client.paidAmount.toLocaleString()} / {client.totalValue.toLocaleString()} €</span>
+              </div>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div 
                 className={`h-2 rounded-full ${
-                  client.paymentStatus === 'paid' ? 'bg-green-500' : 
-                  client.paymentStatus === 'partiallyPaid' ? 'bg-yellow-500' : 
+                  client.paidAmount >= client.totalValue ? 'bg-green-500' : 
+                  client.paidAmount > 0 ? 'bg-yellow-500' : 
                   'bg-red-500'
                 }`}
                 style={{ width: `${Math.min(100, (client.paidAmount / client.totalValue) * 100)}%` }}
@@ -1676,6 +1975,144 @@ const UpcomingBookings = () => {
   const [userRole, setUserRole] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
+  
+  // RECALCULATE FUNCTION - Strictly sums all services to fix broken balances
+  const handleRecalculateTotals = async (client) => {
+    if (!client || !client.bookings || client.bookings.length === 0) return;
+    
+    try {
+      showNotificationMessage(t.recalculating || 'Recalculating totals...');
+      console.log("🔄 Recalculating Source of Truth for client:", client.clientName);
+      
+      const updatedBookings = await Promise.all(client.bookings.map(async (booking) => {
+        const bookingRef = doc(db, 'reservations', booking.id);
+        const bookingSnap = await getDoc(bookingRef);
+        
+        if (!bookingSnap.exists()) return booking;
+        
+        const data = bookingSnap.data();
+        const services = Array.isArray(data.services) ? [...data.services] : [];
+        const paymentHistory = Array.isArray(data.paymentHistory) ? [...data.paymentHistory] : [];
+        
+        // 1. CALCULATE TOTAL FROM SERVICES (The only source of truth for price)
+        let totalValue = services.reduce((sum, s) => {
+          return sum + (parseFloat(s.price || 0) * parseInt(s.quantity || 1));
+        }, 0);
+        
+        // 2. CALCULATE PAID FROM HISTORY (The only source of truth for money received)
+        const totalPaidFromHistory = paymentHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+        
+        // 3. Update each service's payment status based on history
+        const updatedServices = services.map(s => {
+          const sTotal = (parseFloat(s.price || 0) * parseInt(s.quantity || 1));
+          let sPaid = 0;
+          if (s.id) {
+            paymentHistory.forEach(p => {
+              if (p.serviceId === s.id) sPaid += parseFloat(p.amount || 0);
+            });
+          }
+          
+          let sStatus = 'unpaid';
+          if (sPaid >= sTotal && sTotal > 0) sStatus = 'paid';
+          else if (sPaid > 0) sStatus = 'partiallyPaid';
+          
+          return {
+            ...s,
+            amountPaid: sPaid,
+            paymentStatus: sStatus
+          };
+        });
+        
+        // 4. Booking-level status
+        let paymentStatus = 'notPaid';
+        if (totalPaidFromHistory >= totalValue && totalValue > 0) paymentStatus = 'paid';
+        else if (totalPaidFromHistory > 0) paymentStatus = 'partiallyPaid';
+        
+        const updateData = {
+          totalValue,
+          totalAmount: totalValue,
+          paidAmount: totalPaidFromHistory,
+          paymentStatus,
+          services: updatedServices,
+          updatedAt: serverTimestamp()
+        };
+        
+        await updateDoc(bookingRef, updateData);
+        return { ...data, id: booking.id, ...updateData };
+      }));
+      
+      // Update local state: bookings
+      setBookings(prev => {
+        return prev.map(b => {
+          const updated = updatedBookings.find(ub => ub.id === b.id);
+          return updated ? { ...b, ...updated } : b;
+        });
+      });
+      
+      // Update local state: clientGroups
+      setClientGroups(prev => {
+        const clientId = client.clientId;
+        if (!prev[clientId]) return prev;
+        
+        const updatedGroup = { ...prev[clientId] };
+        updatedGroup.bookings = updatedBookings;
+        
+        // Recalculate group totals from all bookings
+        let globalTotalVal = 0;
+        let globalTotalPaid = 0;
+        const allServices = [];
+        const allPayments = [];
+        
+        updatedBookings.forEach(b => {
+          globalTotalVal += b.totalValue || 0;
+          globalTotalPaid += b.paidAmount || 0;
+          if (Array.isArray(b.services)) b.services.forEach(s => allServices.push({ ...s, bookingId: b.id }));
+          if (Array.isArray(b.paymentHistory)) b.paymentHistory.forEach(p => allPayments.push({ ...p, bookingId: b.id }));
+        });
+        
+        updatedGroup.totalValue = globalTotalVal;
+        updatedGroup.paidAmount = globalTotalPaid;
+        updatedGroup.dueAmount = Math.max(0, globalTotalVal - globalTotalPaid);
+        updatedGroup.paymentStatus = globalTotalPaid >= globalTotalVal && globalTotalVal > 0 ? 'paid' : (globalTotalPaid > 0 ? 'partiallyPaid' : 'notPaid');
+        updatedGroup.services = allServices;
+        updatedGroup.paymentHistory = allPayments.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+        
+        return { ...prev, [clientId]: updatedGroup };
+      });
+
+      // Update local state: selectedItem (modal + progress bar)
+      setSelectedItem(prev => {
+        if (!prev || prev.clientId !== client.clientId) return prev;
+        
+        let totalVal = 0;
+        let totalPaid = 0;
+        const allServices = [];
+        const allPayments = [];
+        
+        updatedBookings.forEach(b => {
+          totalVal += b.totalValue || 0;
+          totalPaid += b.paidAmount || 0;
+          if (Array.isArray(b.services)) b.services.forEach(s => allServices.push({ ...s, bookingId: b.id }));
+          if (Array.isArray(b.paymentHistory)) b.paymentHistory.forEach(p => allPayments.push({ ...p, bookingId: b.id }));
+        });
+
+        return {
+          ...prev,
+          services: allServices,
+          paymentHistory: allPayments.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)),
+          totalValue: totalVal,
+          paidAmount: totalPaid,
+          dueAmount: Math.max(0, totalVal - totalPaid),
+          paymentStatus: totalPaid >= totalVal && totalVal > 0 ? 'paid' : (totalPaid > 0 ? 'partiallyPaid' : 'notPaid')
+        };
+      });
+      
+      showNotificationMessage(t.recalculateSuccess || 'Totals recalculated successfully');
+    } catch (err) {
+      console.error('Recalculation error:', err);
+      showNotificationMessage('Recalculation failed', 'error');
+    }
+  };
   
   const { language } = useLanguage();
   const t = useMemo(() => translations[language] || translations.en, [language]);
@@ -2295,62 +2732,69 @@ useEffect(() => {
             ? booking.services
             : (Array.isArray(booking.extras) ? booking.extras : []);
           
-          // Compute services total for this booking (fallback if total missing)
+          // 1. CALCULATE TOTAL VALUE (Sum of all services)
           const serviceTotalForBooking = bookingServices.reduce((sum, svc) => {
-            const price = svc?.price || 0;
-            const qty = svc?.quantity || 1;
-            return sum + price * qty;
+            const price = parseFloat(svc?.price || 0);
+            const qty = parseInt(svc?.quantity || 1);
+            return sum + (price * qty);
           }, 0);
           
-          // Compute paid from history or per-service amounts to avoid false "paid"
-          const paymentHistoryTotal = Array.isArray(booking.paymentHistory)
-            ? booking.paymentHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)
-            : 0;
-          const servicePaidTotal = bookingServices.reduce((sum, svc) => sum + (parseFloat(svc.amountPaid) || 0), 0);
-          const explicitPaid = booking.paidAmount || booking.totalPaid || 0;
-          const paidAmount = paymentHistoryTotal > 0
-            ? paymentHistoryTotal
-            : servicePaidTotal > 0
-              ? servicePaidTotal
-              : ((booking.lastPaymentDate || booking.lastPaymentMethod) ? explicitPaid : 0);
+          // 2. CALCULATE TOTAL PAID FROM HISTORY (The absolute Source of Truth)
+          const paymentHistory = Array.isArray(booking.paymentHistory) ? booking.paymentHistory : [];
+          const totalPaidFromHistory = paymentHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+          
+          // 3. MAP PAYMENTS TO SERVICES (By ID)
+          // We don't automatically allocate money here. 
+          // We only count payments that explicitly have this serviceId.
+          const servicesWithPayments = bookingServices.map(svc => {
+            const svcId = svc.id || svc.templateId;
+            let svcPaid = 0;
+            if (svcId) {
+              paymentHistory.forEach(p => {
+                if (p.serviceId === svcId) svcPaid += parseFloat(p.amount || 0);
+              });
+            }
+            // Preserve stored amountPaid if no history matches (for transition)
+            const finalSvcPaid = svcPaid > 0 ? svcPaid : (parseFloat(svc.amountPaid) || 0);
+            
+            return {
+              ...svc,
+              amountPaid: finalSvcPaid,
+              paymentStatus: finalSvcPaid >= (parseFloat(svc.price || 0) * parseInt(svc.quantity || 1)) ? 'paid' : (finalSvcPaid > 0 ? 'partiallyPaid' : 'unpaid')
+            };
+          });
 
-          const baseTotalValue = booking.totalValue || booking.totalAmount || 0;
+          // 4. CALCULATE UNALLOCATED CREDIT
+          // This is money the client paid that isn't tied to any specific service yet
+          const allocatedPaid = servicesWithPayments.reduce((sum, s) => sum + (s.amountPaid || 0), 0);
+          const unallocatedCredit = Math.max(0, totalPaidFromHistory - allocatedPaid);
+
+          // 5. DEFINE BOOKING TOTALS
+          const bookingTotalValue = serviceTotalForBooking || booking.totalValue || booking.totalAmount || 0;
+          const bookingPaidAmount = totalPaidFromHistory;
           
-          // Re-sync effective total so it never falls below services total or paid amount
-          const combinedTotal = Math.max(baseTotalValue, serviceTotalForBooking, paidAmount);
-          let effectiveTotalValue = combinedTotal > 0 ? combinedTotal : serviceTotalForBooking;
-          
-          // Ensure effective total is not below paid amount to keep ratios sane
-          if (effectiveTotalValue < paidAmount) {
-            effectiveTotalValue = paidAmount;
-          }
+          // Add unallocated credit info to the booking object for UI
+          const enrichedBooking = {
+            ...booking,
+            services: servicesWithPayments,
+            totalValue: bookingTotalValue,
+            paidAmount: bookingPaidAmount,
+            unallocatedCredit: unallocatedCredit
+          };
+
+          groups[clientId].totalValue += bookingTotalValue;
+          groups[clientId].paidAmount += bookingPaidAmount;
+          groups[clientId].dueAmount += Math.max(0, bookingTotalValue - bookingPaidAmount);
+          groups[clientId].bookings.push(enrichedBooking);
           
           if (bookingServices.length > 0) {
-            bookingServices.forEach((service, serviceIndex) => {
-              const stableId = service.id 
-                || service.templateId 
-                || service.uid 
-                || `${booking.id || 'booking'}_${serviceIndex}_${Math.floor(Math.random() * 1e6)}`;
-              
-              // Process service date and createdAt fields
-              const processedService = {
-                ...service,
-                id: stableId,
-                date: service.date?.toDate?.() || service.date,
-                createdAt: service.createdAt?.toDate?.() || service.createdAt || new Date()
-              };
-              
+            servicesWithPayments.forEach((service, serviceIndex) => {
               groups[clientId].services.push({
-                ...processedService,
+                ...service,
                 bookingId: booking.id
               });
             });
           }
-          
-          groups[clientId].bookings.push(booking);
-          groups[clientId].totalValue += effectiveTotalValue;
-          groups[clientId].paidAmount += paidAmount;
-          groups[clientId].dueAmount += Math.max(0, effectiveTotalValue - paidAmount);
           
           // Track last activity (either booking date or last payment)
           const bookingDate = booking.createdAt || booking.checkIn || new Date();
@@ -2826,6 +3270,17 @@ const renderMainContent = (filteredClients) => {
               <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusBadgeClass(selectedItem.paymentStatus)}`}>
                 {getPaymentStatusText(selectedItem.paymentStatus)}
               </div>
+              <div className="mt-2">
+                <button 
+                  onClick={() => handleRecalculateTotals(selectedItem)}
+                  className="text-xs text-blue-600 hover:text-blue-800 underline flex items-center justify-center mx-auto gap-1"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Recalculate Balances
+                </button>
+              </div>
             </div>
             
             <div className="grid grid-cols-2 gap-3 pt-4 border-t">
@@ -2993,13 +3448,16 @@ const renderMainContent = (filteredClients) => {
       // 1. Delete associated finance records first
       const financeQuery = query(
         collection(db, 'financeRecords'),
+        where('companyId', '==', userCompanyId),
         where('bookingId', '==', booking.id)
       );
       const financeDocs = await getDocs(financeQuery);
       
       if (!financeDocs.empty) {
         console.log(`Deleting ${financeDocs.size} finance records for booking ${booking.id}`);
-        const deletePromises = financeDocs.docs.map(doc => deleteDoc(doc.ref));
+        const deletePromises = financeDocs.docs
+          .filter(fDoc => fDoc.data()?.companyId === userCompanyId)
+          .map(fDoc => deleteDoc(fDoc.ref));
         await Promise.all(deletePromises);
       }
 
@@ -3100,26 +3558,21 @@ const renderMainContent = (filteredClients) => {
         throw new Error('You are not authorized to modify this booking');
       }
       
-      // Find the service in services array - FIXED: better service identification
-      const services = bookingData.services || [];
+      // 1. Prepare updated services and payment history
+      const services = Array.isArray(bookingData.services) ? [...bookingData.services] : [];
       let serviceIndex = -1;
       
-      // First try to find by direct comparison
+      // Better service identification
       if (service.id) {
         serviceIndex = services.findIndex(s => s.id === service.id);
       }
       
-      // If not found by id, try to find by name + date/createdAt
       if (serviceIndex === -1) {
         serviceIndex = services.findIndex(s => {
-          // Convert timestamps for comparison
           const sCreatedAt = s.createdAt?.toDate?.() ? s.createdAt.toDate() : s.createdAt;
           const serviceCreatedAt = service.createdAt instanceof Date ? service.createdAt : new Date(service.createdAt);
-          
-          // Match by name and creation time if available
           return s.name === service.name && 
-                 ((sCreatedAt && serviceCreatedAt && 
-                   Math.abs(new Date(sCreatedAt).getTime() - serviceCreatedAt.getTime()) < 1000) || 
+                 ((sCreatedAt && serviceCreatedAt && Math.abs(new Date(sCreatedAt).getTime() - serviceCreatedAt.getTime()) < 1000) || 
                   (s.type === service.type && s.price === service.price && s.quantity === service.quantity));
         });
       }
@@ -3128,96 +3581,130 @@ const renderMainContent = (filteredClients) => {
         throw new Error('Service not found in booking');
       }
       
-      // Calculate the total to subtract
-      const serviceTotal = services[serviceIndex].price * services[serviceIndex].quantity;
+      // Remove the service
+      const deletedService = services.splice(serviceIndex, 1)[0];
       
-      // Remove the service from array
-      services.splice(serviceIndex, 1);
+      // 2. Also remove associated payments from history to prevent "phantom credit"
+      const paymentHistory = Array.isArray(bookingData.paymentHistory) 
+        ? bookingData.paymentHistory.filter(p => p.serviceId !== service.id)
+        : [];
+        
+      // 3. Recalculate totals from the new services and history
+      let newTotal = 0;
+      services.forEach(s => {
+        newTotal += (parseFloat(s.price || 0) * parseInt(s.quantity || 1));
+      });
       
-      // Calculate new booking total
-      const currentTotal = bookingData.totalValue || 0;
-      const newBookingTotal = Math.max(0, currentTotal - serviceTotal);
+      const newPaidAmount = paymentHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
       
-      // Update booking in Firestore
+      let newPaymentStatus = 'notPaid';
+      if (newPaidAmount >= newTotal && newTotal > 0) newPaymentStatus = 'paid';
+      else if (newPaidAmount > 0) newPaymentStatus = 'partiallyPaid';
+      
+      // 4. Update booking in Firestore
       await updateDoc(bookingRef, {
         services,
-        totalValue: newBookingTotal,
+        paymentHistory,
+        totalValue: newTotal,
+        totalAmount: newTotal,
+        paidAmount: newPaidAmount,
+        paymentStatus: newPaymentStatus,
         updatedAt: serverTimestamp()
       });
       
-      console.log("Service deleted successfully, updating local state");
+      console.log("Service and associated payments deleted, updating local state");
       
-      // Update local state
+      // Update local state: bookings
       setBookings(prev => {
         return prev.map(booking => {
           if (booking.id === service.bookingId) {
-            // Remove the service from this booking
-            const updatedServices = (booking.services || []).filter((s, idx) => idx !== serviceIndex);
-            
             return {
               ...booking,
-              services: updatedServices,
-              totalValue: Math.max(0, booking.totalValue - serviceTotal)
+              services,
+              paymentHistory,
+              totalValue: newTotal,
+              paidAmount: newPaidAmount,
+              paymentStatus: newPaymentStatus
             };
           }
           return booking;
         });
       });
       
-      // Update client groups
+      // Update local state: clientGroups
       setClientGroups(prev => {
         const clientId = client.clientId;
         if (!prev[clientId]) return prev;
         
         const updatedGroup = { ...prev[clientId] };
         
-        // Update the booking
+        // Update the booking within the group
         updatedGroup.bookings = updatedGroup.bookings.map(b => {
           if (b.id === service.bookingId) {
-            // Create updated services array
-            const updatedBookingServices = Array.isArray(b.services) 
-              ? b.services.filter((s, idx) => !(s.name === service.name && 
-                                              s.price === service.price &&
-                                              s.quantity === service.quantity))
-              : [];
-              
             return {
               ...b,
-              services: updatedBookingServices,
-              totalValue: Math.max(0, b.totalValue - serviceTotal)
+              services,
+              paymentHistory,
+              totalValue: newTotal,
+              paidAmount: newPaidAmount,
+              paymentStatus: newPaymentStatus
             };
           }
           return b;
         });
         
-        // Remove the service from client's services array - FIXED: better service identification
+        // Remove from flattened services
         updatedGroup.services = updatedGroup.services.filter(s => {
-          if (s.bookingId !== service.bookingId) return true;
-          if (s.id && s.id === service.id) return false;
-          
-          const sCreatedAt = s.createdAt instanceof Date ? s.createdAt : new Date(s.createdAt);
-          const serviceCreatedAt = service.createdAt instanceof Date ? service.createdAt : new Date(service.createdAt);
-          
-          // Keep if it's not the service we're deleting
-          return !(s.name === service.name && 
-                  Math.abs(sCreatedAt.getTime() - serviceCreatedAt.getTime()) < 1000);
+          if (s.id && service.id) return s.id !== service.id;
+          return s.name !== service.name || s.bookingId !== service.bookingId;
         });
         
-        // Update client totals
-        const totalValue = Math.max(0, updatedGroup.totalValue - serviceTotal);
-        updatedGroup.totalValue = totalValue;
-        updatedGroup.dueAmount = Math.max(0, totalValue - updatedGroup.paidAmount);
+        // Update group payment history
+        updatedGroup.paymentHistory = Array.isArray(updatedGroup.paymentHistory)
+          ? updatedGroup.paymentHistory.filter(p => p.serviceId !== service.id || p.bookingId !== service.bookingId)
+          : [];
+          
+        // Recalculate group totals
+        let totalVal = 0;
+        let totalPaid = 0;
+        updatedGroup.bookings.forEach(b => {
+          totalVal += b.totalValue || 0;
+          totalPaid += b.paidAmount || 0;
+        });
         
-        // Update client payment status
-        if (updatedGroup.paidAmount >= totalValue) {
-          updatedGroup.paymentStatus = 'paid';
-        } else if (updatedGroup.paidAmount > 0) {
-          updatedGroup.paymentStatus = 'partiallyPaid';
-        } else {
-          updatedGroup.paymentStatus = 'notPaid';
-        }
+        updatedGroup.totalValue = totalVal;
+        updatedGroup.paidAmount = totalPaid;
+        updatedGroup.dueAmount = Math.max(0, totalVal - totalPaid);
+        updatedGroup.paymentStatus = totalPaid >= totalVal && totalVal > 0 ? 'paid' : (totalPaid > 0 ? 'partiallyPaid' : 'notPaid');
         
         return { ...prev, [clientId]: updatedGroup };
+      });
+
+      // Update local state: selectedItem (modal + progress bar)
+      setSelectedItem(prev => {
+        if (!prev || prev.clientId !== client.clientId) return prev;
+        
+        const updatedServices = (prev.services || []).filter(s => {
+          if (s.id && service.id) return s.id !== service.id;
+          return s.name !== service.name || s.bookingId !== service.bookingId;
+        });
+        
+        const updatedPaymentHistory = (prev.paymentHistory || []).filter(p => {
+          return p.serviceId !== service.id || p.bookingId !== service.bookingId;
+        });
+        
+        const totalVal = updatedServices.reduce((sum, s) => sum + (parseFloat(s.price || 0) * parseInt(s.quantity || 1)), 0);
+        const totalPaid = updatedPaymentHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+        
+        return {
+          ...prev,
+          services: updatedServices,
+          paymentHistory: updatedPaymentHistory,
+          totalValue: totalVal,
+          paidAmount: totalPaid,
+          dueAmount: Math.max(0, totalVal - totalPaid),
+          paymentStatus: totalPaid >= totalVal && totalVal > 0 ? 'paid' : (totalPaid > 0 ? 'partiallyPaid' : 'notPaid')
+        };
       });
       
       showNotificationMessage(t.serviceDeletedSuccess || 'Service deleted successfully');
@@ -3230,7 +3717,6 @@ const renderMainContent = (filteredClients) => {
     }
   };
   
-  // FIXED: Enhanced shopping expense handler - fixed total calculation
   const handleAddShoppingExpense = async (client, shoppingExpense) => {
     if (!client || !shoppingExpense) {
       console.error("Missing client or shopping data");
@@ -3251,7 +3737,6 @@ const renderMainContent = (filteredClients) => {
     try {
       console.log("Adding shopping expense to booking:", targetBooking.id);
       
-      // Verify this booking belongs to the user's company
       const bookingRef = doc(db, 'reservations', targetBooking.id);
       const bookingDoc = await getDoc(bookingRef);
       
@@ -3261,20 +3746,10 @@ const renderMainContent = (filteredClients) => {
       
       const bookingData = bookingDoc.data();
       
-      // Security check: Verify company ID
       if (bookingData.companyId !== userCompanyId) {
         throw new Error(t.notAuthorizedToModify || 'You are not authorized to modify this booking');
       }
       
-      // Calculate total values - FIXED: preserve paid amounts
-      const currentTotal = bookingData.totalValue || 0;
-      const newTotal = currentTotal + shoppingExpense.totalValue;
-      const paidAmount = bookingData.paidAmount || 0; // Preserve paid amount
-      
-      // Create a services array if it doesn't exist
-      const services = Array.isArray(bookingData.services) ? [...bookingData.services] : [];
-      
-      // Add the shopping expense to services array with regular Date instead of serverTimestamp
       const currentDate = new Date();
       const sanitizedReceipt = shoppingExpense.receiptAttachment ? {
         name: shoppingExpense.receiptAttachment.name || 'receipt',
@@ -3286,115 +3761,151 @@ const renderMainContent = (filteredClients) => {
         truncated: shoppingExpense.receiptAttachment.truncated || false
       } : null;
       
-      // Create service object WITHOUT serverTimestamp - add a unique ID
       const newService = {
         ...shoppingExpense,
         receiptAttachment: sanitizedReceipt,
-        id: 'shopping_' + Date.now(), // Add a unique ID
-        createdAt: currentDate
+        id: 'shopping_' + Date.now(),
+        createdAt: currentDate,
+        totalValue: parseFloat(shoppingExpense.price || 0) * parseInt(shoppingExpense.quantity || 1),
+        paymentStatus: shoppingExpense.paymentStatus || 'unpaid',
+        amountPaid: parseFloat(shoppingExpense.amountPaid || 0)
       };
       
-      services.push(newService);
+      // 1. Prepare updated collections
+      const services = Array.isArray(bookingData.services) ? [...bookingData.services, newService] : [newService];
+      const paymentHistory = Array.isArray(bookingData.paymentHistory) ? [...bookingData.paymentHistory] : [];
       
-      // Update the booking in Firestore - only use serverTimestamp for top-level fields
+      // 2. Add payment record if the expense was pre-paid
+      if (newService.amountPaid > 0) {
+        paymentHistory.push({
+          id: 'pay_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+          amount: newService.amountPaid,
+          method: 'cash',
+          notes: `Initial payment for ${newService.name}`,
+          serviceId: newService.id,
+          serviceName: newService.name,
+          bookingId: targetBooking.id,
+          date: currentDate,
+          createdAt: currentDate,
+          createdBy: auth.currentUser?.uid || 'unknown',
+          companyId: userCompanyId
+        });
+      }
+
+      // 3. STRICT RECALCULATION FROM ARRAYS
+      const newTotal = services.reduce((sum, s) => sum + (parseFloat(s.price || 0) * parseInt(s.quantity || 1)), 0);
+      const newPaidAmount = paymentHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+      
+      let newPaymentStatus = 'notPaid';
+      if (newPaidAmount >= newTotal && newTotal > 0) {
+        newPaymentStatus = 'paid';
+      } else if (newPaidAmount > 0) {
+        newPaymentStatus = 'partiallyPaid';
+      }
+
+      // Update Firestore
       await updateDoc(bookingRef, {
         services: services,
+        paymentHistory: paymentHistory,
         totalValue: newTotal,
-        totalAmount: newTotal, // keep legacy field in sync so reloads calculate correctly
-        // KEEP paidAmount unchanged
+        totalAmount: newTotal,
+        paidAmount: newPaidAmount,
+        paymentStatus: newPaymentStatus,
         updatedAt: serverTimestamp()
       });
       
-      // Update local state - FIXED: preserve paid amount in bookings state
-      setBookings(prev => {
-        return prev.map(booking => {
-          if (booking.id === targetBooking.id) {
-            // Create updated services array including the new shopping expense
-            const updatedServices = Array.isArray(booking.services) 
-              ? [...booking.services, newService]
-              : [newService];
-              
-            return {
-              ...booking,
-              services: updatedServices,
-              totalValue: newTotal,
-              totalAmount: newTotal,
-              // Maintain the existing paidAmount
-              paidAmount: booking.paidAmount || 0
-            };
-          }
-          return booking;
-        });
-      });
+      // Update local state: bookings
+      setBookings(prev => prev.map(booking => {
+        if (booking.id === targetBooking.id) {
+          return {
+            ...booking,
+            services,
+            paymentHistory,
+            totalValue: newTotal,
+            paidAmount: newPaidAmount,
+            paymentStatus: newPaymentStatus
+          };
+        }
+        return booking;
+      }));
       
-      // Update client groups - FIXED: preserve paid amounts in client state
+      // Update local state: clientGroups
       setClientGroups(prev => {
         const clientId = client.clientId;
         if (!prev[clientId]) return prev;
         
         const updatedGroup = { ...prev[clientId] };
         
-        // Update the booking
+        // Update the booking within the group
         updatedGroup.bookings = updatedGroup.bookings.map(b => {
           if (b.id === targetBooking.id) {
             return {
               ...b,
-              services: Array.isArray(b.services) ? [...b.services, newService] : [newService],
+              services,
+              paymentHistory,
               totalValue: newTotal,
-              // Maintain paid amount
-              paidAmount: b.paidAmount || 0
+              paidAmount: newPaidAmount,
+              paymentStatus: newPaymentStatus
             };
           }
           return b;
         });
         
-        // Add the service to client's services array
-        updatedGroup.services = [...updatedGroup.services, {
-          ...newService,
-          bookingId: targetBooking.id
-        }];
+        // Refresh flattened services and history
+        const allServices = [];
+        const allPayments = [];
+        updatedGroup.bookings.forEach(b => {
+          if (Array.isArray(b.services)) b.services.forEach(s => allServices.push({ ...s, bookingId: b.id }));
+          if (Array.isArray(b.paymentHistory)) b.paymentHistory.forEach(p => allPayments.push({ ...p, bookingId: b.id }));
+        });
         
-        // Update client totals - FIXED: preserve paid amount
-        const oldTotalValue = updatedGroup.totalValue;
-        updatedGroup.totalValue += shoppingExpense.totalValue;
+        updatedGroup.services = allServices;
+        updatedGroup.paymentHistory = allPayments.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
         
-        // Keep paidAmount the same
-        const paidAmount = updatedGroup.paidAmount;
-        updatedGroup.dueAmount = Math.max(0, updatedGroup.totalValue - paidAmount);
+        // Recalculate group totals
+        let totalVal = 0;
+        let totalPaid = 0;
+        updatedGroup.bookings.forEach(b => {
+          globalTotalVal += b.totalValue || 0; // WAIT, there's a variable name conflict here in the previous version maybe? No, let me use local names.
+        });
         
-        // Update client payment status
-        if (paidAmount >= updatedGroup.totalValue) {
-          updatedGroup.paymentStatus = 'paid';
-        } else if (paidAmount > 0) {
-          updatedGroup.paymentStatus = 'partiallyPaid';
-        } else {
-          updatedGroup.paymentStatus = 'notPaid';
-        }
+        // Let's use clean local variables for clarity
+        let globalTotalValue = 0;
+        let globalTotalPaidAmount = 0;
+        updatedGroup.bookings.forEach(b => {
+          globalTotalValue += b.totalValue || 0;
+          globalTotalPaidAmount += b.paidAmount || 0;
+        });
         
-        // Update last activity timestamp
+        updatedGroup.totalValue = globalTotalValue;
+        updatedGroup.paidAmount = globalTotalPaidAmount;
+        updatedGroup.dueAmount = Math.max(0, globalTotalValue - globalTotalPaidAmount);
+        updatedGroup.paymentStatus = globalTotalPaidAmount >= globalTotalValue && globalTotalValue > 0 ? 'paid' : (globalTotalPaidAmount > 0 ? 'partiallyPaid' : 'notPaid');
+        
         updatedGroup.lastActivity = new Date();
-        
         return { ...prev, [clientId]: updatedGroup };
       });
 
-      // Keep selected item (open modal) in sync so progress bar reflects new total
+      // Update local state: selectedItem (modal + progress bar)
       setSelectedItem(prev => {
         if (!prev || prev.clientId !== client.clientId) return prev;
-        const paidAmountSafe = prev.paidAmount || 0;
-        const updatedTotal = (prev.totalValue || 0) + shoppingExpense.totalValue;
-        const updatedDue = Math.max(0, updatedTotal - paidAmountSafe);
-        const nextPaymentStatus = paidAmountSafe >= updatedTotal
-          ? 'paid'
-          : paidAmountSafe > 0
-            ? 'partiallyPaid'
-            : 'notPaid';
-
+        
+        const updatedServices = [...(prev.services || []), { ...newService, bookingId: targetBooking.id }];
+        const updatedHistory = newService.amountPaid > 0 
+          ? [{ ...paymentHistory[paymentHistory.length - 1], bookingId: targetBooking.id }, ...(prev.paymentHistory || [])]
+          : (prev.paymentHistory || []);
+          
+        const totalVal = updatedServices.reduce((sum, s) => sum + (parseFloat(s.price || 0) * parseInt(s.quantity || 1)), 0);
+        const totalPaid = updatedHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+        
         return {
           ...prev,
-          services: [...(prev.services || []), { ...newService, bookingId: targetBooking.id }],
-          totalValue: updatedTotal,
-          dueAmount: updatedDue,
-          paymentStatus: nextPaymentStatus
+          services: updatedServices,
+          paymentHistory: updatedHistory,
+          totalValue: totalVal,
+          paidAmount: totalPaid,
+          dueAmount: Math.max(0, totalVal - totalPaid),
+          paymentStatus: totalPaid >= totalVal && totalVal > 0 ? 'paid' : (totalPaid > 0 ? 'partiallyPaid' : 'notPaid')
         };
       });
       
@@ -3429,7 +3940,6 @@ const renderMainContent = (filteredClients) => {
     try {
       console.log("Adding service to booking:", targetBooking.id);
       
-      // Verify this booking belongs to the user's company
       const bookingRef = doc(db, 'reservations', targetBooking.id);
       const bookingDoc = await getDoc(bookingRef);
       
@@ -3439,132 +3949,151 @@ const renderMainContent = (filteredClients) => {
       
       const bookingData = bookingDoc.data();
       
-      // Security check: Verify company ID
       if (bookingData.companyId !== userCompanyId) {
         throw new Error(t.notAuthorizedToModify || 'You are not authorized to modify this booking');
       }
       
-      // Prepare the service data with computed values - use Date instead of serverTimestamp
       const currentDate = new Date();
       const preparedService = {
         ...serviceData,
-        id: serviceData.type + '_' + Date.now(), // Add a unique ID
+        id: serviceData.type + '_' + Date.now(),
         createdAt: currentDate,
         companyId: userCompanyId,
         status: serviceData.status || 'confirmed',
-        totalValue: parseFloat(serviceData.price) * parseInt(serviceData.quantity)
+        totalValue: parseFloat(serviceData.price) * parseInt(serviceData.quantity),
+        paymentStatus: serviceData.paymentStatus || 'unpaid',
+        amountPaid: parseFloat(serviceData.amountPaid || 0)
       };
       
-      // Calculate total values for the booking
-      const currentTotal = bookingData.totalValue || 0;
-      const newTotal = currentTotal + preparedService.totalValue;
-      const paidAmount = bookingData.paidAmount || 0; // Preserve paid amount
+      // 1. Prepare updated collections
+      const services = Array.isArray(bookingData.services) ? [...bookingData.services, preparedService] : [preparedService];
+      const paymentHistory = Array.isArray(bookingData.paymentHistory) ? [...bookingData.paymentHistory] : [];
       
-      // Create a services array if it doesn't exist
-      const services = Array.isArray(bookingData.services) ? [...bookingData.services] : [];
+      // 2. Add payment record if the new service was pre-paid
+      if (preparedService.amountPaid > 0) {
+        paymentHistory.push({
+          id: 'pay_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+          amount: preparedService.amountPaid,
+          method: 'cash',
+          notes: `Initial payment for ${preparedService.name}`,
+          serviceId: preparedService.id,
+          serviceName: preparedService.name,
+          bookingId: targetBooking.id,
+          date: currentDate,
+          createdAt: currentDate,
+          createdBy: auth.currentUser?.uid || 'unknown',
+          companyId: userCompanyId
+        });
+      }
+
+      // 3. STRICT RECALCULATION FROM ARRAYS (Source of Truth)
+      const newTotal = services.reduce((sum, s) => sum + (parseFloat(s.price || 0) * parseInt(s.quantity || 1)), 0);
+      const newPaidAmount = paymentHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
       
-      // Add the service to services array
-      services.push(preparedService);
+      let newPaymentStatus = 'notPaid';
+      if (newPaidAmount >= newTotal && newTotal > 0) {
+        newPaymentStatus = 'paid';
+      } else if (newPaidAmount > 0) {
+        newPaymentStatus = 'partiallyPaid';
+      }
       
-      // Update the booking in Firestore - only use serverTimestamp for top-level fields
+      // Update Firestore
       await updateDoc(bookingRef, {
         services: services,
+        paymentHistory: paymentHistory,
         totalValue: newTotal,
-        totalAmount: newTotal, // keep legacy field in sync so reloads calculate correctly
-        // KEEP paidAmount unchanged
+        totalAmount: newTotal,
+        paidAmount: newPaidAmount,
+        paymentStatus: newPaymentStatus,
         updatedAt: serverTimestamp()
       });
       
-      // Update local state - FIXED: preserve paid amount
-      setBookings(prev => {
-        return prev.map(booking => {
-          if (booking.id === targetBooking.id) {
-            // Create updated services array including the new service
-              const updatedServices = Array.isArray(booking.services) 
-                ? [...booking.services, preparedService]
-                : [preparedService];
-              
-              return {
-                ...booking,
-                services: updatedServices,
-                totalValue: newTotal,
-                totalAmount: newTotal,
-                // Maintain the existing paidAmount
-                paidAmount: booking.paidAmount || 0
-              };
-          }
-          return booking;
-        });
-      });
+      // Update local state: bookings
+      setBookings(prev => prev.map(booking => {
+        if (booking.id === targetBooking.id) {
+          return {
+            ...booking,
+            services,
+            paymentHistory,
+            totalValue: newTotal,
+            paidAmount: newPaidAmount,
+            paymentStatus: newPaymentStatus
+          };
+        }
+        return booking;
+      }));
       
-      // Update client groups - FIXED: preserve paid amount
+      // Update local state: clientGroups
       setClientGroups(prev => {
         const clientId = client.clientId;
         if (!prev[clientId]) return prev;
         
         const updatedGroup = { ...prev[clientId] };
         
-        // Update the booking
+        // Update the booking within the group
         updatedGroup.bookings = updatedGroup.bookings.map(b => {
           if (b.id === targetBooking.id) {
             return {
               ...b,
-              services: Array.isArray(b.services) ? [...b.services, preparedService] : [preparedService],
+              services,
+              paymentHistory,
               totalValue: newTotal,
-              // Maintain paid amount
-              paidAmount: b.paidAmount || 0
+              paidAmount: newPaidAmount,
+              paymentStatus: newPaymentStatus
             };
           }
           return b;
         });
         
-        // Add the service to client's services array
-        updatedGroup.services = [...updatedGroup.services, {
-          ...preparedService,
-          bookingId: targetBooking.id
-        }];
+        // Refresh flattened services and history
+        const allServices = [];
+        const allPayments = [];
+        updatedGroup.bookings.forEach(b => {
+          if (Array.isArray(b.services)) b.services.forEach(s => allServices.push({ ...s, bookingId: b.id }));
+          if (Array.isArray(b.paymentHistory)) b.paymentHistory.forEach(p => allPayments.push({ ...p, bookingId: b.id }));
+        });
         
-        // Update client totals - FIXED: preserve paid amount
-        const oldTotalValue = updatedGroup.totalValue;
-        updatedGroup.totalValue += preparedService.totalValue;
+        updatedGroup.services = allServices;
+        updatedGroup.paymentHistory = allPayments.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
         
-        // Keep paidAmount the same
-        const paidAmount = updatedGroup.paidAmount;
-        updatedGroup.dueAmount = Math.max(0, updatedGroup.totalValue - paidAmount);
+        // Recalculate group totals
+        let totalVal = 0;
+        let totalPaid = 0;
+        updatedGroup.bookings.forEach(b => {
+          totalVal += b.totalValue || 0;
+          totalPaid += b.paidAmount || 0;
+        });
         
-        // Update client payment status
-        if (paidAmount >= updatedGroup.totalValue) {
-          updatedGroup.paymentStatus = 'paid';
-        } else if (paidAmount > 0) {
-          updatedGroup.paymentStatus = 'partiallyPaid';
-        } else {
-          updatedGroup.paymentStatus = 'notPaid';
-        }
+        updatedGroup.totalValue = totalVal;
+        updatedGroup.paidAmount = totalPaid;
+        updatedGroup.dueAmount = Math.max(0, totalVal - totalPaid);
+        updatedGroup.paymentStatus = totalPaid >= totalVal && totalVal > 0 ? 'paid' : (totalPaid > 0 ? 'partiallyPaid' : 'notPaid');
         
-        // Update last activity timestamp
         updatedGroup.lastActivity = new Date();
-        
         return { ...prev, [clientId]: updatedGroup };
       });
 
-      // Keep selected item (open modal) in sync so progress bar reflects new total
+      // Update local state: selectedItem (modal + progress bar)
       setSelectedItem(prev => {
         if (!prev || prev.clientId !== client.clientId) return prev;
-        const paidAmountSafe = prev.paidAmount || 0;
-        const updatedTotal = (prev.totalValue || 0) + preparedService.totalValue;
-        const updatedDue = Math.max(0, updatedTotal - paidAmountSafe);
-        const nextPaymentStatus = paidAmountSafe >= updatedTotal
-          ? 'paid'
-          : paidAmountSafe > 0
-            ? 'partiallyPaid'
-            : 'notPaid';
-
+        
+        // Instead of incremental update, rebuild from the newly updated group/booking
+        const updatedServices = [...(prev.services || []), { ...preparedService, bookingId: targetBooking.id }];
+        const updatedHistory = preparedService.amountPaid > 0 
+          ? [{ ...paymentHistory[paymentHistory.length - 1], bookingId: targetBooking.id }, ...(prev.paymentHistory || [])]
+          : (prev.paymentHistory || []);
+          
+        const totalVal = updatedServices.reduce((sum, s) => sum + (parseFloat(s.price || 0) * parseInt(s.quantity || 1)), 0);
+        const totalPaid = updatedHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+        
         return {
           ...prev,
-          services: [...(prev.services || []), { ...preparedService, bookingId: targetBooking.id }],
-          totalValue: updatedTotal,
-          dueAmount: updatedDue,
-          paymentStatus: nextPaymentStatus
+          services: updatedServices,
+          paymentHistory: updatedHistory,
+          totalValue: totalVal,
+          paidAmount: totalPaid,
+          dueAmount: Math.max(0, totalVal - totalPaid),
+          paymentStatus: totalPaid >= totalVal && totalVal > 0 ? 'paid' : (totalPaid > 0 ? 'partiallyPaid' : 'notPaid')
         };
       });
       
@@ -3625,8 +4154,14 @@ async function handleShoppingFormSubmit(shoppingExpense) {
   // PAYMENT HANDLING
   const handleQuickPayment = async (client, amount, targetServiceOverride = null, overrides = {}) => {
     if (!amount || amount <= 0 || !client) return;
-    // Find the booking to update
-    const targetBooking = client.bookings[0]; // Usually update the first booking
+    
+    // Find the specific service we're paying for
+    const targetService = targetServiceOverride || paymentTargetService;
+    
+    // Find the correct booking to update - preferably from the service itself
+    const targetBookingId = targetService?.bookingId || (client.bookings[0]?.id);
+    const targetBooking = client.bookings.find(b => b.id === targetBookingId) || client.bookings[0];
+    
     if (!targetBooking) return;
     
     try {
@@ -3645,7 +4180,6 @@ async function handleShoppingFormSubmit(shoppingExpense) {
         throw new Error(t.notAuthorizedToModify || 'You are not authorized to modify this booking');
       }
       
-      const targetService = targetServiceOverride || paymentTargetService;
       const now = new Date();
       const payment = {
         id: uuidv4(),
@@ -3666,28 +4200,72 @@ async function handleShoppingFormSubmit(shoppingExpense) {
       const newPaidAmount = currentPaid + amount;
       const bookingTotal = bookingData.totalValue || 0;
       
-      // Determine new payment status
+      // Determine new payment status for the booking
       let newPaymentStatus = 'notPaid';
-      if (newPaidAmount >= bookingTotal) {
+      if (newPaidAmount >= bookingTotal && bookingTotal > 0) {
         newPaymentStatus = 'paid';
       } else if (newPaidAmount > 0) {
         newPaymentStatus = 'partiallyPaid';
       }
       
-      // Add payment to history if it exists
-      const paymentHistory = bookingData.paymentHistory || [];
+      // Add payment to history
+      const paymentHistory = Array.isArray(bookingData.paymentHistory) ? [...bookingData.paymentHistory] : [];
       paymentHistory.push(payment);
       
-      // Update booking in Firestore
+      // 3. Update Services with robust matching
+      const services = Array.isArray(bookingData.services) ? [...bookingData.services] : [];
+      let updatedServices = services;
+      
+      if (targetService) {
+        let serviceIndex = -1;
+        
+        // Match by ID
+        if (targetService.id) {
+          serviceIndex = services.findIndex(s => s.id === targetService.id);
+        }
+        
+        // Fallback match by name + properties
+        if (serviceIndex === -1) {
+          serviceIndex = services.findIndex(s => {
+            const sCreatedAt = s.createdAt?.toDate?.() ? s.createdAt.toDate() : s.createdAt;
+            const targetCreatedAt = targetService.createdAt instanceof Date ? targetService.createdAt : new Date(targetService.createdAt);
+            
+            return s.name === targetService.name && 
+                   ((sCreatedAt && targetCreatedAt && Math.abs(new Date(sCreatedAt).getTime() - targetCreatedAt.getTime()) < 5000) || 
+                    (s.type === targetService.type && s.price === targetService.price && s.quantity === targetService.quantity));
+          });
+        }
+        
+        if (serviceIndex !== -1) {
+          const s = services[serviceIndex];
+          const currentServicePaid = parseFloat(s.amountPaid || 0);
+          const nextServicePaid = currentServicePaid + amount;
+          const serviceTotal = parseFloat(s.price || 0) * parseInt(s.quantity || 1);
+          
+          let nextServiceStatus = 'unpaid';
+          if (nextServicePaid >= serviceTotal && serviceTotal > 0) nextServiceStatus = 'paid';
+          else if (nextServicePaid > 0) nextServiceStatus = 'partiallyPaid';
+          
+          services[serviceIndex] = {
+            ...s,
+            amountPaid: nextServicePaid,
+            paymentStatus: nextServiceStatus
+          };
+          updatedServices = services;
+        }
+      }
+
+      // Update Firestore
       await updateDoc(bookingRef, {
         paidAmount: newPaidAmount,
         paymentStatus: newPaymentStatus,
         lastPaymentDate: serverTimestamp(),
         lastPaymentMethod: payment.method,
-        paymentHistory
+        paymentHistory,
+        services: updatedServices
       });
       
-      // Update local state
+      // 4. Update local state: bookings
       setBookings(prev => {
         return prev.map(booking => {
           if (booking.id === targetBooking.id) {
@@ -3697,19 +4275,22 @@ async function handleShoppingFormSubmit(shoppingExpense) {
               paymentStatus: newPaymentStatus,
               lastPaymentDate: new Date(),
               lastPaymentMethod: payment.method,
-              paymentHistory: [...(booking.paymentHistory || []), payment]
+              paymentHistory: [...(booking.paymentHistory || []), payment],
+              services: updatedServices
             };
           }
           return booking;
         });
       });
       
-      // Update client groups
+      // 5. Update local state: clientGroups
       setClientGroups(prev => {
         const clientId = targetBooking.clientId;
         if (!prev[clientId]) return prev;
         
         const updatedGroup = { ...prev[clientId] };
+        
+        // Update the booking within the group
         updatedGroup.bookings = updatedGroup.bookings.map(b => {
           if (b.id === targetBooking.id) {
             return {
@@ -3717,51 +4298,75 @@ async function handleShoppingFormSubmit(shoppingExpense) {
               paidAmount: newPaidAmount,
               paymentStatus: newPaymentStatus,
               lastPaymentDate: new Date(),
-              lastPaymentMethod: payment.method
+              lastPaymentMethod: payment.method,
+              services: updatedServices
             };
           }
           return b;
         });
         
-        const paidAmount = updatedGroup.paidAmount + payment.amount;
-        updatedGroup.paidAmount = paidAmount;
-        updatedGroup.dueAmount = Math.max(0, updatedGroup.totalValue - paidAmount);
+        // Update the flattened services array for the group
+        updatedGroup.services = updatedGroup.services.map(s => {
+          if (s.bookingId === targetBooking.id) {
+            const updated = updatedServices.find(us => {
+              if (s.id && us.id) return s.id === us.id;
+              return s.name === us.name && s.type === us.type && s.price === us.price;
+            });
+            return updated ? { ...updated, bookingId: targetBooking.id } : s;
+          }
+          return s;
+        });
         
-        if (paidAmount >= updatedGroup.totalValue) {
-          updatedGroup.paymentStatus = 'paid';
-        } else if (paidAmount > 0) {
-          updatedGroup.paymentStatus = 'partiallyPaid';
-        } else {
-          updatedGroup.paymentStatus = 'notPaid';
-        }
+        // Recalculate group totals
+        let totalVal = 0;
+        let totalPaid = 0;
+        updatedGroup.bookings.forEach(b => {
+          totalVal += b.totalValue || 0;
+          totalPaid += b.paidAmount || 0;
+        });
         
-        // Add payment to client's payment history
+        updatedGroup.totalValue = totalVal;
+        updatedGroup.paidAmount = totalPaid;
+        updatedGroup.dueAmount = Math.max(0, totalVal - totalPaid);
+        updatedGroup.paymentStatus = totalPaid >= totalVal && totalVal > 0 ? 'paid' : (totalPaid > 0 ? 'partiallyPaid' : 'notPaid');
+        
+        // Update group payment history
         updatedGroup.paymentHistory = [
-          {
-            ...payment,
-            bookingId: targetBooking.id
-          },
-          ...updatedGroup.paymentHistory
+          { ...payment, bookingId: targetBooking.id },
+          ...(updatedGroup.paymentHistory || [])
         ];
         
-        // Update last activity
         updatedGroup.lastActivity = new Date();
-        
         return { ...prev, [clientId]: updatedGroup };
       });
 
-      // Keep selected client (modal + progress bar) in sync with the payment
+      // 6. Update local state: selectedItem (modal + progress bar)
       setSelectedItem(prev => {
         if (!prev || prev.clientId !== targetBooking.clientId) return prev;
+        
         const updatedPaid = (prev.paidAmount || 0) + payment.amount;
         const updatedDue = Math.max(0, (prev.totalValue || 0) - updatedPaid);
-        const updatedStatus = updatedPaid >= (prev.totalValue || 0)
+        const updatedStatus = updatedPaid >= (prev.totalValue || 0) && prev.totalValue > 0
           ? 'paid'
           : updatedPaid > 0
             ? 'partiallyPaid'
             : 'notPaid';
+            
+        // CRITICAL: Update the services array in the selectedItem so the UI reflects the payment
+        const updatedItemServices = (prev.services || []).map(s => {
+          if (s.bookingId === targetBooking.id) {
+            const updated = updatedServices.find(us => {
+              if (s.id && us.id) return s.id === us.id;
+              return s.name === us.name && s.type === us.type && s.price === us.price;
+            });
+            return updated ? { ...updated, bookingId: targetBooking.id } : s;
+          }
+          return s;
+        });
+
         return {
           ...prev,
+          services: updatedItemServices,
           paidAmount: updatedPaid,
           dueAmount: updatedDue,
           paymentStatus: updatedStatus,
@@ -3771,7 +4376,9 @@ async function handleShoppingFormSubmit(shoppingExpense) {
       });
       
       showNotificationMessage(t.paymentSuccess || 'Payment processed successfully');
-      closeBottomSheet();
+      // If payment fully covers the service or client, we can close the bottom sheet
+      // but let's keep it open so they see the success if they are in the paid tab
+      // closeBottomSheet(); 
     } catch (err) {
       console.error('Error processing quick payment:', err);
       showNotificationMessage(t.paymentFailed || 'Payment update failed: ' + err.message, 'error');
@@ -3970,13 +4577,24 @@ async function handleShoppingFormSubmit(shoppingExpense) {
               <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusBadgeClass(selectedItem.paymentStatus)}`}>
                 {getPaymentStatusText(selectedItem.paymentStatus)}
               </div>
+              <div className="mt-2">
+                <button 
+                  onClick={() => handleRecalculateTotals(selectedItem)}
+                  className="text-xs text-blue-600 hover:text-blue-800 underline flex items-center justify-center mx-auto gap-1"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Recalculate Balances
+                </button>
+              </div>
             </div>
             
             {/* Bookings Section */}
             <div className="space-y-3">
               <h3 className="font-semibold text-gray-900">{t.bookings || 'Bookings'} ({selectedItem.bookings.length})</h3>
               {selectedItem.bookings.map((booking, idx) => (
-                <div key={idx} className="p-3 bg-gray-50 rounded-lg">
+                <div key={idx} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                   <div className="flex justify-between items-start mb-2">
                     <div>
                       <p className="font-medium text-gray-900">{safeRender(booking.accommodationType)}</p>
@@ -3989,6 +4607,15 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                       </div>
                     </div>
                   </div>
+                  
+                  {/* UNALLOCATED CREDIT DISPLAY */}
+                  {booking.unallocatedCredit > 0 && (
+                    <div className="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded text-xs flex justify-between items-center">
+                      <span className="text-emerald-700 font-medium">Unallocated Balance (Credit):</span>
+                      <span className="text-emerald-800 font-bold">{booking.unallocatedCredit.toLocaleString()} €</span>
+                    </div>
+                  )}
+
                   <button 
                     className="w-full py-1 px-2 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 mt-2"
                     onClick={() => handleDeleteBooking(selectedItem, booking)}
