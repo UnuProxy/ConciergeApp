@@ -151,12 +151,30 @@ const resolveMonthlyUnit = (entry, fallback = 'nightly') => {
   return normalizeUnitType(fallback, fallback);
 };
 
-const getUnitDisplayLabel = (unit, t) => {
+const getUnitDisplayLabel = (unit, t, category = '') => {
   const normalized = (unit || '').toLowerCase();
+  
+  // Explicit unit checks
   if (normalized.includes('week')) return t.perWeek;
   if (normalized.includes('month')) return t.perMonth;
-  if (normalized.includes('night') || normalized.includes('day')) return t.perNight;
-  return t.perNight;
+  if (normalized.includes('hour')) return t.perHour;
+  if (normalized.includes('day')) return t.perDay;
+  if (normalized.includes('night')) return t.perNight;
+  if (normalized.includes('service')) return t.perService;
+  
+  // Default fallbacks based on common patterns
+  if (normalized === 'h') return t.perHour;
+  if (normalized === 'd') return t.perDay;
+  
+  // Category-based intelligent defaults if unit is missing or generic
+  if (category === 'chefs' || category === 'security' || category === 'nannies' || category === 'chef') {
+    return t.perHour;
+  }
+  if (category === 'villas' || category === 'cars' || category === 'boats') {
+    return t.perDay;
+  }
+  
+  return ''; // Return empty instead of wrong unit
 };
 
 const getMonthlyOptionsForService = (service, language, t) => {
@@ -347,8 +365,11 @@ const translations = {
     weeklyPrice: 'Weekly Price',
     monthlyPrice: 'Monthly Price',
     perDay: 'per day',
+    perNight: 'per night',
     perWeek: 'per week',
     perMonth: 'per month',
+    perHour: 'per hour',
+    perService: 'per service',
     filterByPrice: 'Filter by price',
     minPrice: 'Min price',
     maxPrice: 'Max price',
@@ -554,8 +575,11 @@ const translations = {
     weeklyPrice: 'Preț săptămânal',
     monthlyPrice: 'Preț lunar',
     perDay: 'pe zi',
+    perNight: 'pe noapte',
     perWeek: 'pe săptămână',
     perMonth: 'pe lună',
+    perHour: 'pe oră',
+    perService: 'pe serviciu',
     filterByPrice: 'Filtrează după preț',
     minPrice: 'Preț minim',
     maxPrice: 'Preț maxim',
@@ -1488,11 +1512,21 @@ useEffect(() => {
                                  (data.dailyRate !== undefined ? data.dailyRate : 
                                  (data.hourlyRate !== undefined ? data.hourlyRate : 0)));
                                  
+                // Intelligent unit default based on category
+                let unit = data.unit;
+                if (!unit) {
+                  if (category.id === 'chefs' || category.id === 'security' || category.id === 'nannies' || category.id === 'chef') {
+                    unit = 'hour';
+                  } else {
+                    unit = 'day';
+                  }
+                }
+                                  
                 return {
                   id: doc.id,
                   ...data,
                   price: parseFloat(priceValue) || 0,
-                  unit: data.unit || 'day',
+                  unit: unit,
                   category: category.id,
                   companyId: companyInfo.id,
                   imageUrl: imageUrl
@@ -2673,7 +2707,7 @@ const handleSelectClient = async (client) => {
     const priceToUse = basePrice > 0 ? basePrice : 0;
     const unitForItem = selectedMonthOption
       ? selectedMonthOption.type
-      : service.unit || 'day';
+      : (service.unit || (service.category === 'chefs' || service.category === 'chef' || service.category === 'security' || service.category === 'nannies' ? 'hour' : 'day'));
     
     const existingItem = offerItems.find(item => item.id === lineItemId);
     
@@ -2906,8 +2940,11 @@ const handleSelectClient = async (client) => {
   // Generate PDF for offer with enhanced luxury design - UPDATED for generic company use
 const generateOfferPdf = async (offer) => {
   if (!offer || !companyInfo) return;
+  
+  // ALWAYS use English for PDF as requested
   const pdfLocale = 'en-GB';
   const pdfStrings = translations.en;
+  
   const currencyFormatter = new Intl.NumberFormat(pdfLocale, {
     style: 'currency',
     currency: 'EUR',
@@ -3196,8 +3233,8 @@ const generateOfferPdf = async (offer) => {
       }
       
       const englishSeasonLabel = item.selectedMonth
-        ? formatSeasonalMonthLabel(item.selectedMonth, 'en', pdfStrings)
-        : (item.selectedMonthLabel || null);
+        ? formatSeasonalMonthLabel(item.selectedMonth, 'en', translations.en)
+        : null; // Don't use saved labels as they might be in Romanian
       
       if (englishSeasonLabel) {
         doc.setFontSize(8);
@@ -3208,13 +3245,14 @@ const generateOfferPdf = async (offer) => {
         infoY += 7;
       }
       
-      // Price and quantity
-      const unitInfo = item.unit ? getUnitDisplayLabel(item.unit, pdfStrings) : '';
+      // Price and quantity - FIXED SPACING AND FORMAT
+      const unitInfo = item.unit ? getUnitDisplayLabel(item.unit, pdfStrings, item.category) : '';
       const priceLineY = infoY;
       doc.setFontSize(9);
       doc.setTextColor(32, 32, 64);
-      const unitDescriptor = unitInfo ? ` ${unitInfo}` : '';
-      doc.text(`${formatCurrency(item.price)}${unitDescriptor} × ${item.quantity}`, 80, priceLineY);
+      const unitDescriptor = unitInfo ? ` / ${unitInfo}` : '';
+      // Use more standard Quantity x Price format
+      doc.text(`${item.quantity} × ${formatCurrency(item.price)}${unitDescriptor}`, 80, priceLineY);
       
       // Show if there's a discount
       if (item.discountValue > 0) {
@@ -5273,8 +5311,8 @@ const getUserName = async (userId) => {
                       const baseDailyRate = toNumericPrice(service.originalPricing?.daily || service.price || 0);
                       const displayPrice = selectedMonthOption ? selectedMonthOption.price : baseDailyRate;
                       const displayUnitLabel = selectedMonthOption
-                        ? getUnitDisplayLabel(selectedMonthOption.type, t)
-                        : getUnitDisplayLabel(service.unit || 'day', t);
+                        ? getUnitDisplayLabel(selectedMonthOption.type, t, service.category)
+                        : getUnitDisplayLabel(service.unit || '', t, service.category);
                       const selectSeasonLabel = t.selectMonthLabel || 'Select season';
                       const useStandardLabel = t.useStandardRate || 'Use standard rate';
                       const priceIsAvailable = displayPrice && displayPrice > 0;
@@ -5501,7 +5539,7 @@ const getUserName = async (userId) => {
                 </p>
               </div>
               
-              {/* Offer Items List */}
+              {/* Offer Items List + Custom Service + Summary - ALL SCROLLABLE TOGETHER */}
               <div className="flex-1 overflow-y-auto p-4" style={{minHeight: 0}}>
                 {offerItems.length === 0 ? (
                   <div className="text-center py-8">
@@ -5509,7 +5547,7 @@ const getUserName = async (userId) => {
                     <p className="text-sm text-gray-500">{t.noItemsAdded}</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-3 mb-6">
                     {offerItems.map(item => (
                       <div key={item.id} className="bg-white p-3 rounded-lg border border-gray-200">
                         <div className="flex justify-between items-start mb-2">
@@ -5676,121 +5714,121 @@ const getUserName = async (userId) => {
                     ))}
                   </div>
                 )}
-              </div>
-              
-              {/* Custom Service */}
-              <div className="border-t border-gray-200 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                    <span>➕</span> {t.addCustomService}
-                  </h4>
-                  {!customServiceOpen && (
-                    <button
-                      type="button"
-                      onClick={() => setCustomServiceOpen(true)}
-                      className="text-xs text-indigo-600 font-medium"
-                    >
-                      {t.addCustom}
-                    </button>
+
+                {/* Custom Service - Now inside scrollable area */}
+                <div className="border-t border-gray-200 pt-4 pb-2 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                      <span>➕</span> {t.addCustomService}
+                    </h4>
+                    {!customServiceOpen && (
+                      <button
+                        type="button"
+                        onClick={() => setCustomServiceOpen(true)}
+                        className="text-xs text-indigo-600 font-medium"
+                      >
+                        {t.addCustom}
+                      </button>
+                    )}
+                  </div>
+                  
+                  {customServiceOpen && (
+                    <>
+                      <input
+                        type="text"
+                        name="name"
+                        value={customService.name}
+                        onChange={handleCustomServiceChange}
+                        placeholder={t.customName}
+                        className="w-full p-2 border border-gray-300 rounded text-sm"
+                      />
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          name="price"
+                          value={customService.price}
+                          onChange={handleCustomServiceChange}
+                          placeholder={t.customPrice}
+                          className="w-1/2 p-2 border border-gray-300 rounded text-sm"
+                          min="0"
+                          step="0.01"
+                        />
+                        <input
+                          type="number"
+                          name="quantity"
+                          value={customService.quantity}
+                          onChange={handleCustomServiceChange}
+                          placeholder={t.customQuantity}
+                          className="w-1/2 p-2 border border-gray-300 rounded text-sm"
+                          min="1"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <label className="flex items-center gap-1 text-xs text-gray-700">
+                          <input
+                            type="radio"
+                            name="unit"
+                            value="service"
+                            checked={customServiceUnit === 'service'}
+                            onChange={() => setCustomServiceUnit('service')}
+                          />
+                          {t.unitService}
+                        </label>
+                        <label className="flex items-center gap-1 text-xs text-gray-700">
+                          <input
+                            type="radio"
+                            name="unit"
+                            value="day"
+                            checked={customServiceUnit === 'day'}
+                            onChange={() => setCustomServiceUnit('day')}
+                          />
+                          {t.unitDay}
+                        </label>
+                        <label className="flex items-center gap-1 text-xs text-gray-700">
+                          <input
+                            type="radio"
+                            name="unit"
+                            value="hour"
+                            checked={customServiceUnit === 'hour'}
+                            onChange={() => setCustomServiceUnit('hour')}
+                          />
+                          {t.unitHour}
+                        </label>
+                      </div>
+                      <textarea
+                        name="description"
+                        value={customService.description}
+                        onChange={handleCustomServiceChange}
+                        placeholder={t.customDescription}
+                        className="w-full p-2 border border-gray-300 rounded text-sm resize-vertical min-h-20"
+                      ></textarea>
+                      <button
+                        type="button"
+                        onClick={handleAddCustomService}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-md text-sm font-semibold mb-2"
+                      >
+                        {t.addCustom}
+                      </button>
+                    </>
                   )}
                 </div>
-                
-                {customServiceOpen && (
-                  <>
-                    <input
-                      type="text"
-                      name="name"
-                      value={customService.name}
-                      onChange={handleCustomServiceChange}
-                      placeholder={t.customName}
-                      className="w-full p-2 border border-gray-300 rounded text-sm"
-                    />
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        name="price"
-                        value={customService.price}
-                        onChange={handleCustomServiceChange}
-                        placeholder={t.customPrice}
-                        className="w-1/2 p-2 border border-gray-300 rounded text-sm"
-                        min="0"
-                        step="0.01"
-                      />
-                      <input
-                        type="number"
-                        name="quantity"
-                        value={customService.quantity}
-                        onChange={handleCustomServiceChange}
-                        placeholder={t.customQuantity}
-                        className="w-1/2 p-2 border border-gray-300 rounded text-sm"
-                        min="1"
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <label className="flex items-center gap-1 text-xs text-gray-700">
-                        <input
-                          type="radio"
-                          name="unit"
-                          value="service"
-                          checked={customServiceUnit === 'service'}
-                          onChange={() => setCustomServiceUnit('service')}
-                        />
-                        {t.unitService}
-                      </label>
-                      <label className="flex items-center gap-1 text-xs text-gray-700">
-                        <input
-                          type="radio"
-                          name="unit"
-                          value="day"
-                          checked={customServiceUnit === 'day'}
-                          onChange={() => setCustomServiceUnit('day')}
-                        />
-                        {t.unitDay}
-                      </label>
-                      <label className="flex items-center gap-1 text-xs text-gray-700">
-                        <input
-                          type="radio"
-                          name="unit"
-                          value="hour"
-                          checked={customServiceUnit === 'hour'}
-                          onChange={() => setCustomServiceUnit('hour')}
-                        />
-                        {t.unitHour}
-                      </label>
-                    </div>
-                    <textarea
-                      name="description"
-                      value={customService.description}
-                      onChange={handleCustomServiceChange}
-                      placeholder={t.customDescription}
-                      className="w-full p-2 border border-gray-300 rounded text-sm resize-vertical min-h-20"
-                    ></textarea>
-                    <button
-                      type="button"
-                      onClick={handleAddCustomService}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-md text-sm font-semibold"
-                    >
-                      {t.addCustom}
-                    </button>
-                  </>
-                )}
-              </div>
-              
-              {/* Offer Summary */}
-              {offerItems.length > 0 && (
-                <div className="border-t border-gray-200 p-4">
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>{t.subtotal}:</span>
-                      <span>€{offerItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between font-semibold text-lg border-t pt-2">
-                      <span>{t.total}:</span>
-                      <span>€{offerItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)}</span>
+
+                {/* Offer Summary - Now inside scrollable area to ensure it's always accessible */}
+                {offerItems.length > 0 && (
+                  <div className="border-t border-gray-200 pt-4 pb-2">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>{t.subtotal}:</span>
+                        <span>€{offerItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between font-semibold text-lg border-t pt-2">
+                        <span>{t.total}:</span>
+                        <span>€{offerItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
         </div>
