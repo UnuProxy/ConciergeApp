@@ -157,7 +157,26 @@ export const translations = {
       inDays: "In",
       days: "days",
       yesterday: "Yesterday",
-      daysAgo: "days ago"
+      daysAgo: "days ago",
+      
+      // Date Filter
+      customDate: "Custom Date",
+      selectDates: "Select dates",
+      fromDate: "From Date",
+      toDate: "To Date",
+      thisWeek: "This Week",
+      thisMonth: "This Month",
+      clearFilter: "Clear",
+      showingBookingsFrom: "Showing bookings from",
+      to: "to",
+      dateFilter: "Date Filter",
+      showDateFilter: "Show date filter",
+      hideDateFilter: "Hide date filter",
+      
+      // Payment protection
+      alreadyFullyPaid: "Already Fully Paid!",
+      noPaymentNeeded: "No additional payment is needed.",
+      processing: "Processing..."
     },
     ro: {
       // General
@@ -316,6 +335,25 @@ export const translations = {
       inDays: "În",
       days: "zile",
       yesterday: "Ieri",
-      daysAgo: "zile în urmă"
+      daysAgo: "zile în urmă",
+      
+      // Date Filter
+      customDate: "Dată Personalizată",
+      selectDates: "Selectează date",
+      fromDate: "De la",
+      toDate: "Până la",
+      thisWeek: "Săptămâna aceasta",
+      thisMonth: "Luna aceasta",
+      clearFilter: "Șterge",
+      showingBookingsFrom: "Se afișează rezervările de la",
+      to: "până la",
+      dateFilter: "Filtru Dată",
+      showDateFilter: "Arată filtru dată",
+      hideDateFilter: "Ascunde filtru dată",
+      
+      // Payment protection
+      alreadyFullyPaid: "Deja Plătit Integral!",
+      noPaymentNeeded: "Nu este necesară nicio plată suplimentară.",
+      processing: "Se procesează..."
     }
   };

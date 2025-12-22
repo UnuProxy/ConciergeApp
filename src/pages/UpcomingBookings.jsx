@@ -2321,6 +2321,11 @@ const UpcomingBookings = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [timeFilter, setTimeFilter] = useState(getStoredTimeFilter); // Default to showing active stays
   const [sortOption, setSortOption] = useState('date');
+  
+  // Date filter state
+  const [dateFilterStart, setDateFilterStart] = useState('');
+  const [dateFilterEnd, setDateFilterEnd] = useState('');
+  const [showDateFilter, setShowDateFilter] = useState(false);
 
   const getTodayStart = () => {
     const today = new Date();
@@ -2473,12 +2478,42 @@ const UpcomingBookings = () => {
   };
   const filteredClients = useMemo(
     () => getFilteredClients(),
-    [clientGroups, timeFilter, sortOption, searchQuery]
+    [clientGroups, timeFilter, sortOption, searchQuery, dateFilterStart, dateFilterEnd]
   );
 
   const visibleBookingCount = useMemo(
     () => {
       const today = getTodayStart();
+      
+      // For custom date filter, count all bookings in the date range
+      if (timeFilter === 'custom') {
+        const startDate = dateFilterStart ? new Date(dateFilterStart) : null;
+        const endDate = dateFilterEnd ? new Date(dateFilterEnd) : null;
+        if (endDate) endDate.setHours(23, 59, 59, 999);
+        
+        return filteredClients.reduce((total, client) => {
+          const bookingsInRange = (client.bookings || []).filter(booking => {
+            const checkIn = normalizeDateValue(booking.checkIn);
+            const checkOut = normalizeDateValue(booking.checkOut);
+            if (!checkIn) return false;
+            
+            const bookingStart = checkIn;
+            const bookingEnd = checkOut || checkIn;
+            
+            if (startDate && endDate) {
+              return bookingStart <= endDate && bookingEnd >= startDate;
+            } else if (startDate) {
+              return bookingEnd >= startDate;
+            } else if (endDate) {
+              return bookingStart <= endDate;
+            }
+            return true;
+          });
+          return total + bookingsInRange.length;
+        }, 0);
+      }
+      
+      // Standard time bucket filter
       return filteredClients.reduce((total, client) => {
         const bookingsForFilter = (client.bookings || []).filter(
           (booking) => getBookingTimeBucket(booking, today) === timeFilter
@@ -2486,7 +2521,7 @@ const UpcomingBookings = () => {
         return total + bookingsForFilter.length;
       }, 0);
     },
-    [filteredClients, timeFilter]
+    [filteredClients, timeFilter, dateFilterStart, dateFilterEnd]
   );
   
   const todayLabel = useMemo(() => {
@@ -3122,10 +3157,46 @@ useEffect(() => {
   // Filter clients based on time and search filters
   function getFilteredClients() {
     const today = getTodayStart();
-    const getBookingsForFilter = (client) =>
-      (client.bookings || []).filter(
+    
+    // Custom date filter function
+    const getBookingsForDateRange = (client) => {
+      if (!dateFilterStart && !dateFilterEnd) return client.bookings || [];
+      
+      const startDate = dateFilterStart ? new Date(dateFilterStart) : null;
+      const endDate = dateFilterEnd ? new Date(dateFilterEnd) : null;
+      if (endDate) endDate.setHours(23, 59, 59, 999); // Include the entire end day
+      
+      return (client.bookings || []).filter(booking => {
+        const checkIn = normalizeDateValue(booking.checkIn);
+        const checkOut = normalizeDateValue(booking.checkOut);
+        if (!checkIn) return false;
+        
+        // Check if booking overlaps with the date range
+        // Booking overlaps if: checkIn <= endDate AND checkOut >= startDate
+        const bookingStart = checkIn;
+        const bookingEnd = checkOut || checkIn;
+        
+        if (startDate && endDate) {
+          return bookingStart <= endDate && bookingEnd >= startDate;
+        } else if (startDate) {
+          return bookingEnd >= startDate;
+        } else if (endDate) {
+          return bookingStart <= endDate;
+        }
+        return true;
+      });
+    };
+    
+    const getBookingsForFilter = (client) => {
+      // If custom date filter is active, use date range filter
+      if (timeFilter === 'custom') {
+        return getBookingsForDateRange(client);
+      }
+      // Otherwise use standard time bucket filter
+      return (client.bookings || []).filter(
         (booking) => getBookingTimeBucket(booking, today) === timeFilter
       );
+    };
     
     return Object.values(clientGroups).filter(client => {
       const bookingsForFilter = getBookingsForFilter(client);
@@ -4939,7 +5010,10 @@ async function handleShoppingFormSubmit(shoppingExpense) {
             <button
               key={tab.id}
               className={`booking-tab ${timeFilter === tab.id ? 'booking-tab--active' : ''}`}
-              onClick={() => setTimeFilter(tab.id)}
+              onClick={() => {
+                setTimeFilter(tab.id);
+                setShowDateFilter(false);
+              }}
             >
               <span className="booking-tab__icon">{renderTabIcon(tab.icon)}</span>
               <div>
@@ -4948,7 +5022,151 @@ async function handleShoppingFormSubmit(shoppingExpense) {
               </div>
             </button>
           ))}
+          
+          {/* Custom Date Filter Toggle Button */}
+          <button
+            className={`booking-tab ${timeFilter === 'custom' || showDateFilter ? 'booking-tab--active' : ''}`}
+            onClick={() => {
+              if (showDateFilter) {
+                // If already showing, hide it and go back to active
+                setShowDateFilter(false);
+                if (timeFilter === 'custom' && !dateFilterStart && !dateFilterEnd) {
+                  setTimeFilter('active');
+                }
+              } else {
+                // Show the date filter
+                setShowDateFilter(true);
+                if (dateFilterStart || dateFilterEnd) {
+                  setTimeFilter('custom');
+                }
+              }
+            }}
+          >
+            <span className="booking-tab__icon">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                {showDateFilter && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />}
+              </svg>
+            </span>
+            <div>
+              <p>{t.dateFilter}</p>
+              <small>{showDateFilter ? (t.hideDateFilter) : (t.showDateFilter)}</small>
+            </div>
+          </button>
         </div>
+        
+        {/* Date Range Filter - Collapsible */}
+        {showDateFilter && (
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200 animate-fadeIn">
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="font-medium text-gray-800 flex items-center gap-2">
+                📅 {t.dateFilter}
+              </h4>
+              <button
+                onClick={() => setShowDateFilter(false)}
+                className="text-gray-500 hover:text-gray-700 p-1"
+                title={t.hideDateFilter}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {t.fromDate}
+                </label>
+                <input
+                  type="date"
+                  value={dateFilterStart}
+                  onChange={(e) => {
+                    setDateFilterStart(e.target.value);
+                    setTimeFilter('custom');
+                  }}
+                  className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {t.toDate}
+                </label>
+                <input
+                  type="date"
+                  value={dateFilterEnd}
+                  onChange={(e) => {
+                    setDateFilterEnd(e.target.value);
+                    setTimeFilter('custom');
+                  }}
+                  className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => {
+                    const today = new Date().toISOString().split('T')[0];
+                    setDateFilterStart(today);
+                    setDateFilterEnd(today);
+                    setTimeFilter('custom');
+                  }}
+                  className="px-3 py-2.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  {t.today}
+                </button>
+                <button
+                  onClick={() => {
+                    const today = new Date();
+                    const startOfWeek = new Date(today);
+                    startOfWeek.setDate(today.getDate() - today.getDay() + 1); // Monday
+                    const endOfWeek = new Date(startOfWeek);
+                    endOfWeek.setDate(startOfWeek.getDate() + 6); // Sunday
+                    setDateFilterStart(startOfWeek.toISOString().split('T')[0]);
+                    setDateFilterEnd(endOfWeek.toISOString().split('T')[0]);
+                    setTimeFilter('custom');
+                  }}
+                  className="px-3 py-2.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  {t.thisWeek}
+                </button>
+                <button
+                  onClick={() => {
+                    const today = new Date();
+                    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+                    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                    setDateFilterStart(startOfMonth.toISOString().split('T')[0]);
+                    setDateFilterEnd(endOfMonth.toISOString().split('T')[0]);
+                    setTimeFilter('custom');
+                  }}
+                  className="px-3 py-2.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  {t.thisMonth}
+                </button>
+                {(dateFilterStart || dateFilterEnd) && (
+                  <button
+                    onClick={() => {
+                      setDateFilterStart('');
+                      setDateFilterEnd('');
+                      setTimeFilter('active');
+                    }}
+                    className="px-3 py-2.5 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                  >
+                    {t.clearFilter}
+                  </button>
+                )}
+              </div>
+            </div>
+            
+            {(dateFilterStart || dateFilterEnd) && (
+              <div className="mt-3 text-sm text-blue-700 bg-blue-100 p-2 rounded">
+                📅 {t.showingBookingsFrom}{' '}
+                <strong>{dateFilterStart || '...'}</strong>{' '}
+                {t.to}{' '}
+                <strong>{dateFilterEnd || '...'}</strong>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="booking-filters__info">
           <span>{t.found} <strong>{visibleBookingCount}</strong> {t.bookings}</span>
