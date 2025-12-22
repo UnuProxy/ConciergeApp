@@ -3556,55 +3556,92 @@ const renderMainContent = (filteredClients) => {
           <div className="p-4 bg-white space-y-4">
             {(() => {
               const paymentContext = getPaymentContext(selectedItem, paymentTargetService, selectedItem.paymentHistory || [], safeRender);
+              const clientDue = Math.max(0, (selectedItem.totalValue || 0) - (selectedItem.paidAmount || 0));
+              const isAlreadyFullyPaid = clientDue <= 0;
+              
               return (
-                <div className="text-center border-b pb-4">
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    {paymentTargetService ? (t.service || 'Service') : (t.client || 'Client')}:{' '}
-                    {paymentTargetService ? safeRender(paymentTargetService.name) : safeRender(selectedItem.clientName)}
-                  </h2>
-                  <p className="text-red-600 font-bold text-xl">
-                    {t.amountDue || 'Due'}: {paymentContext.due.toLocaleString()} €
-                  </p>
-                  {paymentTargetService && (
-                    <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full text-xs text-blue-700">
-                      <span>{t.client || 'Client'}:</span>
-                      <span className="font-medium">{safeRender(selectedItem.clientName)}</span>
+                <>
+                  <div className="text-center border-b pb-4">
+                    <h2 className="text-lg font-semibold text-gray-900">
+                      {paymentTargetService ? (t.service || 'Service') : (t.client || 'Client')}:{' '}
+                      {paymentTargetService ? safeRender(paymentTargetService.name) : safeRender(selectedItem.clientName)}
+                    </h2>
+                    
+                    {isAlreadyFullyPaid ? (
+                      <div className="mt-3 p-3 bg-green-100 border border-green-300 rounded-lg">
+                        <p className="text-green-700 font-bold text-lg">✅ {t.alreadyFullyPaid || 'Already Fully Paid!'}</p>
+                        <p className="text-green-600 text-sm mt-1">{t.noPaymentNeeded || 'No additional payment is needed for this booking.'}</p>
+                      </div>
+                    ) : (
+                      <p className="text-red-600 font-bold text-xl">
+                        {t.amountDue || 'Due'}: {paymentContext.due.toLocaleString()} €
+                      </p>
+                    )}
+                    
+                    {paymentTargetService && (
+                      <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full text-xs text-blue-700">
+                        <span>{t.client || 'Client'}:</span>
+                        <span className="font-medium">{safeRender(selectedItem.clientName)}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {!isAlreadyFullyPaid && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">{t.paymentAmount || 'Payment Amount'} *</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={paymentData.amount || ''}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              // Cap at client's due amount to prevent overpayment
+                              setPaymentData({...paymentData, amount: Math.min(val, clientDue)});
+                            }}
+                            max={clientDue}
+                            className="w-full pl-8 pr-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                            placeholder="0.00"
+                          />
+                          <span className="absolute left-3 top-3 text-gray-500 font-medium">€</span>
+                        </div>
+                        {paymentData.amount > clientDue && (
+                          <p className="text-amber-600 text-xs mt-1">⚠️ {t.maxPaymentWarning || 'Maximum payment is'} {clientDue.toLocaleString()} €</p>
+                        )}
+                      </div>
+                      
+                      <div className="flex gap-3">
+                        <button
+                          onClick={closeBottomSheet}
+                          className="flex-1 py-3 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300"
+                        >
+                          {t.cancel || 'Cancel'}
+                        </button>
+                        <button
+                          onClick={() => handleQuickPayment(selectedItem, paymentData.amount)}
+                          disabled={!paymentData.amount || paymentData.amount <= 0 || isProcessingPayment}
+                          className="flex-2 py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium"
+                        >
+                          {isProcessingPayment ? (t.processing || 'Processing...') : (t.completePayment || 'Complete Payment')}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  
+                  {isAlreadyFullyPaid && (
+                    <div className="flex justify-center">
+                      <button
+                        onClick={closeBottomSheet}
+                        className="py-3 px-8 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300"
+                      >
+                        {t.close || 'Close'}
+                      </button>
                     </div>
                   )}
-                </div>
+                </>
               );
             })()}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">{t.paymentAmount || 'Payment Amount'} *</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  step="0.01"
-                  value={paymentData.amount || ''}
-                  onChange={(e) => setPaymentData({...paymentData, amount: parseFloat(e.target.value) || 0})}
-                  className="w-full pl-8 pr-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  placeholder="0.00"
-                />
-                <span className="absolute left-3 top-3 text-gray-500 font-medium">€</span>
-              </div>
-            </div>
-            
-            <div className="flex gap-3">
-              <button
-                onClick={closeBottomSheet}
-                className="flex-1 py-3 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300"
-              >
-                {t.cancel || 'Cancel'}
-              </button>
-              <button
-                onClick={() => handleQuickPayment(selectedItem, paymentData.amount)}
-                disabled={!paymentData.amount || paymentData.amount <= 0 || isProcessingPayment}
-                className="flex-2 py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium"
-              >
-                {isProcessingPayment ? (t.processing || 'Processing...') : (t.completePayment || 'Complete Payment')}
-              </button>
-            </div>
           </div>
         )}
         
@@ -4494,6 +4531,22 @@ async function handleShoppingFormSubmit(shoppingExpense) {
       console.warn('⚠️ Payment already in progress, ignoring duplicate request');
       return;
     }
+    
+    // CRITICAL: Check if booking is already fully paid or overpaid
+    const clientTotalDue = Math.max(0, (client.totalValue || 0) - (client.paidAmount || 0));
+    if (clientTotalDue <= 0) {
+      console.warn('⚠️ Client already fully paid, no payment needed');
+      showNotificationMessage(t.alreadyFullyPaid || 'This booking is already fully paid', 'warning');
+      closeBottomSheet();
+      return;
+    }
+    
+    // Cap payment at what's actually due to prevent overpayment
+    if (amount > clientTotalDue) {
+      console.log(`📝 Capping payment from ${amount}€ to ${clientTotalDue}€ (client's actual due)`);
+      amount = clientTotalDue;
+    }
+    
     setIsProcessingPayment(true);
     
     // Find the specific service we're paying for
@@ -4750,9 +4803,20 @@ async function handleShoppingFormSubmit(shoppingExpense) {
       });
       
       showNotificationMessage(t.paymentSuccess || 'Payment processed successfully');
-      // If payment fully covers the service or client, we can close the bottom sheet
-      // but let's keep it open so they see the success if they are in the paid tab
-      // closeBottomSheet();
+      
+      // CRITICAL: Close the modal immediately to prevent double-payments
+      closeBottomSheet();
+      
+      // Reset payment form data
+      setPaymentData({
+        amount: 0,
+        method: 'cash',
+        notes: '',
+        receiptNumber: '',
+        createdAt: new Date(),
+        modifiedAt: new Date()
+      });
+      setPaymentTargetService(null);
       
       // Reset processing flag after successful completion
       setIsProcessingPayment(false);
@@ -5264,114 +5328,140 @@ async function handleShoppingFormSubmit(shoppingExpense) {
         )}
         
         {/* PAYMENT FORM */}
-        {(bottomSheetContent === 'quick-payment' || bottomSheetContent === 'edit-payment') && selectedItem && (
-          <div className="p-4 bg-white space-y-4">
-            <div className="text-center border-b pb-4">
-              <h2 className="text-lg font-semibold text-gray-900">{t.client || 'Client'}: {safeRender(selectedItem.clientName)}</h2>
-              <p className="text-red-600 font-bold text-xl">{t.amountDue || 'Due'}: {selectedItem.dueAmount.toLocaleString()} €</p>
-            </div>
+        {(bottomSheetContent === 'quick-payment' || bottomSheetContent === 'edit-payment') && selectedItem && (() => {
+          const clientDue = Math.max(0, (selectedItem.totalValue || 0) - (selectedItem.paidAmount || 0));
+          const isAlreadyFullyPaid = clientDue <= 0;
+          
+          return (
+            <div className="p-4 bg-white space-y-4">
+              <div className="text-center border-b pb-4">
+                <h2 className="text-lg font-semibold text-gray-900">{t.client || 'Client'}: {safeRender(selectedItem.clientName)}</h2>
+                
+                {isAlreadyFullyPaid ? (
+                  <div className="mt-3 p-3 bg-green-100 border border-green-300 rounded-lg">
+                    <p className="text-green-700 font-bold text-lg">✅ {t.alreadyFullyPaid || 'Already Fully Paid!'}</p>
+                    <p className="text-green-600 text-sm mt-1">{t.noPaymentNeeded || 'No additional payment is needed.'}</p>
+                  </div>
+                ) : (
+                  <p className="text-red-600 font-bold text-xl">{t.amountDue || 'Due'}: {clientDue.toLocaleString()} €</p>
+                )}
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">{t.paymentAmount || 'Payment Amount'} *</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  step="0.01"
-                  value={paymentData.amount || ''}
-                  onChange={(e) => setPaymentData({...paymentData, amount: parseFloat(e.target.value) || 0})}
-                  className="w-full pl-8 pr-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  placeholder="0.00"
-                />
-                <span className="absolute left-3 top-3 text-gray-500 font-medium">€</span>
-              </div>
-              <div className="flex gap-2 mt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const ctx = getPaymentContext(selectedItem, paymentTargetService, selectedItem.paymentHistory || [], safeRender);
-                    setPaymentData({...paymentData, amount: ctx.due});
-                  }}
-                  className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                >
-                  {t.fullAmount || 'Full Amount'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const ctx = getPaymentContext(selectedItem, paymentTargetService, selectedItem.paymentHistory || [], safeRender);
-                    setPaymentData({...paymentData, amount: Math.round(ctx.due / 2)});
-                  }}
-                  className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
-                >
-                  {t.half || 'Half'}
-                </button>
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">{t.paymentMethod || 'Payment Method'} *</label>
-              <div className="grid grid-cols-2 gap-2">
-                {['cash', 'card', 'bankTransfer', 'crypto'].map((method) => (
-                  <button 
-                    key={method}
-                    type="button" 
-                    onClick={() => setPaymentData({...paymentData, method})}
-                    className={`p-3 border-2 rounded-lg text-center transition-colors ${
-                      paymentData.method === method 
-                        ? 'bg-blue-50 border-blue-500 text-blue-700' 
-                        : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
-                    }`}
-                  >
-                    <div className="text-sm font-medium">
-                      {method === 'cash' ? (t.cash || 'Cash') : 
-                       method === 'card' ? (t.card || 'Card') : 
-                       method === 'bankTransfer' ? (t.transfer || 'Transfer') : 
-                       (t.crypto || 'Crypto')}
+              {!isAlreadyFullyPaid && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{t.paymentAmount || 'Payment Amount'} *</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={paymentData.amount || ''}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value) || 0;
+                          setPaymentData({...paymentData, amount: Math.min(val, clientDue)});
+                        }}
+                        max={clientDue}
+                        className="w-full pl-8 pr-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+                        placeholder="0.00"
+                      />
+                      <span className="absolute left-3 top-3 text-gray-500 font-medium">€</span>
                     </div>
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentData({...paymentData, amount: clientDue})}
+                        className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                      >
+                        {t.fullAmount || 'Full Amount'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentData({...paymentData, amount: Math.round(clientDue / 2)})}
+                        className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                      >
+                        {t.half || 'Half'}
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{t.paymentMethod || 'Payment Method'} *</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['cash', 'card', 'bankTransfer', 'crypto'].map((method) => (
+                        <button 
+                          key={method}
+                          type="button" 
+                          onClick={() => setPaymentData({...paymentData, method})}
+                          className={`p-3 border-2 rounded-lg text-center transition-colors ${
+                            paymentData.method === method 
+                              ? 'bg-blue-50 border-blue-500 text-blue-700' 
+                              : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
+                          }`}
+                        >
+                          <div className="text-sm font-medium">
+                            {method === 'cash' ? (t.cash || 'Cash') : 
+                             method === 'card' ? (t.card || 'Card') : 
+                             method === 'bankTransfer' ? (t.transfer || 'Transfer') : 
+                             (t.crypto || 'Crypto')}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{t.receiptNumber || 'Receipt Number'} ({t.optional || 'optional'})</label>
+                    <input
+                      type="text"
+                      value={paymentData.receiptNumber || ''}
+                      onChange={(e) => setPaymentData({...paymentData, receiptNumber: e.target.value})}
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                      placeholder={t.enterReceiptNumber || 'Enter receipt number if available'}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{t.notes || 'Notes'} ({t.optional || 'optional'})</label>
+                    <textarea
+                      value={paymentData.notes || ''}
+                      onChange={(e) => setPaymentData({...paymentData, notes: e.target.value})}
+                      rows={3}
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 resize-none"
+                      placeholder={t.addPaymentDetails || 'Add payment details or reference'}
+                    ></textarea>
+                  </div>
+                  
+                  <div className="flex gap-3">
+                    <button
+                      onClick={closeBottomSheet}
+                      className="flex-1 py-3 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300"
+                    >
+                      {t.cancel || 'Cancel'}
+                    </button>
+                    <button
+                      onClick={() => handleQuickPayment(selectedItem, paymentData.amount)}
+                      disabled={!paymentData.amount || paymentData.amount <= 0 || isProcessingPayment}
+                      className="flex-2 py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium"
+                    >
+                      {isProcessingPayment ? (t.processing || 'Processing...') : (t.completePayment || 'Complete Payment')}
+                    </button>
+                  </div>
+                </>
+              )}
+              
+              {isAlreadyFullyPaid && (
+                <div className="flex justify-center">
+                  <button
+                    onClick={closeBottomSheet}
+                    className="py-3 px-8 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300"
+                  >
+                    {t.close || 'Close'}
                   </button>
-                ))}
-              </div>
+                </div>
+              )}
             </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">{t.receiptNumber || 'Receipt Number'} ({t.optional || 'optional'})</label>
-              <input
-                type="text"
-                value={paymentData.receiptNumber || ''}
-                onChange={(e) => setPaymentData({...paymentData, receiptNumber: e.target.value})}
-                className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
-                placeholder={t.enterReceiptNumber || 'Enter receipt number if available'}
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">{t.notes || 'Notes'} ({t.optional || 'optional'})</label>
-              <textarea
-                value={paymentData.notes || ''}
-                onChange={(e) => setPaymentData({...paymentData, notes: e.target.value})}
-                rows={3}
-                className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 resize-none"
-                placeholder={t.addPaymentDetails || 'Add payment details or reference'}
-              ></textarea>
-            </div>
-            
-            <div className="flex gap-3">
-              <button
-                onClick={closeBottomSheet}
-                className="flex-1 py-3 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300"
-              >
-                {t.cancel || 'Cancel'}
-              </button>
-              <button
-                onClick={() => handleQuickPayment(selectedItem, paymentData.amount)}
-                disabled={!paymentData.amount || paymentData.amount <= 0 || isProcessingPayment}
-                className="flex-2 py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium"
-              >
-                {isProcessingPayment ? (t.processing || 'Processing...') : (t.completePayment || 'Complete Payment')}
-              </button>
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* SERVICE SELECTION */}
         {bottomSheetContent === 'add-service' && selectedItem && (
