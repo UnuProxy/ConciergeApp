@@ -2523,6 +2523,9 @@ const UpcomingBookings = () => {
     modifiedAt: new Date()
   });
   
+  // Prevent double-click on payment buttons
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  
   // Notification states
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
@@ -4520,9 +4523,6 @@ async function handleShoppingFormSubmit(shoppingExpense) {
 
   
   // PAYMENT HANDLING
-  // Prevent double-click on payment buttons
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  
   const handleQuickPayment = async (client, amount, targetServiceOverride = null, overrides = {}) => {
     if (!amount || amount <= 0 || !client) return;
     
