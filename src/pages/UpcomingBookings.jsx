@@ -1836,12 +1836,17 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
                 </div>
                 
                 {earliestBooking.checkIn && (
-                  <div className="ml-2 text-xs text-gray-600 flex items-center">
+                  <div className="ml-2 text-xs text-gray-600 flex items-center flex-wrap gap-1">
                     <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16"></path>
                     </svg>
                     {formatShortDate(earliestBooking.checkIn)}
                     {earliestBooking.checkOut && ` - ${formatShortDate(earliestBooking.checkOut)}`}
+                    {client.bookings.length > 1 && (
+                      <span className="ml-1 text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-bold border border-purple-200">
+                        📅 {client.bookings.length} {language === 'ro' ? 'rezervări' : 'bookings'}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -1884,37 +1889,104 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
           </div>
         )}
         
-        {/* Services summary */}
-        {(villaName || client.services.length > 0) && (
+        {/* Services summary - GROUPED BY BOOKING */}
+        {client.bookings && client.bookings.length > 0 && (
           <div className="mt-3 space-y-2">
             <div className="text-xs text-gray-600">{t.servicesAndExtras}</div>
-            {villaName && (
-              <div className="flex items-center gap-2 text-xs">
-                <span className={`px-3 py-1 rounded-full border font-semibold ${getServiceTagClasses('villa')}`}>
-                  {villaName}
-                </span>
-                <span className="uppercase tracking-wide text-[0.65rem] text-gray-500">
-                  {t.primaryResidence || 'Villa'}
-                </span>
+            
+            {/* Show services grouped by booking when there are multiple bookings */}
+            {client.bookings.length > 1 ? (
+              // Multiple bookings - show each booking's services separately
+              <div className="space-y-3">
+                {[...client.bookings]
+                  .sort((a, b) => new Date(a.checkIn || 0) - new Date(b.checkIn || 0))
+                  .map((booking, bookingIdx) => {
+                    const bookingServices = booking.services || [];
+                    if (bookingServices.length === 0) return null;
+                    
+                    // Format booking dates
+                    const checkInDate = booking.checkIn ? new Date(booking.checkIn) : null;
+                    const checkOutDate = booking.checkOut ? new Date(booking.checkOut) : null;
+                    const formatDate = (d) => d ? `${d.getDate()}/${d.getMonth() + 1}` : '';
+                    const isToday = checkInDate && checkInDate.toDateString() === new Date().toDateString();
+                    const isTomorrow = checkInDate && checkInDate.toDateString() === new Date(Date.now() + 86400000).toDateString();
+                    
+                    return (
+                      <div 
+                        key={booking.id || bookingIdx}
+                        className={`p-2 rounded-lg border ${
+                          isToday 
+                            ? 'bg-amber-50 border-amber-200' 
+                            : isTomorrow 
+                              ? 'bg-blue-50 border-blue-200' 
+                              : 'bg-gray-50 border-gray-200'
+                        }`}
+                      >
+                        {/* Booking date header */}
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                            isToday 
+                              ? 'bg-amber-200 text-amber-800' 
+                              : isTomorrow 
+                                ? 'bg-blue-200 text-blue-800' 
+                                : 'bg-gray-200 text-gray-700'
+                          }`}>
+                            {isToday ? (language === 'ro' ? 'Azi' : 'Today') : 
+                             isTomorrow ? (language === 'ro' ? 'Mâine' : 'Tomorrow') :
+                             formatDate(checkInDate)}
+                          </span>
+                          <span className="text-[10px] text-gray-500">
+                            {formatDate(checkInDate)} → {formatDate(checkOutDate)}
+                          </span>
+                        </div>
+                        
+                        {/* Services for this booking */}
+                        <div className="flex flex-wrap gap-1.5">
+                          {bookingServices.map((service, idx) => (
+                            <span
+                              key={`${booking.id}-${service.id || idx}`}
+                              className={`px-2 py-0.5 rounded-full border text-xs ${getServiceTagClasses(service.type || service.category)}`}
+                            >
+                              {safeRender(service.name)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
-            )}
-            {client.services.length > 0 && (
-              <div className="flex flex-wrap gap-2 text-xs">
-                {client.services
-                  .filter(service => {
-                    const serviceName = safeRender(service.name || '');
-                    if (!serviceName || !villaName) return true;
-                    return serviceName.trim().toLowerCase() !== villaName.trim().toLowerCase();
-                  })
-                  .map((service, idx) => (
-                    <span
-                      key={`${service.name}-${idx}`}
-                      className={`px-2 py-1 rounded-full border ${getServiceTagClasses(service.type)}`}
-                    >
-                      {safeRender(service.name)}
+            ) : (
+              // Single booking - show services normally
+              <>
+                {villaName && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className={`px-3 py-1 rounded-full border font-semibold ${getServiceTagClasses('villa')}`}>
+                      {villaName}
                     </span>
-                  ))}
-              </div>
+                    <span className="uppercase tracking-wide text-[0.65rem] text-gray-500">
+                      {t.primaryResidence || 'Villa'}
+                    </span>
+                  </div>
+                )}
+                {client.services.length > 0 && (
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    {client.services
+                      .filter(service => {
+                        const serviceName = safeRender(service.name || '');
+                        if (!serviceName || !villaName) return true;
+                        return serviceName.trim().toLowerCase() !== villaName.trim().toLowerCase();
+                      })
+                      .map((service, idx) => (
+                        <span
+                          key={`${service.name}-${idx}`}
+                          className={`px-2 py-1 rounded-full border ${getServiceTagClasses(service.type)}`}
+                        >
+                          {safeRender(service.name)}
+                        </span>
+                      ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -3527,10 +3599,10 @@ const renderMainContent = (filteredClients) => {
               </button>
               <button
                 onClick={() => handleQuickPayment(selectedItem, paymentData.amount)}
-                disabled={!paymentData.amount || paymentData.amount <= 0}
-                className="flex-2 py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white rounded-lg font-medium"
+                disabled={!paymentData.amount || paymentData.amount <= 0 || isProcessingPayment}
+                className="flex-2 py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium"
               >
-                {t.completePayment || 'Complete Payment'}
+                {isProcessingPayment ? (t.processing || 'Processing...') : (t.completePayment || 'Complete Payment')}
               </button>
             </div>
           </div>
@@ -4411,8 +4483,18 @@ async function handleShoppingFormSubmit(shoppingExpense) {
 
   
   // PAYMENT HANDLING
+  // Prevent double-click on payment buttons
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  
   const handleQuickPayment = async (client, amount, targetServiceOverride = null, overrides = {}) => {
     if (!amount || amount <= 0 || !client) return;
+    
+    // CRITICAL: Prevent double-click/double-submission
+    if (isProcessingPayment) {
+      console.warn('⚠️ Payment already in progress, ignoring duplicate request');
+      return;
+    }
+    setIsProcessingPayment(true);
     
     // Find the specific service we're paying for
     const targetService = targetServiceOverride || paymentTargetService;
@@ -4426,6 +4508,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
       if (serviceDue <= 0 && serviceTotal > 0) {
         console.warn('⚠️ Attempted to pay for already-paid service:', targetService.name);
         showNotificationMessage(t.serviceAlreadyPaid || 'This service is already fully paid', 'warning');
+        setIsProcessingPayment(false); // Reset flag before returning
         return;
       }
       
@@ -4440,7 +4523,10 @@ async function handleShoppingFormSubmit(shoppingExpense) {
     const targetBookingId = targetService?.bookingId || (client.bookings[0]?.id);
     const targetBooking = client.bookings.find(b => b.id === targetBookingId) || client.bookings[0];
     
-    if (!targetBooking) return;
+    if (!targetBooking) {
+      setIsProcessingPayment(false); // Reset flag before returning
+      return;
+    }
     
     try {
       // First, verify this booking belongs to the user's company
@@ -4540,6 +4626,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
       });
       
       // 4. Update local state: bookings
+      // CRITICAL FIX: Use the prepared paymentHistory, NOT spread + add (which causes duplicates)
       setBookings(prev => {
         return prev.map(booking => {
           if (booking.id === targetBooking.id) {
@@ -4549,7 +4636,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
               paymentStatus: newPaymentStatus,
               lastPaymentDate: new Date(),
               lastPaymentMethod: payment.method,
-              paymentHistory: [...(booking.paymentHistory || []), payment],
+              paymentHistory: paymentHistory, // Use the prepared array, not [...old, payment]
               services: updatedServices
             };
           }
@@ -4665,9 +4752,14 @@ async function handleShoppingFormSubmit(shoppingExpense) {
       showNotificationMessage(t.paymentSuccess || 'Payment processed successfully');
       // If payment fully covers the service or client, we can close the bottom sheet
       // but let's keep it open so they see the success if they are in the paid tab
-      // closeBottomSheet(); 
+      // closeBottomSheet();
+      
+      // Reset processing flag after successful completion
+      setIsProcessingPayment(false);
     } catch (err) {
       console.error('Error processing quick payment:', err);
+      // Reset processing flag on error
+      setIsProcessingPayment(false);
       showNotificationMessage(t.paymentFailed || 'Payment update failed: ' + err.message, 'error');
     }
   };
@@ -4883,8 +4975,11 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                 <span>{t.bookings || 'Bookings'} ({selectedItem.bookings.length})</span>
               </h3>
               
-              {selectedItem.bookings.map((booking, idx) => (
-                <div key={idx} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+              {/* Sort bookings by check-in date (earliest first) for clear differentiation */}
+              {[...selectedItem.bookings]
+                .sort((a, b) => new Date(a.checkIn || 0) - new Date(b.checkIn || 0))
+                .map((booking, idx) => (
+                <div key={booking.id || idx} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
                   {/* Booking Header */}
                   <div className="p-3 bg-gray-50 border-b border-gray-200">
                     <div className="flex justify-between items-start">
@@ -4893,8 +4988,8 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                           <span className="text-lg">🏠</span>
                           <p className="font-bold text-gray-900">{safeRender(booking.accommodationType)}</p>
                         </div>
-                        <p className="text-xs text-gray-600 font-medium bg-white px-2 py-1 rounded border inline-block">
-                          {formatShortDate(booking.checkIn)} - {formatShortDate(booking.checkOut)}
+                        <p className="text-xs text-gray-700 font-semibold bg-blue-50 px-2 py-1 rounded border border-blue-200 inline-block">
+                          📅 {new Date(booking.checkIn).toLocaleDateString(language === 'en' ? 'en-GB' : 'ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' })} → {new Date(booking.checkOut).toLocaleDateString(language === 'en' ? 'en-GB' : 'ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                         </p>
                       </div>
                       <div className="text-right">
@@ -4983,9 +5078,14 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                                 
                                 {!isPaidOut && (
                                   <button
-                                    className="p-1.5 bg-blue-50 border border-blue-200 rounded shadow-sm text-blue-700 hover:bg-blue-100 transition-all flex items-center justify-center flex-[2]"
+                                    className={`p-1.5 border rounded shadow-sm transition-all flex items-center justify-center flex-[2] ${
+                                      isProcessingPayment 
+                                        ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' 
+                                        : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
+                                    }`}
+                                    disabled={isProcessingPayment}
                                     onClick={() => {
-                                      if (ctx.due > 0) {
+                                      if (ctx.due > 0 && !isProcessingPayment) {
                                         handleQuickPayment(selectedItem, ctx.due, { ...service, bookingId: booking.id }, { method: 'cash' });
                                       }
                                     }}
@@ -4993,7 +5093,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                                     <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                                     </svg>
-                                    <span className="text-[10px] font-bold uppercase">{t.markPaid || 'Paid'}</span>
+                                    <span className="text-[10px] font-bold uppercase">{isProcessingPayment ? '...' : (t.markPaid || 'Paid')}</span>
                                   </button>
                                 )}
                               </div>
@@ -5069,14 +5169,19 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                             <button className="flex-1 py-1.5 bg-white border border-gray-200 rounded text-xs text-gray-700" onClick={() => openEditServiceModal(selectedItem, { ...service, bookingId: service.bookingId })}>{t.edit || 'Edit'}</button>
                             {!isPaidOut && (
                               <button
-                                className="flex-[2] py-1.5 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 font-bold"
+                                className={`flex-[2] py-1.5 border rounded text-xs font-bold ${
+                                  isProcessingPayment 
+                                    ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' 
+                                    : 'bg-blue-50 border-blue-200 text-blue-700'
+                                }`}
+                                disabled={isProcessingPayment}
                                 onClick={() => {
-                                  if (ctx.due > 0) {
+                                  if (ctx.due > 0 && !isProcessingPayment) {
                                     handleQuickPayment(selectedItem, ctx.due, { ...service, bookingId: service.bookingId }, { method: 'cash' });
                                   }
                                 }}
                               >
-                                {t.markPaid || 'Paid'}
+                                {isProcessingPayment ? '...' : (t.markPaid || 'Paid')}
                               </button>
                             )}
                           </div>
@@ -5259,15 +5364,15 @@ async function handleShoppingFormSubmit(shoppingExpense) {
               </button>
               <button
                 onClick={() => handleQuickPayment(selectedItem, paymentData.amount)}
-                disabled={!paymentData.amount || paymentData.amount <= 0}
+                disabled={!paymentData.amount || paymentData.amount <= 0 || isProcessingPayment}
                 className="flex-2 py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium"
               >
-                {t.completePayment || 'Complete Payment'}
+                {isProcessingPayment ? (t.processing || 'Processing...') : (t.completePayment || 'Complete Payment')}
               </button>
             </div>
           </div>
         )}
-        
+
         {/* SERVICE SELECTION */}
         {bottomSheetContent === 'add-service' && selectedItem && (
           <div className="bg-white">

@@ -1893,7 +1893,7 @@ setAvailableServices(services);
             if (item.discountValue) {
               total += calculateItemPrice(item);
             } else {
-              total += (item.price * item.quantity);
+              total += ((item.originalPrice || item.price) * item.quantity);
             }
           }
         });
@@ -2117,16 +2117,12 @@ const fetchCompanyAdminForPdf = async (companyId) => {
     try {
       const { offer, reservationData, services } = reservationFromOffer;
       
-      // Validate required fields
-      if (!reservationData.checkIn || !reservationData.checkOut) {
-        alert('Please fill all required fields');
-        return;
-      }
-      
-      // Extract included services
+      // Extract included services and calculate booking dates from service dates
       const includedServices = [];
       let hasAccommodation = false;
       let totalPaid = 0;
+      let earliestStartDate = null;
+      let latestEndDate = null;
       
       const servicesForThisOffer = filterServicesForOffer(services, offer.id);
       
@@ -2137,12 +2133,24 @@ const fetchCompanyAdminForPdf = async (companyId) => {
               // Add payment information
               totalPaid += parseFloat(item.amountPaid || 0);
               
+              // Get service dates (use today as fallback if not set)
+              const serviceStartDate = item.startDate || new Date().toISOString().split('T')[0];
+              const serviceEndDate = item.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+              
+              // Track earliest start and latest end dates for booking
+              if (!earliestStartDate || serviceStartDate < earliestStartDate) {
+                earliestStartDate = serviceStartDate;
+              }
+              if (!latestEndDate || serviceEndDate > latestEndDate) {
+                latestEndDate = serviceEndDate;
+              }
+              
               // Add this service to the included services
               includedServices.push({
                 ...item,
                 id: item.id || `${category}_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
-                startDate: item.startDate || reservationData.checkIn,
-                endDate: item.endDate || reservationData.checkOut,
+                startDate: serviceStartDate,
+                endDate: serviceEndDate,
                 paymentStatus: item.paymentStatus || 'unpaid',
                 amountPaid: parseFloat(item.amountPaid || 0)
               });
@@ -2158,15 +2166,28 @@ const fetchCompanyAdminForPdf = async (companyId) => {
             }
           });
         });
+      
       } else {
         // If services weren't explicitly selected, include all from the offer
         offer.items.forEach(item => {
+          // Get service dates from item or use defaults
+          const serviceStartDate = item.startDate || new Date().toISOString().split('T')[0];
+          const serviceEndDate = item.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+          
+          // Track earliest start and latest end dates for booking
+          if (!earliestStartDate || serviceStartDate < earliestStartDate) {
+            earliestStartDate = serviceStartDate;
+          }
+          if (!latestEndDate || serviceEndDate > latestEndDate) {
+            latestEndDate = serviceEndDate;
+          }
+          
           includedServices.push({
             ...item,
             id: item.id || `${item.category || 'service'}_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
             included: true,
-            startDate: reservationData.checkIn,
-            endDate: reservationData.checkOut,
+            startDate: serviceStartDate,
+            endDate: serviceEndDate,
             paymentStatus: 'unpaid',
             amountPaid: 0,
             offerId: offer.id
@@ -2182,6 +2203,10 @@ const fetchCompanyAdminForPdf = async (companyId) => {
           }
         });
       }
+      
+      // Calculate booking dates from service dates (earliest start, latest end)
+      const bookingCheckIn = earliestStartDate || new Date().toISOString().split('T')[0];
+      const bookingCheckOut = latestEndDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       
       // Determine main accommodation type
       let mainAccommodationType = "Various Services";
@@ -2231,14 +2256,14 @@ const fetchCompanyAdminForPdf = async (companyId) => {
           createdBy: currentUser.uid
         }));
       
-      // Save reservation to Firestore
+      // Save reservation to Firestore - using dates calculated from service dates
       const reservationsRef = collection(db, "reservations");
       const docRef = await addDoc(reservationsRef, {
         clientId: selectedClient.id,
         companyId: companyInfo.id,
         offerId: offer.id,
-        checkIn: reservationData.checkIn,
-        checkOut: reservationData.checkOut,
+        checkIn: bookingCheckIn,
+        checkOut: bookingCheckOut,
         adults: parseInt(reservationData.adults) || 2,
         children: parseInt(reservationData.children) || 0,
         accommodationType: mainAccommodationType,
@@ -2420,10 +2445,12 @@ const handleSelectClient = async (client) => {
   };
   
   // Calculate price for an individual item after its discount
+  // IMPORTANT: Always use originalPrice (not price) to avoid double-discounting
   const calculateItemPrice = (item) => {
-    if (!item.discountValue) return item.price * item.quantity;
+    const basePrice = item.originalPrice || item.price;
+    if (!item.discountValue) return basePrice * item.quantity;
     
-    const itemTotal = item.price * item.quantity;
+    const itemTotal = basePrice * item.quantity;
     if (item.discountType === 'percentage') {
       const discountAmount = itemTotal * (item.discountValue / 100);
       return Math.max(itemTotal - discountAmount, 0);
@@ -2804,7 +2831,7 @@ const handleSelectClient = async (client) => {
   };
   
   // Calculate subtotal (before discount)
-  const calculateSubtotal = () => offerItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+  const calculateSubtotal = () => offerItems.reduce((total, item) => total + ((item.originalPrice || item.price) * item.quantity), 0);
   
   // Calculate discount amount
   const calculateDiscountAmount = (subtotal) => {
@@ -3269,11 +3296,12 @@ const generateOfferPdf = async (offer) => {
       doc.setTextColor(32, 32, 64);
       doc.setFont("helvetica", "bold");
       
+      const basePrice = item.originalPrice || item.price;
       const itemTotal = item.discountValue
         ? (item.discountType === 'percentage' 
-            ? (item.price * item.quantity) * (1 - item.discountValue/100) 
-            : (item.price * item.quantity) - item.discountValue)
-        : (item.price * item.quantity);
+            ? (basePrice * item.quantity) * (1 - item.discountValue/100) 
+            : (basePrice * item.quantity) - item.discountValue)
+        : (basePrice * item.quantity);
         
       doc.text(formatCurrency(itemTotal), 180, priceLineY, { align: 'right' });
       
@@ -5014,11 +5042,8 @@ const getUserName = async (userId) => {
           i.id === item.id ? { 
             ...i, 
             discountValue: discountValue,
-            hasCustomDiscount: discountValue > 0,
-            // Recalculate price with discount
-            price: item.discountType === 'percentage' 
-              ? item.originalPrice * (1 - discountValue/100)
-              : Math.max(item.originalPrice - discountValue, 0)
+            hasCustomDiscount: discountValue > 0
+            // DO NOT modify price - discount is applied in calculateItemPrice
           } : i
         ));
       }}
@@ -5029,8 +5054,7 @@ const getUserName = async (userId) => {
             i.id === item.id ? { 
               ...i, 
               discountValue: 0,
-              hasCustomDiscount: false,
-              price: i.originalPrice
+              hasCustomDiscount: false
             } : i
           ));
         }
@@ -5055,10 +5079,7 @@ const getUserName = async (userId) => {
           i.id === item.id ? { 
             ...i, 
             discountValue: quickDiscount,
-            hasCustomDiscount: true,
-            price: item.discountType === 'percentage' 
-              ? item.originalPrice * (1 - quickDiscount/100)
-              : Math.max(item.originalPrice - quickDiscount, 0)
+            hasCustomDiscount: true
           } : i
         ));
       }}
@@ -5073,10 +5094,7 @@ const getUserName = async (userId) => {
           i.id === item.id ? { 
             ...i, 
             discountValue: quickDiscount,
-            hasCustomDiscount: true,
-            price: item.discountType === 'percentage' 
-              ? item.originalPrice * (1 - quickDiscount/100)
-              : Math.max(item.originalPrice - quickDiscount, 0)
+            hasCustomDiscount: true
           } : i
         ));
       }}
@@ -5090,8 +5108,7 @@ const getUserName = async (userId) => {
           i.id === item.id ? { 
             ...i, 
             discountValue: 0,
-            hasCustomDiscount: false,
-            price: i.originalPrice
+            hasCustomDiscount: false
           } : i
         ));
       }}
@@ -5105,10 +5122,10 @@ const getUserName = async (userId) => {
   {item.hasCustomDiscount && item.discountValue > 0 && (
     <div className="mt-2 flex items-center justify-between text-sm">
       <span className="text-gray-500 line-through">
-        Original: € {item.originalPrice}
+        Original: € {(item.originalPrice * item.quantity).toFixed(2)}
       </span>
       <span className="font-bold text-green-600">
-        After discount: €{item.price.toFixed(2)}
+        After discount: €{calculateItemPrice(item).toFixed(2)}
       </span>
     </div>
   )}
@@ -5675,10 +5692,8 @@ const getUserName = async (userId) => {
           i.id === item.id ? { 
             ...i, 
             discountValue: discountValue,
-            hasCustomDiscount: discountValue > 0,
-            price: item.discountType === 'percentage' 
-              ? item.originalPrice * (1 - discountValue/100)
-              : Math.max(item.originalPrice - discountValue, 0)
+            hasCustomDiscount: discountValue > 0
+            // DO NOT modify price - discount is applied in calculateItemPrice
           } : i
         ));
       }}
@@ -5697,10 +5712,10 @@ const getUserName = async (userId) => {
   {item.hasCustomDiscount && item.discountValue > 0 && (
     <div className="mt-2 flex items-center justify-between text-xs">
       <span className="text-gray-500 line-through">
-        Original: €{item.originalPrice}
+        Original: €{(item.originalPrice * item.quantity).toFixed(2)}
       </span>
       <span className="font-bold text-green-600">
-        After: € {item.price.toFixed(2)}
+        After: € {calculateItemPrice(item).toFixed(2)}
       </span>
     </div>
   )}
@@ -5708,7 +5723,7 @@ const getUserName = async (userId) => {
                         
                         {/* Price breakdown */}
                         <div className="text-xs text-gray-500 mt-2">
-                          € {item.price.toFixed(2)} × {item.quantity} = €{(item.price * item.quantity).toFixed(2)}
+                          € {(item.originalPrice || item.price).toFixed(2)} × {item.quantity} = €{calculateItemPrice(item).toFixed(2)}
                         </div>
                       </div>
                     ))}
@@ -6088,7 +6103,7 @@ const getUserName = async (userId) => {
                   </div>
                   
                   <div className={`p-${isMobile ? '3' : '4'} flex flex-col gap-${isMobile ? '4' : '6'} overflow-auto flex-1`}>
-                    {/* Booking Overview Section */}
+                    {/* Services Section - Each service has its own dates */}
                     <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                       <h3 className="text-base font-semibold text-gray-800 mb-4">
                         {t.servicesToIncludeInBooking}
@@ -6124,9 +6139,7 @@ const getUserName = async (userId) => {
                                 updatedItems.services[category] = updatedItems.services[category].map(item => ({
                                   ...item,
                                   paymentStatus: 'partially_paid',
-                                  amountPaid: item.discountValue ? 
-                                    calculateItemPrice(item) * 0.5 : 
-                                    (item.price * item.quantity) * 0.5
+                                  amountPaid: calculateItemPrice(item) * 0.5
                                 }));
                               });
                               
@@ -6149,9 +6162,7 @@ const getUserName = async (userId) => {
                                 updatedItems.services[category] = updatedItems.services[category].map(item => ({
                                   ...item,
                                   paymentStatus: 'paid',
-                                  amountPaid: item.discountValue ? 
-                                    calculateItemPrice(item) : 
-                                    (item.price * item.quantity)
+                                  amountPaid: calculateItemPrice(item)
                                 }));
                               });
                               
@@ -6266,11 +6277,22 @@ const getUserName = async (userId) => {
                                         {typeof item.name === 'object' ? getLocalizedText(item.name, language) : item.name}
                                       </div>
                                       <div className="text-xs text-gray-500 flex flex-wrap gap-2 ml-6">
-                                        <span>€ {item.price.toFixed(2)} {item.unit ? `/${item.unit}` : ''}</span>
+                                        <span>€ {(item.originalPrice || item.price).toFixed(2)} {item.unit ? `/${item.unit}` : ''}</span>
                                         <span>× {item.quantity}</span>
-                                        <span>= € {item.discountValue ? 
-                                          calculateItemPrice(item).toFixed(2) : 
-                                          (item.price * item.quantity).toFixed(2)}</span>
+                                        {item.discountValue ? (
+                                          <>
+                                            <span>= € {((item.originalPrice || item.price) * item.quantity).toFixed(2)}</span>
+                                            <span className="text-red-600">
+                                              - € {item.discountType === 'percentage' 
+                                                ? (((item.originalPrice || item.price) * item.quantity) * (item.discountValue / 100)).toFixed(2)
+                                                : item.discountValue.toFixed(2)}
+                                              {item.discountType === 'percentage' ? ` (${item.discountValue}%)` : ''}
+                                            </span>
+                                            <span className="font-medium text-green-700">= € {calculateItemPrice(item).toFixed(2)}</span>
+                                          </>
+                                        ) : (
+                                          <span>= € {(item.price * item.quantity).toFixed(2)}</span>
+                                        )}
                                       </div>
                                     </div>
                                     
@@ -6292,9 +6314,9 @@ const getUserName = async (userId) => {
                                         `}>
                                           <input
                                             type="date"
-                                            value={item.startDate || reservationFromOffer.reservationData.checkIn}
+                                            value={item.startDate || new Date().toISOString().split('T')[0]}
                                             onChange={(e) => {
-                                              // Update this specific item's dates
+                                              // Update this service's start date
                                               const updatedItems = {...reservationFromOffer};
                                               const itemIndex = items.findIndex(i => i.id === item.id);
                                               if (itemIndex !== -1) {
@@ -6316,9 +6338,9 @@ const getUserName = async (userId) => {
                                           />
                                           <input
                                             type="date"
-                                            value={item.endDate || reservationFromOffer.reservationData.checkOut}
+                                            value={item.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
                                             onChange={(e) => {
-                                              // Update this specific item's dates
+                                              // Update this service's end date
                                               const updatedItems = {...reservationFromOffer};
                                               const itemIndex = items.findIndex(i => i.id === item.id);
                                               if (itemIndex !== -1) {
@@ -6402,9 +6424,7 @@ const getUserName = async (userId) => {
                                               const updatedItems = {...reservationFromOffer};
                                               const itemIndex = items.findIndex(i => i.id === item.id);
                                               if (itemIndex !== -1) {
-                                                const itemTotal = item.discountValue ? 
-                                                  calculateItemPrice(item) : 
-                                                  (item.price * item.quantity);
+                                                const itemTotal = calculateItemPrice(item);
                                                   
                                                 updatedItems.services = updatedItems.services || {};
                                                 updatedItems.services[category] = [...items];
@@ -6434,9 +6454,7 @@ const getUserName = async (userId) => {
                                               const updatedItems = {...reservationFromOffer};
                                               const itemIndex = items.findIndex(i => i.id === item.id);
                                               if (itemIndex !== -1) {
-                                                const itemTotal = item.discountValue ? 
-                                                  calculateItemPrice(item) : 
-                                                  (item.price * item.quantity);
+                                                const itemTotal = calculateItemPrice(item);
                                                   
                                                 updatedItems.services = updatedItems.services || {};
                                                 updatedItems.services[category] = [...items];
@@ -6485,16 +6503,21 @@ const getUserName = async (userId) => {
                                           <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 text-xs">€</span>
                                           <input
                                             type="number"
-                                            value={item.amountPaid || 0}
+                                            value={item.amountPaid === 0 || item.amountPaid === undefined ? '' : item.amountPaid}
+                                            placeholder="0"
+                                            onFocus={(e) => {
+                                              if (e.target.value === '0') {
+                                                e.target.value = '';
+                                              }
+                                            }}
                                             onChange={(e) => {
                                               // Update amount paid
                                               const updatedItems = {...reservationFromOffer};
                                               const itemIndex = items.findIndex(i => i.id === item.id);
                                               if (itemIndex !== -1) {
-                                                const newAmount = parseFloat(e.target.value) || 0;
-                                                const itemTotal = item.discountValue ? 
-                                                  calculateItemPrice(item) : 
-                                                  (item.price * item.quantity);
+                                                const rawValue = e.target.value;
+                                                const newAmount = rawValue === '' ? 0 : parseFloat(rawValue) || 0;
+                                                const itemTotal = calculateItemPrice(item);
                                                   
                                                 let paymentStatus = 'unpaid';
                                                 if (newAmount >= itemTotal) {
@@ -6508,9 +6531,26 @@ const getUserName = async (userId) => {
                                                 updatedItems.services[category][itemIndex] = {
                                                   ...items[itemIndex],
                                                   paymentStatus,
-                                                  amountPaid: newAmount
+                                                  amountPaid: rawValue === '' ? '' : newAmount
                                                 };
                                                 setReservationFromOffer(updatedItems);
+                                              }
+                                            }}
+                                            onBlur={(e) => {
+                                              // On blur, set to 0 if empty
+                                              if (e.target.value === '') {
+                                                const updatedItems = {...reservationFromOffer};
+                                                const itemIndex = items.findIndex(i => i.id === item.id);
+                                                if (itemIndex !== -1) {
+                                                  updatedItems.services = updatedItems.services || {};
+                                                  updatedItems.services[category] = [...items];
+                                                  updatedItems.services[category][itemIndex] = {
+                                                    ...items[itemIndex],
+                                                    paymentStatus: 'unpaid',
+                                                    amountPaid: 0
+                                                  };
+                                                  setReservationFromOffer(updatedItems);
+                                                }
                                               }
                                             }}
                                             className={`
@@ -6526,9 +6566,7 @@ const getUserName = async (userId) => {
                                           />
                                         </div>
                                         <div className="text-xs text-gray-500 ml-2">
-                                          {t.of} € {item.discountValue ? 
-                                            calculateItemPrice(item).toFixed(2) : 
-                                            (item.price * item.quantity).toFixed(2)}
+                                          {t.of} € {calculateItemPrice(item).toFixed(2)}
                                         </div>
                                       </div>
                                     </div>
@@ -6849,15 +6887,15 @@ const getUserName = async (userId) => {
                               {selectedClient.propertyTypes?.villas && (
                                 <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs">Vile</span>
                               )}
-                              {selectedClient.propertyTypes?.apartamente && (
+                              {selectedClient.propertyTypes?.apartments && (
                                 <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs">Apartamente</span>
                               )}
-                              {selectedClient.propertyTypes?.hoteluri && (
+                              {selectedClient.propertyTypes?.hotels && (
                                 <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs">Hoteluri</span>
                               )}
                               {!selectedClient.propertyTypes?.villas && 
-                              !selectedClient.propertyTypes?.apartamente && 
-                              !selectedClient.propertyTypes?.hoteluri && 
+                              !selectedClient.propertyTypes?.apartments && 
+                              !selectedClient.propertyTypes?.hotels && 
                                 <span className="text-sm text-blue-900">-</span>
                               }
                             </div>
@@ -7062,11 +7100,11 @@ const getUserName = async (userId) => {
                                           {item.discountValue > 0 ? (
                                             <span className="text-red-600">
                                               € {(item.discountType === 'percentage' 
-                                                ? (item.price * item.quantity) * (1 - item.discountValue/100) 
-                                                : (item.price * item.quantity) - item.discountValue).toFixed(2)}
+                                                ? ((item.originalPrice || item.price) * item.quantity) * (1 - item.discountValue/100) 
+                                                : ((item.originalPrice || item.price) * item.quantity) - item.discountValue).toFixed(2)}
                                             </span>
                                           ) : (
-                                            `€${(item.price * item.quantity).toFixed(2)}`
+                                            `€${((item.originalPrice || item.price) * item.quantity).toFixed(2)}`
                                           )}
                                         </span>
                                       </li>
@@ -7158,33 +7196,18 @@ const getUserName = async (userId) => {
                   </div>
                   
                   <form onSubmit={handleFinalizeReservationFromOffer} className="p-4 flex flex-col gap-4 overflow-auto flex-1">
-                    <div className="flex flex-col gap-4">
-                      <div className="w-full">
-                        <label className="block text-sm font-medium text-gray-600 mb-2">
-                          {t.startDate} *
-                        </label>
-                        <input
-                          type="date"
-                          name="checkIn"
-                          value={reservationFromOffer.reservationData.checkIn}
-                          onChange={handleReservationFromOfferChange}
-                          required
-                          className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
-                        />
-                      </div>
-                      <div className="w-full">
-                        <label className="block text-sm font-medium text-gray-600 mb-2">
-                          {t.endDate} *
-                        </label>
-                        <input
-                          type="date"
-                          name="checkOut"
-                          value={reservationFromOffer.reservationData.checkOut}
-                          onChange={handleReservationFromOfferChange}
-                          required
-                          className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
-                        />
-                      </div>
+                    {/* Info: Booking dates are auto-calculated from service dates */}
+                    <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                      <p className="text-sm text-blue-700">
+                        ℹ️ {language === 'ro' 
+                          ? 'Datele rezervării vor fi calculate automat din datele serviciilor din ofertă.'
+                          : 'Booking dates will be auto-calculated from service dates in the offer.'}
+                      </p>
+                      {reservationFromOffer.offer?.items && (
+                        <p className="text-xs text-blue-600 mt-1">
+                          {language === 'ro' ? 'Servicii:' : 'Services:'} {reservationFromOffer.offer.items.length}
+                        </p>
+                      )}
                     </div>
                     
                     <div className="flex flex-col gap-4">
