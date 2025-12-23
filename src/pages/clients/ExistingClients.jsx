@@ -2830,8 +2830,8 @@ const handleSelectClient = async (client) => {
     ));
   };
   
-  // Calculate subtotal (before discount)
-  const calculateSubtotal = () => offerItems.reduce((total, item) => total + ((item.originalPrice || item.price) * item.quantity), 0);
+  // Calculate subtotal (sum of all items with their individual discounts applied)
+  const calculateSubtotal = () => offerItems.reduce((total, item) => total + calculateItemPrice(item), 0);
   
   // Calculate discount amount
   const calculateDiscountAmount = (subtotal) => {
@@ -3336,6 +3336,17 @@ const generateOfferPdf = async (offer) => {
     doc.setLineWidth(0.3);
     doc.line(120, currentY - 5, 190, currentY - 5);
     
+    // Recalculate subtotal from items (in case stored value is incorrect for old offers)
+    const recalculatedSubtotal = offer.items.reduce((sum, item) => {
+      const basePrice = item.originalPrice || item.price;
+      const itemTotal = item.discountValue
+        ? (item.discountType === 'percentage' 
+            ? (basePrice * item.quantity) * (1 - item.discountValue/100) 
+            : (basePrice * item.quantity) - item.discountValue)
+        : (basePrice * item.quantity);
+      return sum + Math.max(itemTotal, 0);
+    }, 0);
+    
     // Subtotal
     doc.setFontSize(10);
     doc.setTextColor(60, 60, 70);
@@ -3343,14 +3354,14 @@ const generateOfferPdf = async (offer) => {
     doc.text(`Subtotal:`, 150, currentY, { align: 'right' });
     
     doc.setFont("helvetica", "bold");
-    doc.text(formatCurrency(offer.subtotal), 190, currentY, { align: 'right' });
+    doc.text(formatCurrency(recalculatedSubtotal), 190, currentY, { align: 'right' });
     
-    // Discount if applicable
+    // Discount if applicable (global discount on top of item discounts)
     let finalY = currentY;
     if (offer.discountValue > 0) {
       finalY += 7;
       const discountAmount = offer.discountType === 'percentage' 
-        ? (offer.subtotal * (offer.discountValue / 100)) 
+        ? (recalculatedSubtotal * (offer.discountValue / 100)) 
         : offer.discountValue;
       
       const discountText = offer.discountType === 'percentage' 
@@ -3365,7 +3376,14 @@ const generateOfferPdf = async (offer) => {
       doc.text(`-${formatCurrency(discountAmount)}`, 190, finalY, { align: 'right' });
     }
     
-    // Total
+    // Total - recalculate from subtotal minus global discount
+    const globalDiscountAmount = offer.discountValue > 0
+      ? (offer.discountType === 'percentage' 
+          ? (recalculatedSubtotal * (offer.discountValue / 100)) 
+          : offer.discountValue)
+      : 0;
+    const recalculatedTotal = Math.max(recalculatedSubtotal - globalDiscountAmount, 0);
+    
     finalY += 10;
     doc.setDrawColor(180, 160, 120); // Gold tone
     doc.setLineWidth(0.5);
@@ -3377,7 +3395,7 @@ const generateOfferPdf = async (offer) => {
     doc.text(`TOTAL:`, 150, finalY + 5, { align: 'right' });
     
     doc.setFontSize(14);
-    doc.text(formatCurrency(offer.totalValue), 190, finalY + 5, { align: 'right' });
+    doc.text(formatCurrency(recalculatedTotal), 190, finalY + 5, { align: 'right' });
     
     // Add notes with better styling
     if (offer.notes) {
