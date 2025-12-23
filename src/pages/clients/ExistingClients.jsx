@@ -5236,7 +5236,7 @@ const getUserName = async (userId) => {
           )}
 
           {/* Center - Services Grid */}
-          <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
             
             {/* Services Header */}
             <div className={`${isMobile ? 'p-3' : 'p-4'} border-b border-gray-200 bg-white flex-shrink-0`}>
@@ -5317,7 +5317,7 @@ const getUserName = async (userId) => {
             </div>
 
             {/* Services Grid - FIXED WITH PROPER SCROLLING */}
-            <div className={`flex-1 overflow-y-auto ${isMobile ? 'p-3' : 'p-4'}`} style={{minHeight: 0}}>
+            <div className={`flex-1 overflow-y-auto ${isMobile ? 'p-3 pb-6' : 'p-4'}`} style={{minHeight: 0}}>
               {loadingServices ? (
                 <div className="flex flex-col items-center justify-center h-full min-h-48">
                   <div className="inline-block w-8 h-8 border-2 border-gray-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
@@ -6314,16 +6314,20 @@ const getUserName = async (userId) => {
                                       </div>
                                     </div>
                                     
-                                    {/* Date adjustment for this item if needed */}
-                                    {['villas', 'cars', 'boats'].includes(category) && item.included && (
+                                    {/* Date adjustment for ALL services - each service can have its own date range */}
+                                    {item.included && (
                                       <div className={`
                                         flex flex-col 
                                         ${isMobile ? 'ml-6' : 'mr-4'}
                                         gap-1
                                         ${isMobile ? 'items-start mt-2' : 'items-center'}
                                       `}>
-                                        <div className="text-xs text-gray-500">
-                                          {t.serviceDates}
+                                        <div className="text-xs text-gray-500 flex items-center gap-1">
+                                          {['villas', 'cars', 'boats'].includes(category) ? (
+                                            <>📅 {t.serviceDates}</>
+                                          ) : (
+                                            <>🗓️ {t.serviceDates || 'Service Dates'}</>
+                                          )}
                                         </div>
                                         <div className={`
                                           flex 
@@ -6354,31 +6358,75 @@ const getUserName = async (userId) => {
                                               ${isMobile ? 'w-full min-h-10' : 'w-30'}
                                             `}
                                           />
-                                          <input
-                                            type="date"
-                                            value={item.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
-                                            onChange={(e) => {
-                                              // Update this service's end date
-                                              const updatedItems = {...reservationFromOffer};
-                                              const itemIndex = items.findIndex(i => i.id === item.id);
-                                              if (itemIndex !== -1) {
-                                                updatedItems.services = updatedItems.services || {};
-                                                updatedItems.services[category] = [...items];
-                                                updatedItems.services[category][itemIndex] = {
-                                                  ...items[itemIndex],
-                                                  endDate: e.target.value
-                                                };
-                                                setReservationFromOffer(updatedItems);
-                                              }
-                                            }}
-                                            className={`
-                                              border border-gray-300 rounded-md
-                                              p-1.5
-                                              text-sm
-                                              ${isMobile ? 'w-full min-h-10' : 'w-30'}
-                                            `}
-                                          />
+                                          {/* For single-day services, show "Same Day" option or end date */}
+                                          {['chefs', 'security', 'nannies', 'excursions', 'concierge-core'].includes(category) ? (
+                                            <div className="flex items-center gap-1">
+                                              <span className="text-gray-400 text-xs">→</span>
+                                              <input
+                                                type="date"
+                                                value={item.endDate || item.startDate || new Date().toISOString().split('T')[0]}
+                                                min={item.startDate || new Date().toISOString().split('T')[0]}
+                                                onChange={(e) => {
+                                                  // Update this service's end date
+                                                  const updatedItems = {...reservationFromOffer};
+                                                  const itemIndex = items.findIndex(i => i.id === item.id);
+                                                  if (itemIndex !== -1) {
+                                                    updatedItems.services = updatedItems.services || {};
+                                                    updatedItems.services[category] = [...items];
+                                                    updatedItems.services[category][itemIndex] = {
+                                                      ...items[itemIndex],
+                                                      endDate: e.target.value
+                                                    };
+                                                    setReservationFromOffer(updatedItems);
+                                                  }
+                                                }}
+                                                className={`
+                                                  border border-gray-300 rounded-md
+                                                  p-1.5
+                                                  text-sm
+                                                  ${isMobile ? 'w-full min-h-10' : 'w-30'}
+                                                `}
+                                              />
+                                            </div>
+                                          ) : (
+                                            <input
+                                              type="date"
+                                              value={item.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                                              min={item.startDate || new Date().toISOString().split('T')[0]}
+                                              onChange={(e) => {
+                                                // Update this service's end date
+                                                const updatedItems = {...reservationFromOffer};
+                                                const itemIndex = items.findIndex(i => i.id === item.id);
+                                                if (itemIndex !== -1) {
+                                                  updatedItems.services = updatedItems.services || {};
+                                                  updatedItems.services[category] = [...items];
+                                                  updatedItems.services[category][itemIndex] = {
+                                                    ...items[itemIndex],
+                                                    endDate: e.target.value
+                                                  };
+                                                  setReservationFromOffer(updatedItems);
+                                                }
+                                              }}
+                                              className={`
+                                                border border-gray-300 rounded-md
+                                                p-1.5
+                                                text-sm
+                                                ${isMobile ? 'w-full min-h-10' : 'w-30'}
+                                              `}
+                                            />
+                                          )}
                                         </div>
+                                        {/* Show duration hint for day-based services */}
+                                        {['chefs', 'security', 'nannies', 'excursions'].includes(category) && item.startDate && item.endDate && (
+                                          <div className="text-xs text-indigo-600 mt-1">
+                                            {(() => {
+                                              const start = new Date(item.startDate);
+                                              const end = new Date(item.endDate);
+                                              const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                                              return days === 1 ? '1 day' : `${days} days`;
+                                            })()}
+                                          </div>
+                                        )}
                                       </div>
                                     )}
                                   </div>

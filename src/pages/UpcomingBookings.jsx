@@ -304,12 +304,14 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
     quantity: 1,
     unit: 'hourly',
     date: new Date().toISOString().split('T')[0],
+    startDate: new Date().toISOString().split('T')[0], // NEW: Service start date
+    endDate: new Date().toISOString().split('T')[0],   // NEW: Service end date
     status: 'confirmed',
     notes: '',
     selectedMonth: '',
     monthlyOptions: [],
-    paymentStatus: 'unpaid', // NEW: Track payment status
-    amountPaid: 0 // NEW: Track amount paid for this service
+    paymentStatus: 'unpaid', // Track payment status
+    amountPaid: 0 // Track amount paid for this service
   });
 
   // Fetch categories first
@@ -615,6 +617,8 @@ const getServiceThumbnail = (service) => {
       name: serviceData.name,
       description: serviceData.description || '',
       date: serviceData.date,
+      startDate: serviceData.startDate || serviceData.date, // NEW: Service start date
+      endDate: serviceData.endDate || serviceData.startDate || serviceData.date, // NEW: Service end date
       month: serviceData.selectedMonth || null,
       price: serviceData.price,
       quantity: serviceData.quantity,
@@ -824,14 +828,50 @@ const renderServicesList = () => (
       </div>
       
       <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">{t.date || 'Date'}</label>
-          <input
-            type="date"
-            value={serviceData.date}
-            onChange={(e) => setServiceData({...serviceData, date: e.target.value})}
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
-          />
+        {/* Service Dates - Start and End */}
+        <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+          <label className="block text-sm font-medium text-indigo-800 mb-2 flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16" />
+            </svg>
+            {t.serviceDates || 'Service Dates'}
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">{t.startDate || 'Start Date'}</label>
+              <input
+                type="date"
+                value={serviceData.startDate || serviceData.date}
+                onChange={(e) => setServiceData({
+                  ...serviceData, 
+                  startDate: e.target.value,
+                  date: e.target.value, // Keep date in sync for backwards compatibility
+                  endDate: serviceData.endDate || e.target.value // Default end to start if not set
+                })}
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">{t.endDate || 'End Date'}</label>
+              <input
+                type="date"
+                value={serviceData.endDate || serviceData.startDate || serviceData.date}
+                min={serviceData.startDate || serviceData.date}
+                onChange={(e) => setServiceData({...serviceData, endDate: e.target.value})}
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+              />
+            </div>
+          </div>
+          {serviceData.startDate && serviceData.endDate && (
+            <p className="text-xs text-indigo-600 mt-2 font-medium">
+              📅 {(() => {
+                const start = new Date(serviceData.startDate);
+                const end = new Date(serviceData.endDate);
+                const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                return days === 1 ? '1 day' : `${days} days`;
+              })()}
+            </p>
+          )}
         </div>
 
         {serviceData.monthlyOptions.length > 0 && (
@@ -1079,14 +1119,50 @@ const renderServicesList = () => (
           ></textarea>
         </div>
         
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">{t.date || 'Date'}</label>
-          <input
-            type="date"
-            value={serviceData.date}
-            onChange={(e) => setServiceData({...serviceData, date: e.target.value})}
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
-          />
+        {/* Service Dates - Start and End */}
+        <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+          <label className="block text-sm font-medium text-indigo-800 mb-2 flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16" />
+            </svg>
+            {t.serviceDates || 'Service Dates'}
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">{t.startDate || 'Start Date'}</label>
+              <input
+                type="date"
+                value={serviceData.startDate || serviceData.date}
+                onChange={(e) => setServiceData({
+                  ...serviceData, 
+                  startDate: e.target.value,
+                  date: e.target.value,
+                  endDate: serviceData.endDate || e.target.value
+                })}
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">{t.endDate || 'End Date'}</label>
+              <input
+                type="date"
+                value={serviceData.endDate || serviceData.startDate || serviceData.date}
+                min={serviceData.startDate || serviceData.date}
+                onChange={(e) => setServiceData({...serviceData, endDate: e.target.value})}
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+              />
+            </div>
+          </div>
+          {serviceData.startDate && serviceData.endDate && (
+            <p className="text-xs text-indigo-600 mt-2 font-medium">
+              📅 {(() => {
+                const start = new Date(serviceData.startDate);
+                const end = new Date(serviceData.endDate);
+                const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                return days === 1 ? '1 day' : `${days} days`;
+              })()}
+            </p>
+          )}
         </div>
         
         <div className="grid grid-cols-2 gap-3">
@@ -1940,15 +2016,24 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
                           </span>
                         </div>
                         
-                        {/* Services for this booking */}
+                        {/* Services for this booking - with dates */}
                         <div className="flex flex-wrap gap-1.5">
                           {bookingServices.map((service, idx) => (
-                            <span
+                            <div
                               key={`${booking.id}-${service.id || idx}`}
-                              className={`px-2 py-0.5 rounded-full border text-xs ${getServiceTagClasses(service.type || service.category)}`}
+                              className={`px-2 py-0.5 rounded-full border text-xs ${getServiceTagClasses(service.type || service.category)} flex items-center gap-1`}
+                              title={service.startDate ? `${formatShortDate(service.startDate)}${service.endDate && service.endDate !== service.startDate ? ` → ${formatShortDate(service.endDate)}` : ''}` : ''}
                             >
-                              {safeRender(service.name)}
-                            </span>
+                              <span>{safeRender(service.name)}</span>
+                              {service.startDate && (
+                                <span className="text-[9px] opacity-75 font-medium">
+                                  📅 {formatShortDate(service.startDate).split('/').slice(0, 2).join('/')}
+                                  {service.endDate && service.endDate !== service.startDate && (
+                                    <>-{formatShortDate(service.endDate).split('/').slice(0, 2).join('/')}</>
+                                  )}
+                                </span>
+                              )}
+                            </div>
                           ))}
                         </div>
                       </div>
@@ -5294,8 +5379,11 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                   {/* Services for THIS Booking */}
                   <div className="p-3 space-y-3 bg-white">
                     <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                      <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-                      {t.servicesAndExtras || 'Services & Extras'}
+                      <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16" />
+                      </svg>
+                      {t.serviceSchedule || 'Service Schedule'}
+                      <span className="text-[9px] font-normal text-gray-400 normal-case">(sorted by date)</span>
                     </h4>
                     
                     {(!booking.services || booking.services.length === 0) ? (
@@ -5304,7 +5392,14 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                       </p>
                     ) : (
                       <div className="space-y-2">
-                        {booking.services.map((service, sIdx) => {
+                        {/* Sort services chronologically by startDate for timeline view */}
+                        {[...booking.services]
+                          .sort((a, b) => {
+                            const dateA = new Date(a.startDate || a.date || 0);
+                            const dateB = new Date(b.startDate || b.date || 0);
+                            return dateA - dateB;
+                          })
+                          .map((service, sIdx) => {
                           const ctx = getPaymentContext(selectedItem, service, selectedItem.paymentHistory || [], safeRender);
                           const isPaidOut = ctx.due <= 0;
                           const { total, paid, due } = getServicePaymentInfo(service, selectedItem.paymentHistory || [], safeRender);
@@ -5318,17 +5413,67 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                           
                           const statusLabel = status === 'paid' ? (t.paid || 'Paid') : (status === 'partial' ? (t.partiallyPaid || 'Partially Paid') : (t.notPaid || 'Not Paid'));
 
+                          // Check if service is today, tomorrow, or upcoming
+                          const serviceStartDate = new Date(service.startDate || service.date);
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          serviceStartDate.setHours(0, 0, 0, 0);
+                          const tomorrow = new Date(today);
+                          tomorrow.setDate(tomorrow.getDate() + 1);
+                          
+                          const isToday = serviceStartDate.getTime() === today.getTime();
+                          const isTomorrow = serviceStartDate.getTime() === tomorrow.getTime();
+                          const isPast = serviceStartDate < today;
+                          
+                          // Determine card styling based on urgency
+                          const urgencyBorder = isToday 
+                            ? 'border-l-4 border-l-red-500 border-red-200 bg-red-50/30' 
+                            : isTomorrow 
+                              ? 'border-l-4 border-l-orange-400 border-orange-200 bg-orange-50/30' 
+                              : isPast
+                                ? 'border-l-4 border-l-gray-300 bg-gray-50/50 opacity-75'
+                                : 'border-gray-100 bg-gray-50/50';
+
                           return (
-                            <div key={sIdx} className="p-3 border border-gray-100 rounded-lg bg-gray-50/50 hover:bg-white hover:border-blue-200 transition-all group">
+                            <div key={sIdx} className={`p-3 border rounded-lg hover:bg-white hover:border-blue-200 transition-all group ${urgencyBorder}`}>
+                              {/* Urgency indicator badge */}
+                              {(isToday || isTomorrow) && (
+                                <div className={`text-[9px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1 ${isToday ? 'text-red-600' : 'text-orange-600'}`}>
+                                  <span className={`w-2 h-2 rounded-full ${isToday ? 'bg-red-500 animate-pulse' : 'bg-orange-400'}`}></span>
+                                  {isToday ? '🔴 TODAY' : '🟠 TOMORROW'}
+                                </div>
+                              )}
+                              
                               <div className="flex justify-between items-start mb-2">
                                 <div>
                                   <p className="font-semibold text-gray-900 text-sm group-hover:text-blue-700 transition-colors">{safeRender(service.name)}</p>
-                                  <p className="text-[10px] text-gray-500 flex items-center gap-1">
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  {/* Service Dates - Show date range if available */}
+                                  <div className="text-[10px] text-gray-500 flex items-center gap-1 flex-wrap">
+                                    <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16" />
                                     </svg>
-                                    {formatShortDate(service.date)}
-                                  </p>
+                                    {service.startDate && service.endDate ? (
+                                      <>
+                                        <span className={`font-medium ${isToday ? 'text-red-600' : isTomorrow ? 'text-orange-600' : 'text-indigo-600'}`}>{formatShortDate(service.startDate)}</span>
+                                        <span className="text-gray-400">→</span>
+                                        <span className="font-medium text-indigo-600">{formatShortDate(service.endDate)}</span>
+                                        {(() => {
+                                          const start = new Date(service.startDate);
+                                          const end = new Date(service.endDate);
+                                          const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                                          return days > 0 && (
+                                            <span className="ml-1 px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded text-[9px] font-bold">
+                                              {days === 1 ? '1 day' : `${days} days`}
+                                            </span>
+                                          );
+                                        })()}
+                                      </>
+                                    ) : service.startDate ? (
+                                      <span className={`font-medium ${isToday ? 'text-red-600' : isTomorrow ? 'text-orange-600' : 'text-indigo-600'}`}>{formatShortDate(service.startDate)}</span>
+                                    ) : (
+                                      <span>{formatShortDate(service.date)}</span>
+                                    )}
+                                  </div>
                                 </div>
                                 <div className="text-right">
                                   <p className="font-bold text-gray-900 text-sm">{total.toLocaleString()} €</p>
@@ -5748,8 +5893,38 @@ async function handleShoppingFormSubmit(shoppingExpense) {
               <p className="text-xl font-bold text-gray-900">{((selectedService.price || 0) * (selectedService.quantity || 1)).toLocaleString()} €</p>
             </div>
             
-            <div className="space-y-2">
-              <p className="text-sm"><span className="text-gray-500">{t.date || 'Date'}:</span> <span className="text-gray-900">{formatShortDate(selectedService.date)}</span></p>
+            <div className="space-y-3">
+              {/* Service Dates - Display date range */}
+              <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                <div className="flex items-center gap-2 text-sm font-medium text-indigo-800 mb-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16" />
+                  </svg>
+                  {t.serviceDates || 'Service Dates'}
+                </div>
+                {selectedService.startDate && selectedService.endDate ? (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="font-bold text-indigo-700">{formatShortDate(selectedService.startDate)}</span>
+                    <span className="text-indigo-400">→</span>
+                    <span className="font-bold text-indigo-700">{formatShortDate(selectedService.endDate)}</span>
+                    {(() => {
+                      const start = new Date(selectedService.startDate);
+                      const end = new Date(selectedService.endDate);
+                      const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                      return (
+                        <span className="ml-2 px-2 py-0.5 bg-indigo-200 text-indigo-800 rounded-full text-xs font-bold">
+                          {days === 1 ? '1 day' : `${days} days`}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                ) : selectedService.startDate ? (
+                  <span className="font-bold text-indigo-700">{formatShortDate(selectedService.startDate)}</span>
+                ) : (
+                  <span className="text-gray-600">{formatShortDate(selectedService.date)}</span>
+                )}
+              </div>
+              
               <p className="text-sm"><span className="text-gray-500">{t.quantity || 'Quantity'}:</span> <span className="text-gray-900">{selectedService.quantity} × {(selectedService.price || 0).toLocaleString()} €</span></p>
               {selectedService.notes && (
                 <div className="p-3 bg-gray-50 rounded text-sm text-gray-700">

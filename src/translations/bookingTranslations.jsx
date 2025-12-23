@@ -71,6 +71,10 @@ export const translations = {
       addService: "Add Service",
       serviceDetails: "Service Details",
       addShoppingExpense: "Add Shopping Expense",
+      serviceDates: "Service Dates",
+      startDate: "Start Date",
+      endDate: "End Date",
+      serviceSchedule: "Service Schedule",
       
       // Client Details
       clientId: "Client ID:",
@@ -249,6 +253,10 @@ export const translations = {
       addService: "Adaugă Serviciu",
       serviceDetails: "Detalii Serviciu",
       addShoppingExpense: "Adaugă Cheltuieli Cumpărături",
+      serviceDates: "Datele Serviciului",
+      startDate: "Data Început",
+      endDate: "Data Sfârșit",
+      serviceSchedule: "Programul Serviciilor",
       
       // Client Details
       clientId: "ID Client:",
