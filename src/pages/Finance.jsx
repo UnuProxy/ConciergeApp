@@ -12,6 +12,9 @@ const Finance = () => {
   const [financeRecords, setFinanceRecords] = useState([]);
   const [categoryPayments, setCategoryPayments] = useState([]);
   const [expenses, setExpenses] = useState([]);
+  const [transactionsPage, setTransactionsPage] = useState(1);
+  const [servicePage, setServicePage] = useState(1);
+  const [expensesPage, setExpensesPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
   const [error, setError] = useState(null);
@@ -22,7 +25,7 @@ const Finance = () => {
   const [userId, setUserId] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const [syncingFinance, setSyncingFinance] = useState(false);
-  const [filters, setFilters] = useState({ service: 'all', startDate: '', endDate: '' });
+  const [filters, setFilters] = useState({ service: 'all', startDate: '', endDate: '', timeRange: 'all' });
   const [updatingRecord, setUpdatingRecord] = useState(null);
   const [costDrafts, setCostDrafts] = useState({});
   const [showAllPending, setShowAllPending] = useState(false);
@@ -165,6 +168,12 @@ const Finance = () => {
       startDate: 'Data început',
       endDate: 'Data sfârșit',
       applyFilters: 'Aplică filtre',
+      timeRange: 'Perioadă',
+      allPeriods: 'Toată perioada',
+      thisWeek: 'Săptămâna aceasta',
+      thisMonth: 'Luna aceasta',
+      thisYear: 'Anul acesta',
+      customRange: 'Interval personalizat',
       clearFilters: 'Resetează',
       noPending: 'Nu există plăți în așteptare'
     },
@@ -273,6 +282,12 @@ const Finance = () => {
       startDate: 'Start date',
       endDate: 'End date',
       applyFilters: 'Apply filters',
+      timeRange: 'Time range',
+      allPeriods: 'All time',
+      thisWeek: 'This week',
+      thisMonth: 'This month',
+      thisYear: 'This year',
+      customRange: 'Custom range',
       clearFilters: 'Reset',
       noPending: 'No pending payments'
     }
@@ -292,6 +307,15 @@ const Finance = () => {
       return value[language] || value.en || value.ro || Object.values(value)[0] || fallback;
     }
     return fallback;
+  };
+  const getClientDisplayName = (client, fallback = 'Client') => {
+    if (!client) return fallback;
+    if (typeof client.name === 'string') return client.name;
+    const nameFromObj = client.name?.[language] || client.name?.en || client.name?.ro;
+    const full = nameFromObj || client.fullName || client.companyName;
+    if (full) return full;
+    const composed = [client.firstName, client.lastName].filter(Boolean).join(' ');
+    return composed || fallback;
   };
 
   // Remove finance records whose linked booking/client no longer exists.
@@ -603,6 +627,7 @@ const Finance = () => {
           id: doc.id,
           ...doc.data()
         }));
+        const clientMap = new Map(clientsList.map(c => [c.id, c]));
         
         // Fetch finance records for provider costs and profit tracking
         const financeRef = collection(db, 'financeRecords');
@@ -610,6 +635,8 @@ const Finance = () => {
         const financeSnapshot = await getDocs(financeQuery);
         const financeList = financeSnapshot.docs.map(doc => {
           const data = doc.data();
+          const client = data.clientId ? clientMap.get(data.clientId) : null;
+          const clientName = data.clientName || getClientDisplayName(client, '');
           const parsedDate = data.date
             ? (data.date.seconds ? new Date(data.date.seconds * 1000).toISOString().split('T')[0] : data.date)
             : '';
@@ -627,7 +654,8 @@ const Finance = () => {
             providerCost,
             profit: data.profit ?? (clientAmount - (providerCost || 0)),
             status,
-            date: parsedDate
+            date: parsedDate,
+            clientName
           };
         });
         
@@ -708,17 +736,6 @@ const Finance = () => {
     return startOk && endOk;
   });
 
-  const pendingFinance = filteredFinanceRecords.filter(r => (r.status === 'pending') || r.providerCost === null);
-  const totalClientRevenue = filteredFinanceRecords.reduce((sum, r) => sum + (r.clientAmount || 0), 0);
-  const totalProviderCosts = filteredFinanceRecords.reduce((sum, r) => sum + (r.providerCost || 0), 0);
-  const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const grossProfit = totalClientRevenue - totalProviderCosts;
-  const totalRevenue = grossProfit;
-  const netProfit = totalRevenue - totalExpenses;
-  const totalIncome = totalClientRevenue;
-  const totalPayments = totalProviderCosts;
-  const trueProfit = netProfit;
-
   const serviceBreakdown = Object.values(filteredFinanceRecords.reduce((acc, r) => {
     const key = r.service || 'Unknown';
     if (!acc[key]) {
@@ -732,11 +749,85 @@ const Finance = () => {
     return acc;
   }, {}));
   
+  // Reset transactions pagination when filters change
+  useEffect(() => {
+    setTransactionsPage(1);
+  }, [filteredFinanceRecords.length]);
+
+  // Reset service pagination when dataset changes
+  useEffect(() => {
+    setServicePage(1);
+  }, [serviceBreakdown.length]);
+
+  // Reset expenses pagination when dataset changes
+  useEffect(() => {
+    setExpensesPage(1);
+  }, [filteredExpenses.length]);
+
+  const pendingFinance = filteredFinanceRecords.filter(r => (r.status === 'pending') || r.providerCost === null);
+  const totalClientRevenue = filteredFinanceRecords.reduce((sum, r) => sum + (r.clientAmount || 0), 0);
+  const totalProviderCosts = filteredFinanceRecords.reduce((sum, r) => sum + (r.providerCost || 0), 0);
+  const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const grossProfit = totalClientRevenue - totalProviderCosts;
+  const totalRevenue = grossProfit;
+  const netProfit = totalRevenue - totalExpenses;
+  const totalIncome = totalClientRevenue;
+  const totalPayments = totalProviderCosts;
+  const trueProfit = netProfit;
+  
   // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString(language === 'ro' ? 'ro-RO' : 'en-US');
+  };
+
+  const toISODate = (dateObj) => dateObj.toISOString().split('T')[0];
+
+  const applyTimeRange = (range) => {
+    const today = new Date();
+    let startDate = '';
+    let endDate = '';
+
+    switch (range) {
+      case 'week': {
+        const start = new Date(today);
+        start.setDate(today.getDate() - 6);
+        startDate = toISODate(start);
+        endDate = toISODate(today);
+        break;
+      }
+      case 'month': {
+        const start = new Date(today.getFullYear(), today.getMonth(), 1);
+        startDate = toISODate(start);
+        endDate = toISODate(today);
+        break;
+      }
+      case 'year': {
+        const start = new Date(today.getFullYear(), 0, 1);
+        startDate = toISODate(start);
+        endDate = toISODate(today);
+        break;
+      }
+      default:
+        startDate = '';
+        endDate = '';
+    }
+
+    setFilters(prev => ({
+      ...prev,
+      timeRange: range,
+      startDate,
+      endDate
+    }));
+  };
+
+  const handleDateChange = (key, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: value,
+      timeRange: 'custom'
+    }));
   };
   
   // Show toast message
@@ -1096,11 +1187,11 @@ const Finance = () => {
               <span>{pendingFinance.length} {t.pendingPayments}</span>
             </div>
           </div>
-          <div className="flex flex-wrap gap-3 items-center">
-            <select
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-              value={filters.service}
-              onChange={(e) => setFilters({...filters, service: e.target.value})}
+        <div className="flex flex-wrap gap-3 items-center">
+          <select
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+            value={filters.service}
+            onChange={(e) => setFilters({...filters, service: e.target.value})}
             >
               <option value="all">{t.serviceType}</option>
               {serviceOptions.map(option => (
@@ -1111,19 +1202,29 @@ const Finance = () => {
               type="date"
               className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
               value={filters.startDate}
-              onChange={(e) => setFilters({...filters, startDate: e.target.value})}
+              onChange={(e) => handleDateChange('startDate', e.target.value)}
               placeholder={t.startDate}
             />
             <input
               type="date"
               className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
               value={filters.endDate}
-              onChange={(e) => setFilters({...filters, endDate: e.target.value})}
+              onChange={(e) => handleDateChange('endDate', e.target.value)}
               placeholder={t.endDate}
             />
+            <select
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              value={filters.timeRange}
+              onChange={(e) => applyTimeRange(e.target.value)}
+            >
+              <option value="all">{t.allPeriods}</option>
+              <option value="week">{t.thisWeek}</option>
+              <option value="month">{t.thisMonth}</option>
+              <option value="year">{t.thisYear}</option>
+            </select>
             <button
               className="px-3 py-2 bg-gray-100 text-sm rounded-lg"
-              onClick={() => setFilters({ service: 'all', startDate: '', endDate: '' })}
+              onClick={() => setFilters({ service: 'all', startDate: '', endDate: '', timeRange: 'all' })}
             >
               {t.clearFilters}
             </button>
@@ -1218,6 +1319,9 @@ const Finance = () => {
                   <div>
                     <p className="text-sm font-semibold capitalize text-gray-900">{item.service}</p>
                     <p className="text-xs text-gray-500 mt-1">{formatDate(item.date)}</p>
+                    {item.clientName && (
+                      <p className="text-xs text-gray-500">{item.clientName}</p>
+                    )}
                   </div>
                   <span className="h-3 w-3 rounded-full bg-red-500 mt-1"></span>
                 </div>
@@ -1306,43 +1410,145 @@ const Finance = () => {
   );
 
   // Render transactions view
-  const renderTransactions = () => (
-    <div className="space-y-4 pb-20">
-      <div className="bg-white rounded-xl shadow-sm">
-        <div className="px-4 py-3 border-b border-gray-100">
-          <h2 className="font-bold">{t.transactions}</h2>
-        </div>
-        
-        <div className="p-4">
-          {filteredFinanceRecords.length === 0 ? (
-            <div className="py-8 text-center text-gray-500">{t.noTransactions}</div>
-          ) : (
-            <div className="space-y-3">
-              {filteredFinanceRecords.map(item => (
-                <div key={item.id} className="p-3 bg-gray-50 rounded-lg">
-                  <div className="flex justify-between">
-                    <div className="font-medium text-sm capitalize">{item.service}</div>
-                    <div className="text-xs text-gray-500">{formatDate(item.date)}</div>
+  const renderTransactions = () => {
+    const pageSize = 10;
+    const totalPages = Math.max(1, Math.ceil(filteredFinanceRecords.length / pageSize));
+    const pageItems = filteredFinanceRecords.slice((transactionsPage - 1) * pageSize, transactionsPage * pageSize);
+
+    return (
+      <div className="space-y-4 pb-20">
+        <div className="bg-white rounded-xl shadow-sm">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <h2 className="font-bold">{t.transactions}</h2>
+          </div>
+          
+          <div className="p-4">
+            {filteredFinanceRecords.length === 0 ? (
+              <div className="py-8 text-center text-gray-500">{t.noTransactions}</div>
+            ) : (
+              <div className="space-y-3">
+                {pageItems.map(item => (
+                  <div key={item.id} className="p-3 bg-gray-50 rounded-lg">
+                    <div className="flex justify-between">
+                      <div className="font-medium text-sm capitalize">{item.service}</div>
+                      <div className="text-xs text-gray-500">{formatDate(item.date)}</div>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1 mb-2 line-clamp-1">{item.description}</div>
+                    <div className="text-right font-bold text-lg">
+                      {formatCurrency(item.clientAmount)}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-500 mt-1 mb-2 line-clamp-1">{item.description}</div>
-                  <div className="text-right font-bold text-lg">
-                    {formatCurrency(item.clientAmount)}
+                ))}
+                
+                <div className="mt-4 flex items-center justify-between">
+                  <div className="text-sm text-gray-500">
+                    {((transactionsPage - 1) * pageSize) + 1}-{Math.min(transactionsPage * pageSize, filteredFinanceRecords.length)} / {filteredFinanceRecords.length}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm disabled:opacity-50"
+                      onClick={() => setTransactionsPage(p => Math.max(1, p - 1))}
+                      disabled={transactionsPage === 1}
+                    >
+                      ‹
+                    </button>
+                    <span className="text-sm text-gray-700">{transactionsPage}/{totalPages}</span>
+                    <button
+                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm disabled:opacity-50"
+                      onClick={() => setTransactionsPage(p => Math.min(totalPages, p + 1))}
+                      disabled={transactionsPage === totalPages}
+                    >
+                      ›
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <div className="font-medium">{t.total}</div>
+                    <div className="font-bold text-lg">{formatCurrency(totalClientRevenue)}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderServiceCards = () => {
+    const pageSize = 6;
+    const totalPages = Math.max(1, Math.ceil(serviceBreakdown.length / pageSize));
+    const pageItems = serviceBreakdown.slice((servicePage - 1) * pageSize, servicePage * pageSize);
+
+    return (
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">{t.profitByService}</h3>
+          <div className="text-sm text-gray-500">{serviceBreakdown.length} {t.transactions}</div>
+        </div>
+        {serviceBreakdown.length === 0 ? (
+          <div className="text-center text-gray-500 py-6">{t.noTransactions}</div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {pageItems.map((item, index) => (
+                <div key={`${item.service}-${index}`} className="border border-gray-100 rounded-xl p-4 bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold capitalize text-gray-900">{item.service}</p>
+                    <span className={`text-xs px-2 py-1 rounded-full ${item.margin >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {item.margin.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="mt-2 space-y-1 text-sm text-gray-700">
+                    <div className="flex justify-between">
+                      <span>{t.income}</span>
+                      <span className="font-semibold">{formatCurrency(item.revenue)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>{t.providerCost}</span>
+                      <span className="font-semibold">{formatCurrency(item.cost)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>{t.profitPerService}</span>
+                      <span className={`font-semibold ${item.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {formatCurrency(item.profit)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               ))}
-              
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                <div className="flex justify-between items-center">
-                  <div className="font-medium">{t.total}</div>
-                  <div className="font-bold text-lg">{formatCurrency(totalClientRevenue)}</div>
+            </div>
+            {serviceBreakdown.length > pageSize && (
+              <div className="mt-4 flex items-center justify-between">
+                <div className="text-sm text-gray-500">
+                  {((servicePage - 1) * pageSize) + 1}-{Math.min(servicePage * pageSize, serviceBreakdown.length)} / {serviceBreakdown.length}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm disabled:opacity-50"
+                    onClick={() => setServicePage(p => Math.max(1, p - 1))}
+                    disabled={servicePage === 1}
+                  >
+                    ‹
+                  </button>
+                  <span className="text-sm text-gray-700">{servicePage}/{totalPages}</span>
+                  <button
+                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm disabled:opacity-50"
+                    onClick={() => setServicePage(p => Math.min(totalPages, p + 1))}
+                    disabled={servicePage === totalPages}
+                  >
+                    ›
+                  </button>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   // Categories view removed (profit moved to transactions)
 
@@ -1456,38 +1662,69 @@ const Finance = () => {
                 </button>
               </div>
             ) : (
-              <div
-                className="grid gap-4"
-                style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}
-              >
-                {filteredExpenses.map(item => (
-                  <div key={item.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200 shadow-sm">
-                    <div className="flex justify-between">
-                      <div className="font-medium text-sm capitalize">{getExpenseCategoryName(item.category)}</div>
-                      <div className="text-xs text-gray-500">{formatDate(item.date)}</div>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1 mb-2 line-clamp-2">{item.description}</div>
-                    <div className="flex items-center justify-between mt-1">
-                      <div className="text-right font-bold">
-                        €{item.amount.toLocaleString()}
+              <div className="space-y-4">
+                <div
+                  className="grid gap-4"
+                  style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}
+                >
+                  {filteredExpenses
+                    .slice((expensesPage - 1) * 9, expensesPage * 9)
+                    .map(item => (
+                      <div key={item.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200 shadow-sm">
+                        <div className="flex justify-between">
+                          <div className="font-medium text-sm capitalize">{getExpenseCategoryName(item.category)}</div>
+                          <div className="text-xs text-gray-500">{formatDate(item.date)}</div>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1 mb-2 line-clamp-2">{item.description}</div>
+                        <div className="flex items-center justify-between mt-1">
+                          <div className="text-right font-bold">
+                            €{item.amount.toLocaleString()}
+                          </div>
+                          <button
+                            className="text-xs text-red-600 hover:text-red-700 px-2 py-1 rounded"
+                            onClick={() => handleDeleteExpense(item.id)}
+                            disabled={deletingExpenseId === item.id}
+                          >
+                            {deletingExpenseId === item.id ? '...' : t.deleteExpense}
+                          </button>
+                        </div>
                       </div>
+                    ))}
+                  
+                  <div className="mt-2 p-3 bg-blue-50 rounded-lg col-span-full">
+                    <div className="flex justify-between items-center">
+                      <div className="font-medium">{t.total}</div>
+                      <div className="font-bold">€{totalExpenses.toLocaleString()}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {filteredExpenses.length > 9 && (
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-500">
+                      {((expensesPage - 1) * 9) + 1}-{Math.min(expensesPage * 9, filteredExpenses.length)} / {filteredExpenses.length}
+                    </div>
+                    <div className="flex items-center gap-2">
                       <button
-                        className="text-xs text-red-600 hover:text-red-700 px-2 py-1 rounded"
-                        onClick={() => handleDeleteExpense(item.id)}
-                        disabled={deletingExpenseId === item.id}
+                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm disabled:opacity-50"
+                        onClick={() => setExpensesPage(p => Math.max(1, p - 1))}
+                        disabled={expensesPage === 1}
                       >
-                        {deletingExpenseId === item.id ? '...' : t.deleteExpense}
+                        ‹
+                      </button>
+                      <span className="text-sm text-gray-700">
+                        {expensesPage}/{Math.max(1, Math.ceil(filteredExpenses.length / 9))}
+                      </span>
+                      <button
+                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm disabled:opacity-50"
+                        onClick={() => setExpensesPage(p => Math.min(Math.max(1, Math.ceil(filteredExpenses.length / 9)), p + 1))}
+                        disabled={expensesPage === Math.max(1, Math.ceil(filteredExpenses.length / 9))}
+                      >
+                        ›
                       </button>
                     </div>
                   </div>
-                ))}
-                
-                <div className="mt-2 p-3 bg-blue-50 rounded-lg col-span-full">
-                  <div className="flex justify-between items-center">
-                    <div className="font-medium">{t.total}</div>
-                    <div className="font-bold">€{totalExpenses.toLocaleString()}</div>
-                  </div>
-                </div>
+                )}
               </div>
             )}
           </div>
@@ -1554,7 +1791,42 @@ const Finance = () => {
     <div className="space-y-4 pb-20">
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100">
-          <h2 className="font-bold">{t.financialSummary}</h2>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <h2 className="font-bold">{t.financialSummary}</h2>
+            <div className="flex flex-wrap gap-2 items-center justify-end">
+              <input
+                type="date"
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                value={filters.startDate}
+                onChange={(e) => handleDateChange('startDate', e.target.value)}
+                placeholder={t.startDate}
+              />
+              <input
+                type="date"
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                value={filters.endDate}
+                onChange={(e) => handleDateChange('endDate', e.target.value)}
+                placeholder={t.endDate}
+              />
+              <select
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                value={filters.timeRange}
+                onChange={(e) => applyTimeRange(e.target.value)}
+              >
+                <option value="all">{t.allPeriods}</option>
+                <option value="week">{t.thisWeek}</option>
+                <option value="month">{t.thisMonth}</option>
+                <option value="year">{t.thisYear}</option>
+                <option value="custom">{t.customRange}</option>
+              </select>
+              <button
+                className="px-3 py-2 bg-gray-100 text-sm rounded-lg"
+                onClick={() => setFilters({ service: 'all', startDate: '', endDate: '', timeRange: 'all' })}
+              >
+                {t.clearFilters}
+              </button>
+            </div>
+          </div>
         </div>
         
         <div className="p-4">

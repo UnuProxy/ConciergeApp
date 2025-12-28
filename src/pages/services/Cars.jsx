@@ -6,12 +6,35 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { db, storage } from '../../firebase/config';
 import { getCurrentLanguage } from "../../utils/languageHelper";
 
-// Helper to safely read first photo url (string or {url})
+// Normalize media items to a consistent shape for images and PDFs
+const normalizeMediaItem = (item) => {
+  if (!item) return null;
+  if (typeof item === 'string') {
+    return { url: item, type: 'image', name: '' };
+  }
+  const inferredType = item.type || (item.url && item.url.toLowerCase().endsWith('.pdf') ? 'pdf' : 'image');
+  return {
+    name: item.name || item.originalName || '',
+    ...item,
+    type: inferredType
+  };
+};
+
+// Helper to safely read first displayable image URL (ignores PDFs)
 const getCarPhotoUrl = (car) => {
-  if (!car?.photos || car.photos.length === 0) return null;
-  const first = car.photos[0];
-  if (typeof first === 'string') return first;
-  return first?.url || null;
+  const photos = car?.photos || [];
+  for (const item of photos) {
+    const media = normalizeMediaItem(item);
+    if (media?.url && media.type !== 'pdf') return media.url;
+  }
+  if (car?.photoUrl) return car.photoUrl;
+  return null;
+};
+
+const getCarDocuments = (car) => {
+  const mediaDocs = (car?.photos || []).map(normalizeMediaItem).filter(item => item?.type === 'pdf');
+  const explicitDocs = (car?.documents || []).map(normalizeMediaItem).filter(item => item?.type === 'pdf');
+  return [...mediaDocs, ...explicitDocs];
 };
 
 // Enhanced styles with mobile responsiveness and new filter styles
@@ -229,6 +252,32 @@ resultsCount: {
     cursor: 'pointer',
     fontSize: '15px',
     touchAction: 'manipulation'
+  },
+  buttonIcon: {
+    backgroundColor: '#f3f4f6',
+    color: '#1f2937',
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    width: '44px',
+    height: '44px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '18px',
+    cursor: 'pointer'
+  },
+  buttonIconDanger: {
+    backgroundColor: '#fff1f2',
+    color: '#b91c1c',
+    border: '1px solid #fecdd3',
+    borderRadius: '8px',
+    width: '44px',
+    height: '44px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '18px',
+    cursor: 'pointer'
   },
   buttonDanger: {
     backgroundColor: '#fee2e2',
@@ -487,6 +536,8 @@ function Cars() {
   const [isUploading, setIsUploading] = useState(false);
   const [photoFiles, setPhotoFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [documentFiles, setDocumentFiles] = useState([]);
   const [activeTab, setActiveTab] = useState('basic');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [imageErrors, setImageErrors] = useState({});
@@ -938,31 +989,93 @@ function Cars() {
     setExistingPhotos([]);
     setPhotoFiles([]);
     setPreviewUrls([]);
+    setDocuments([]);
+    setDocumentFiles([]);
     setActiveTab('basic');
     setShowAdvanced(false);
     setImageErrors({});
   };
   
-  // Handle photo file selection
+  // Handle photo file selection (images only)
   const handlePhotoChange = (e) => {
     if (!e.target.files) return;
-    const filesArray = Array.from(e.target.files);
+    const filesArray = Array.from(e.target.files).filter(file => 
+      file.type.startsWith('image/')
+    );
     const currentPhotoCount = existingPhotos.length + photoFiles.length;
     const newTotalCount = currentPhotoCount + filesArray.length;
     
     if (newTotalCount > 24) {
-      alert(`You can only upload a maximum of 24 photos.`);
+      alert(`You can only upload a maximum of 24 files.`);
       return;
     }
     
     setPhotoFiles(prev => [...prev, ...filesArray]);
     
-    // Create preview URLs
-    const newPreviewUrls = filesArray.map(file => URL.createObjectURL(file));
+    // Create preview URLs and metadata
+    const newPreviewUrls = filesArray.map(file => ({
+      url: URL.createObjectURL(file),
+      name: file.name
+    }));
     setPreviewUrls(prev => [...prev, ...newPreviewUrls]);
   };
+
+  // Handle PDF document selection
+  const handleDocumentChange = (e) => {
+    if (!e.target.files) return;
+    const filesArray = Array.from(e.target.files).filter(file => file.type === 'application/pdf');
+    setDocumentFiles(prev => [...prev, ...filesArray]);
+  };
   
-  // Enhanced Upload photos to Firebase Storage with better error handling and retry logic
+  // Upload PDF documents
+  const uploadDocuments = async () => {
+    if (documentFiles.length === 0) return [];
+    setIsUploading(true);
+    const uploadedDocs = [];
+
+    try {
+      const auth = getAuth();
+      if (!auth.currentUser) {
+        await signInAnonymously(auth);
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      for (let i = 0; i < documentFiles.length; i++) {
+        const file = documentFiles[i];
+        if (!(file instanceof File) || file.type !== 'application/pdf') continue;
+
+        const timestamp = Date.now();
+        const randomStr = Math.random().toString(36).substring(2, 8);
+        const safeFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+        const fileName = `cars/docs/${timestamp}_${randomStr}_${safeFileName}`;
+
+        try {
+          const storageRef = ref(storage, fileName);
+          const uploadTask = uploadBytesResumable(storageRef, file);
+          await uploadTask;
+          const downloadURL = await getDownloadURL(storageRef);
+          uploadedDocs.push({
+            url: downloadURL,
+            path: fileName,
+            type: 'pdf',
+            name: file.name
+          });
+        } catch (err) {
+          console.error("Error uploading document:", err);
+        }
+      }
+    } catch (err) {
+      console.error("Unexpected error during document uploads:", err);
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+      setDocumentFiles([]);
+    }
+
+    return uploadedDocs;
+  };
+
+  // Enhanced Upload photos with better error handling and retry logic
   const uploadPhotos = async () => {
     if (photoFiles.length === 0) return [];
     
@@ -989,6 +1102,8 @@ function Cars() {
       for (let i = 0; i < photoFiles.length; i++) {
         const file = photoFiles[i];
         if (!(file instanceof File)) continue;
+        const isImage = file.type.startsWith('image/');
+        if (!isImage) continue;
         
         // Create a unique filename that includes the service type
         const timestamp = Date.now();
@@ -1022,7 +1137,9 @@ function Cars() {
                   const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
                   photoUrls.push({
                     url: downloadURL,
-                    path: fileName
+                    path: fileName,
+                    type: 'image',
+                    name: file.name
                   });
                   resolve();
                 } catch (urlError) {
@@ -1108,11 +1225,13 @@ function Cars() {
     try {
       // Upload photos
       const photoUrls = await uploadPhotos();
+      const docUrls = await uploadDocuments();
       
       // Prepare structured data for Firestore
       const carData = {
         ...prepareFormDataForSave(),
         photos: photoUrls,
+        documents: docUrls,
         createdAt: new Date()
       };
       
@@ -1144,17 +1263,21 @@ function Cars() {
       
       // Get existing photos as an array
       let updatedPhotos = [...existingPhotos];
+      let updatedDocuments = [...documents];
       
       // Upload any new photos
       const newPhotoUrls = await uploadPhotos();
+      const newDocUrls = await uploadDocuments();
       
       // Combine existing photos with new ones
       updatedPhotos = [...updatedPhotos, ...newPhotoUrls];
+      updatedDocuments = [...updatedDocuments, ...newDocUrls];
       
       // Prepare structured data for Firestore
       const carData = {
         ...prepareFormDataForSave(),
         photos: updatedPhotos,
+        documents: updatedDocuments,
         updatedAt: new Date()
       };
       
@@ -1191,6 +1314,19 @@ function Cars() {
               await deleteObject(storageRef);
             } catch (error) {
               console.error("Error deleting image:", error);
+            }
+          }
+        }
+      }
+      // Delete documents from storage if they exist
+      if (carToDelete.documents && carToDelete.documents.length > 0) {
+        for (const docItem of carToDelete.documents) {
+          if (docItem.path) {
+            try {
+              const storageRef = ref(storage, docItem.path);
+              await deleteObject(storageRef);
+            } catch (error) {
+              console.error("Error deleting document:", error);
             }
           }
         }
@@ -1238,10 +1374,29 @@ function Cars() {
       
       setPreviewUrls(prev => {
         const updated = [...prev];
-        URL.revokeObjectURL(updated[index]); // Clean up URL
+        if (updated[index]?.url) {
+          URL.revokeObjectURL(updated[index].url); // Clean up URL
+        }
         updated.splice(index, 1);
         return updated;
       });
+    }
+  };
+
+  const handleDeleteDocument = async (index, isExisting = false) => {
+    if (isExisting) {
+      const docToDelete = documents[index];
+      setDocuments(prev => prev.filter((_, i) => i !== index));
+      if (docToDelete?.path) {
+        try {
+          const storageRef = ref(storage, docToDelete.path);
+          await deleteObject(storageRef);
+        } catch (error) {
+          console.error("Error deleting document from storage:", error);
+        }
+      }
+    } else {
+      setDocumentFiles(prev => prev.filter((_, i) => i !== index));
     }
   };
   
@@ -1313,8 +1468,10 @@ function Cars() {
       bookingNotes_ro: typeof car.bookingNotes === 'string' ? car.bookingNotes : (car.bookingNotes?.ro || '')
     });
     
-    // Set existing photos
-    setExistingPhotos(car.photos || []);
+    // Set existing media
+    setExistingPhotos((car.photos || []).map(normalizeMediaItem).filter(Boolean));
+    setDocuments((car.documents || []).map(normalizeMediaItem).filter(Boolean));
+    setDocumentFiles([]);
     setIsEditingCar(true);
   };
   
@@ -1633,6 +1790,8 @@ function Cars() {
   
   // Enhanced image rendering for car cards with proper error handling
   const renderCarImage = (car) => {
+    const imageUrl = getCarPhotoUrl(car);
+
     // Check if we have a previously recorded error for this car
     if (imageErrors[car.id]) {
       return (
@@ -1646,14 +1805,14 @@ function Cars() {
     }
     
     // If we have photos and no error yet, try to render the image
-    if (car.photos && car.photos.length > 0 && car.photos[0].url) {
+    if (imageUrl) {
       return (
         <img
-          src={car.photos[0].url}
+          src={imageUrl}
           alt={getLocalizedContent(car.name, language, t.noPhotos)}
           style={styles.carImage}
-          onError={(e) => {
-            console.error(`Failed to load image for car ${car.id}:`, car.photos[0].url);
+          onError={() => {
+            console.error(`Failed to load image for car ${car.id}:`, imageUrl);
             setImageErrors(prev => ({...prev, [car.id]: true}));
           }}
         />
@@ -1749,26 +1908,35 @@ function Cars() {
             style={styles.fileInput}
           />
           <div style={styles.photosContainer}>
-            {existingPhotos.map((photo, index) => (
-              <div key={`existing-${index}`} style={styles.photoPreview}>
-                <img
-                  src={photo.url}
-                  alt={`Photo ${index}`}
-                  style={{width: '100%', height: '100%', objectFit: 'cover'}}
-                />
-                <button
-                  type="button"
-                  onClick={() => handleDeletePhoto(index, true)}
-                  style={styles.deleteButton}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-            {previewUrls.map((url, index) => (
+            {existingPhotos.map((photo, index) => {
+              const normalizedPhoto = normalizeMediaItem(photo);
+              return (
+                <div key={`existing-${index}`} style={styles.photoPreview}>
+                  {normalizedPhoto?.type === 'pdf' ? (
+                    <div style={{width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6', fontSize: '12px', textAlign: 'center', padding: '4px'}}>
+                      📄 {normalizedPhoto.name || 'PDF'}
+                    </div>
+                  ) : (
+                    <img
+                      src={normalizedPhoto?.url}
+                      alt={`Photo ${index}`}
+                      style={{width: '100%', height: '100%', objectFit: 'cover'}}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleDeletePhoto(index, true)}
+                    style={styles.deleteButton}
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+            {previewUrls.map((file, index) => (
               <div key={`preview-${index}`} style={styles.photoPreview}>
                 <img
-                  src={url}
+                  src={file?.url}
                   alt={`Preview ${index}`}
                   style={{width: '100%', height: '100%', objectFit: 'cover'}}
                 />
@@ -1781,6 +1949,83 @@ function Cars() {
                 </button>
               </div>
             ))}
+            </div>
+          <div style={styles.formSection}>
+            <label style={styles.formLabel}>
+              {language === 'en' ? 'Documents (PDF)' : 'Documente (PDF)'}
+            </label>
+            <input
+              type="file"
+              accept="application/pdf"
+              multiple
+              onChange={handleDocumentChange}
+              style={styles.fileInput}
+            />
+            <div className="space-y-2">
+              {documents.map((doc, idx) => (
+                <div key={`existing-doc-${idx}`} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                  <span className="flex items-center gap-2 text-sm text-gray-800">
+                    <span>📄</span>
+                    {doc.name || `Document ${idx + 1}`}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <a href={doc.url} target="_blank" rel="noreferrer" className="text-indigo-600 text-sm">
+                      {language === 'en' ? 'Open' : 'Deschide'}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteDocument(idx, true)}
+                      style={styles.buttonIconDanger}
+                      aria-label={t.delete}
+                      title={t.delete}
+                    >
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {documentFiles.map((doc, idx) => (
+                <div key={`pending-doc-${idx}`} className="flex items-center justify-between p-2 bg-gray-100 rounded">
+                  <span className="flex items-center gap-2 text-sm text-gray-700">
+                    <span>📄</span>
+                    {doc.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteDocument(idx, false)}
+                    style={styles.buttonIconDanger}
+                    aria-label={t.delete}
+                    title={t.delete}
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6l-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -2855,6 +3100,35 @@ function Cars() {
                       >
                         {t.view || 'Vezi'}
                       </button>
+                      {getCarDocuments(car).length > 0 && (
+                        <a
+                          href={getCarDocuments(car)[0].url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={styles.buttonIcon}
+                          aria-label={language === 'en' ? 'Download PDF' : 'Descarcă PDF'}
+                          title={language === 'en' ? 'Download PDF' : 'Descarcă PDF'}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <path d="M9 13h6" />
+                            <path d="M9 17h3" />
+                            <path d="M12 11v6" />
+                          </svg>
+                        </a>
+                      )}
                       <button
                         type="button"
                         onClick={() => startEditingCar(car)}
@@ -2869,9 +3143,23 @@ function Cars() {
                             handleDeleteCar(car.id);
                           }
                         }}
-                        style={isMobile ? {...styles.buttonDanger, flex: 1} : styles.buttonDanger}
+                        style={styles.buttonIconDanger}
+                        aria-label={t.delete}
+                        title={t.delete}
                       >
-                        {t.delete}
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6l-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2" />
+                        </svg>
                       </button>
                     </div>
                   </div>
@@ -2902,10 +3190,17 @@ function CarViewModal({ car, onClose, language, t, getLocalizedContent }) {
 
   if (!car) return null;
 
-  const photoUrls = [
-    ...(car.photos || []).map(p => (typeof p === 'string' ? p : p?.url)).filter(Boolean),
-    ...(car.photoUrl ? [car.photoUrl] : [])
+  const mediaItems = [
+    ...(car.photos || []).map(normalizeMediaItem).filter(Boolean),
+    ...(car.photoUrl ? [normalizeMediaItem({ url: car.photoUrl, type: 'image' })] : [])
   ];
+  const documentItems = (car.documents || []).map(normalizeMediaItem).filter(Boolean);
+  const imageItems = mediaItems.filter(item => item.type !== 'pdf' && item.url);
+  const pdfItems = [
+    ...mediaItems.filter(item => item.type === 'pdf' && item.url),
+    ...documentItems
+  ];
+  const photoUrls = imageItems.map(item => item.url);
 
   const monthlyEntries = car.pricing?.monthly
     ? Object.entries(car.pricing.monthly).filter(([, val]) => val)
@@ -2979,8 +3274,8 @@ function CarViewModal({ car, onClose, language, t, getLocalizedContent }) {
               {/* Images */}
               {(() => {
                 if (photoUrls.length === 0) return (
-                  <div className="bg-gray-200 rounded-lg h-64 flex items-center justify-center text-gray-400">
-                    {t.noPhotos}
+                  <div className="bg-gray-200 rounded-lg h-64 flex items-center justify-center text-gray-400 text-center px-4">
+                    {pdfItems.length > 0 ? (language === 'en' ? 'No images available. See documents below.' : 'Nicio imagine disponibilă. Vezi documentele de mai jos.') : t.noPhotos}
                   </div>
                 );
 
@@ -3049,6 +3344,33 @@ function CarViewModal({ car, onClose, language, t, getLocalizedContent }) {
                   </div>
                 );
               })()}
+
+              {pdfItems.length > 0 && (
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <h2 className="text-xl font-semibold text-gray-800 mb-4">
+                    {language === 'en' ? 'Documents' : 'Documente'}
+                  </h2>
+                  <div className="space-y-2">
+                    {pdfItems.map((file, idx) => (
+                      <a
+                        key={`${file.url}-${idx}`}
+                        href={file.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-between p-3 border rounded hover:bg-gray-50 transition"
+                      >
+                        <span className="flex items-center gap-2 text-gray-800">
+                          <span className="text-lg">📄</span>
+                          {file.name || `${language === 'en' ? 'Document' : 'Document'} ${idx + 1}`}
+                        </span>
+                        <span className="text-indigo-600 text-sm font-medium">
+                          {language === 'en' ? 'Open PDF' : 'Deschide PDF'}
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Description */}
               <div className="bg-white rounded-lg shadow-md p-6">
