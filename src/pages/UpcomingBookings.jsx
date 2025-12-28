@@ -236,14 +236,19 @@ const getServicePaymentInfo = (service, payments = [], safeRenderFn = (v) => v) 
   // DO NOT use name matching - multiple services can have the same name!
   const storedPaid = parseFloat(service?.amountPaid || 0);
   
-  // Cross-check with payment history ONLY by unique service ID (never by name)
+  // Cross-check with payment history by BOTH serviceId AND bookingId
+  // This prevents the bug where payments are double-counted across bookings with same serviceId
   let paidFromHistory = 0;
   const serviceId = service?.id || null;
+  const serviceBookingId = service?.bookingId || null;
   
   if (serviceId && Array.isArray(payments) && payments.length > 0) {
     payments.forEach((payment) => {
-      // STRICT: Only match by exact service ID - no name matching allowed
-      if (payment.serviceId && payment.serviceId === serviceId) {
+      // STRICT: Match by serviceId AND bookingId (if available) to prevent cross-booking double-counting
+      const paymentMatchesService = payment.serviceId && payment.serviceId === serviceId;
+      const paymentMatchesBooking = !serviceBookingId || !payment.bookingId || payment.bookingId === serviceBookingId;
+      
+      if (paymentMatchesService && paymentMatchesBooking) {
         paidFromHistory += parseFloat(payment.amount || 0);
       }
     });
@@ -286,14 +291,31 @@ const getPaymentContext = (client, service, paymentHistory = [], safeRenderFn = 
 };
 
 // IMPROVED SERVICE SELECTION COMPONENT
-const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) => {
-  const [step, setStep] = useState('category');
+const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t, formError, bookings = [] }) => {
+  // If multiple bookings, start with booking selection; otherwise go straight to category
+  const hasMultipleBookings = bookings && bookings.length > 1;
+  const [step, setStep] = useState(hasMultipleBookings ? 'booking' : 'category');
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [serviceSearch, setServiceSearch] = useState('');
+  
+  // Track selected booking (default to most recent if only one)
+  const defaultBooking = bookings?.length > 0 
+    ? [...bookings].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0]
+    : null;
+  const [selectedBooking, setSelectedBooking] = useState(defaultBooking);
+  
+  // Get booking date constraints from selected booking
+  const bookingCheckIn = selectedBooking?.checkIn;
+  const bookingCheckOut = selectedBooking?.checkOut;
+  const minDate = bookingCheckIn ? new Date(bookingCheckIn).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+  const maxDate = bookingCheckOut ? new Date(bookingCheckOut).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+  
+  // Initialize service dates to booking check-in date (or today if not available)
+  const initialDate = minDate;
   
   // Form state for custom service
   const [serviceData, setServiceData] = useState({
@@ -303,9 +325,9 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
     price: 0,
     quantity: 1,
     unit: 'hourly',
-    date: new Date().toISOString().split('T')[0],
-    startDate: new Date().toISOString().split('T')[0], // NEW: Service start date
-    endDate: new Date().toISOString().split('T')[0],   // NEW: Service end date
+    date: initialDate,
+    startDate: initialDate, // Initialize to booking start date
+    endDate: initialDate,   // Initialize to booking start date
     status: 'confirmed',
     notes: '',
     selectedMonth: '',
@@ -313,6 +335,19 @@ const ServiceSelectionPanel = ({ onServiceAdded, onCancel, userCompanyId, t }) =
     paymentStatus: 'unpaid', // Track payment status
     amountPaid: 0 // Track amount paid for this service
   });
+  
+  // Update service dates when booking selection changes
+  useEffect(() => {
+    if (selectedBooking) {
+      const newMinDate = selectedBooking.checkIn ? new Date(selectedBooking.checkIn).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+      setServiceData(prev => ({
+        ...prev,
+        date: newMinDate,
+        startDate: newMinDate,
+        endDate: newMinDate
+      }));
+    }
+  }, [selectedBooking]);
 
   // Fetch categories first
   useEffect(() => {
@@ -617,8 +652,8 @@ const getServiceThumbnail = (service) => {
       name: serviceData.name,
       description: serviceData.description || '',
       date: serviceData.date,
-      startDate: serviceData.startDate || serviceData.date, // NEW: Service start date
-      endDate: serviceData.endDate || serviceData.startDate || serviceData.date, // NEW: Service end date
+      startDate: serviceData.startDate || serviceData.date,
+      endDate: serviceData.endDate || serviceData.startDate || serviceData.date,
       month: serviceData.selectedMonth || null,
       price: serviceData.price,
       quantity: serviceData.quantity,
@@ -632,15 +667,140 @@ const getServiceThumbnail = (service) => {
       createdAt: new Date(),
       companyId: userCompanyId,
       paymentStatus: serviceData.paymentStatus,
-      amountPaid: amountPaid
+      amountPaid: amountPaid,
+      // Include the selected booking ID so we know which booking to add this to
+      targetBookingId: selectedBooking?.id || null
     };
     
     onServiceAdded(newService);
   };
 
+  // RENDER BOOKING SELECTION (when client has multiple bookings)
+  const renderBookingSelection = () => (
+    <div className="bg-white">
+      {formError && (
+        <div className="mb-3 px-3 py-2 rounded-md border border-red-200 bg-red-50 text-red-700 text-sm flex items-center gap-2">
+          <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          {safeRender(formError)}
+        </div>
+      )}
+      <h4 className="text-lg font-medium mb-2 text-gray-900">{t.selectBooking || 'Select Booking'}</h4>
+      <p className="text-sm text-gray-600 mb-4">{t.selectBookingDescription || 'Choose which booking to add this service to:'}</p>
+      
+      <div className="space-y-3">
+        {bookings.map((booking, index) => {
+          const checkIn = booking.checkIn ? new Date(booking.checkIn) : null;
+          const checkOut = booking.checkOut ? new Date(booking.checkOut) : null;
+          const isSelected = selectedBooking?.id === booking.id;
+          const accommodationName = safeRender(booking.accommodationType || booking.propertyName || booking.villaName || `Booking ${index + 1}`);
+          
+          // Check if booking is current (today is within dates)
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const isCurrent = checkIn && checkOut && today >= checkIn && today <= checkOut;
+          const isUpcoming = checkIn && today < checkIn;
+          
+          return (
+            <button
+              key={booking.id}
+              onClick={() => {
+                setSelectedBooking(booking);
+                setStep('category');
+              }}
+              className={`w-full p-4 border-2 rounded-lg text-left transition-all ${
+                isSelected 
+                  ? 'border-blue-500 bg-blue-50' 
+                  : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-gray-900">{accommodationName}</span>
+                    {isCurrent && (
+                      <span className="px-2 py-0.5 text-xs font-bold bg-green-100 text-green-700 rounded-full">
+                        {t.currentBooking || 'CURRENT'}
+                      </span>
+                    )}
+                    {isUpcoming && !isCurrent && (
+                      <span className="px-2 py-0.5 text-xs font-bold bg-amber-100 text-amber-700 rounded-full">
+                        {t.upcoming || 'UPCOMING'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span>
+                      {checkIn?.toLocaleDateString() || '?'} → {checkOut?.toLocaleDateString() || '?'}
+                    </span>
+                  </div>
+                  {booking.services?.length > 0 && (
+                    <div className="mt-2 text-xs text-gray-500">
+                      {booking.services.length} {booking.services.length === 1 ? (t.service || 'service') : (t.services || 'services')}
+                    </div>
+                  )}
+                </div>
+                <div className="text-right">
+                  <div className="font-bold text-gray-900">{(booking.totalValue || 0).toLocaleString()} €</div>
+                  {isSelected && (
+                    <svg className="w-5 h-5 text-blue-500 ml-auto mt-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      
+      <div className="mt-4 pt-4 border-t">
+        <button
+          onClick={onCancel}
+          className="w-full py-2 text-gray-600 hover:text-gray-800 text-sm"
+        >
+          {t.cancel || 'Cancel'}
+        </button>
+      </div>
+    </div>
+  );
+
   // RENDER CATEGORY SELECTION
   const renderCategorySelection = () => (
     <div className="bg-white">
+      {formError && (
+        <div className="mb-3 px-3 py-2 rounded-md border border-red-200 bg-red-50 text-red-700 text-sm">
+          {safeRender(formError)}
+        </div>
+      )}
+      
+      {/* Show selected booking info when there are multiple bookings */}
+      {hasMultipleBookings && selectedBooking && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex justify-between items-center">
+            <div>
+              <span className="text-sm text-blue-700 font-medium">{t.addingTo || 'Adding to'}:</span>
+              <span className="ml-2 font-semibold text-blue-900">
+                {safeRender(selectedBooking.accommodationType || selectedBooking.propertyName || 'Booking')}
+              </span>
+              <span className="ml-2 text-sm text-blue-600">
+                ({new Date(selectedBooking.checkIn).toLocaleDateString()} → {new Date(selectedBooking.checkOut).toLocaleDateString()})
+              </span>
+            </div>
+            <button
+              onClick={() => setStep('booking')}
+              className="text-xs text-blue-600 hover:text-blue-800 underline"
+            >
+              {t.change || 'Change'}
+            </button>
+          </div>
+        </div>
+      )}
+      
       <h4 className="text-lg font-medium mb-4 text-gray-900">{t.selectServiceCategory || 'Select Service Category'}</h4>
       
       {loading ? (
@@ -813,6 +973,16 @@ const renderServicesList = () => (
   // RENDER SERVICE DETAILS FORM
   const renderServiceDetailsForm = () => (
     <div className="bg-white">
+      {/* Form Error Display */}
+      {formError && (
+        <div className="mb-3 px-3 py-2 rounded-md border border-red-200 bg-red-50 text-red-700 text-sm flex items-center gap-2">
+          <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          {safeRender(formError)}
+        </div>
+      )}
+      
       <div className="flex justify-between items-center mb-4">
         <h4 className="text-lg font-medium text-gray-900">
           {serviceData.name ? `${serviceData.name}` : t.serviceDetails || 'Service Details'}
@@ -828,6 +998,21 @@ const renderServicesList = () => (
       </div>
       
       <div className="space-y-4">
+        {/* Booking Date Range Notice */}
+        {bookingCheckIn && bookingCheckOut && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-center gap-2 text-amber-800 text-sm font-medium">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+              {t.bookingPeriod || 'Booking Period'}
+            </div>
+            <p className="text-amber-700 text-sm mt-1">
+              {t.serviceDatesMustBeWithin || 'Service dates must be within'}: <strong>{new Date(bookingCheckIn).toLocaleDateString()} → {new Date(bookingCheckOut).toLocaleDateString()}</strong>
+            </p>
+          </div>
+        )}
+        
         {/* Service Dates - Start and End */}
         <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
           <label className="block text-sm font-medium text-indigo-800 mb-2 flex items-center gap-2">
@@ -842,11 +1027,13 @@ const renderServicesList = () => (
               <input
                 type="date"
                 value={serviceData.startDate || serviceData.date}
+                min={minDate}
+                max={maxDate}
                 onChange={(e) => setServiceData({
                   ...serviceData, 
                   startDate: e.target.value,
                   date: e.target.value, // Keep date in sync for backwards compatibility
-                  endDate: serviceData.endDate || e.target.value // Default end to start if not set
+                  endDate: serviceData.endDate && serviceData.endDate >= e.target.value ? serviceData.endDate : e.target.value // Default end to start if not set or if end is before new start
                 })}
                 className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
               />
@@ -856,7 +1043,8 @@ const renderServicesList = () => (
               <input
                 type="date"
                 value={serviceData.endDate || serviceData.startDate || serviceData.date}
-                min={serviceData.startDate || serviceData.date}
+                min={serviceData.startDate || serviceData.date || minDate}
+                max={maxDate}
                 onChange={(e) => setServiceData({...serviceData, endDate: e.target.value})}
                 className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
               />
@@ -1079,6 +1267,16 @@ const renderServicesList = () => (
   // RENDER CUSTOM SERVICE FORM
   const renderCustomForm = () => (
     <div className="bg-white">
+      {/* Form Error Display */}
+      {formError && (
+        <div className="mb-3 px-3 py-2 rounded-md border border-red-200 bg-red-50 text-red-700 text-sm flex items-center gap-2">
+          <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          {safeRender(formError)}
+        </div>
+      )}
+      
       <div className="flex justify-between items-center mb-4">
         <h4 className="text-lg font-medium text-gray-900">{t.customService || 'Custom Service'}</h4>
         <button 
@@ -1092,6 +1290,21 @@ const renderServicesList = () => (
       </div>
       
       <div className="space-y-4">
+        {/* Booking Date Range Notice */}
+        {bookingCheckIn && bookingCheckOut && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-center gap-2 text-amber-800 text-sm font-medium">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+              {t.bookingPeriod || 'Booking Period'}
+            </div>
+            <p className="text-amber-700 text-sm mt-1">
+              {t.serviceDatesMustBeWithin || 'Service dates must be within'}: <strong>{new Date(bookingCheckIn).toLocaleDateString()} → {new Date(bookingCheckOut).toLocaleDateString()}</strong>
+            </p>
+          </div>
+        )}
+        
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             {t.serviceName || 'Service Name*'}
@@ -1133,11 +1346,13 @@ const renderServicesList = () => (
               <input
                 type="date"
                 value={serviceData.startDate || serviceData.date}
+                min={minDate}
+                max={maxDate}
                 onChange={(e) => setServiceData({
                   ...serviceData, 
                   startDate: e.target.value,
                   date: e.target.value,
-                  endDate: serviceData.endDate || e.target.value
+                  endDate: serviceData.endDate && serviceData.endDate >= e.target.value ? serviceData.endDate : e.target.value
                 })}
                 className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
               />
@@ -1147,7 +1362,8 @@ const renderServicesList = () => (
               <input
                 type="date"
                 value={serviceData.endDate || serviceData.startDate || serviceData.date}
-                min={serviceData.startDate || serviceData.date}
+                min={serviceData.startDate || serviceData.date || minDate}
+                max={maxDate}
                 onChange={(e) => setServiceData({...serviceData, endDate: e.target.value})}
                 className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
               />
@@ -1282,6 +1498,7 @@ const renderServicesList = () => (
   // MAIN COMPONENT RENDER
   return (
     <div className="p-4 bg-white min-h-full">
+      {step === 'booking' && renderBookingSelection()}
       {step === 'category' && renderCategorySelection()}
       {step === 'services' && renderServicesList()}
       {step === 'details' && renderServiceDetailsForm()}
@@ -1727,7 +1944,15 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
       editBookingDates: "Edit Booking Dates",
       updateBooking: "Update Booking",
       updatingBooking: "Updating booking...",
-      bookingUpdatedSuccess: "Booking updated successfully"
+      bookingUpdatedSuccess: "Booking updated successfully",
+      serviceOutsideBooking: "Service dates must stay within the booking period.",
+      bookingPeriod: "Booking Period",
+      serviceDatesMustBeWithin: "Service dates must be within",
+      selectBooking: "Select Booking",
+      selectBookingDescription: "Choose which booking to add this service to:",
+      currentBooking: "CURRENT",
+      addingTo: "Adding to",
+      change: "Change"
     },
     ro: {
       paid: "Plătit",
@@ -1759,7 +1984,15 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
       editBookingDates: "Editează Datele Rezervării",
       updateBooking: "Actualizează Rezervarea",
       updatingBooking: "Se actualizează rezervarea...",
-      bookingUpdatedSuccess: "Rezervare actualizată cu succes"
+      bookingUpdatedSuccess: "Rezervare actualizată cu succes",
+      serviceOutsideBooking: "Serviciul trebuie programat în perioada rezervării.",
+      bookingPeriod: "Perioada Rezervării",
+      serviceDatesMustBeWithin: "Datele serviciului trebuie să fie în intervalul",
+      selectBooking: "Selectează Rezervarea",
+      selectBookingDescription: "Alege la care rezervare vrei să adaugi acest serviciu:",
+      currentBooking: "ÎN CURS",
+      addingTo: "Adaugă la",
+      change: "Schimbă"
     }
   };
   
@@ -1831,6 +2064,20 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
   const getStatusBadgeClass = (status) => {
     return statusColors[status]?.cssClass || 'bg-gray-100 text-gray-700 border-gray-200';
   };
+
+  function isServiceWithinBooking(service, booking) {
+    if (!service || !booking) return true;
+    const checkIn = booking.checkIn ? new Date(booking.checkIn) : null;
+    const checkOut = booking.checkOut ? new Date(booking.checkOut) : null;
+    if (!checkIn || !checkOut) return true;
+
+    const start = new Date(service.startDate || service.date);
+    const end = new Date(service.endDate || service.startDate || service.date || start);
+    if (Number.isNaN(start) || Number.isNaN(end)) return true;
+
+    [start, end, checkIn, checkOut].forEach(d => d.setHours(0, 0, 0, 0));
+    return start >= checkIn && end <= checkOut;
+  }
 
   const getDaysLeft = (date) => {
     if (!date) return '';
@@ -2214,6 +2461,38 @@ const UpcomingBookings = () => {
         
         paymentHistory = cleanedPaymentHistory;
         
+        // STEP 0.5: FIX DATA INCONSISTENCY - Create missing payment records for services with amountPaid but no payment
+        // This fixes the bug where services show as "Paid" but progress bar shows money due
+        services.forEach((service, svcIdx) => {
+          const serviceId = service.id;
+          const serviceAmountPaid = parseFloat(service.amountPaid || 0);
+          const serviceTotal = parseFloat(service.price || 0) * parseInt(service.quantity || 1);
+          
+          if (serviceAmountPaid > 0 && serviceId) {
+            // Check if there's a matching payment in history
+            const paymentsForService = paymentHistory.filter(p => p.serviceId === serviceId);
+            const totalPaidInHistory = paymentsForService.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+            
+            // If service shows paid but no payment record exists, create one
+            if (totalPaidInHistory < serviceAmountPaid) {
+              const missingAmount = serviceAmountPaid - totalPaidInHistory;
+              console.log(`🔧 Creating missing payment record: ${missingAmount}€ for service ${service.name || serviceId}`);
+              
+              paymentHistory.push({
+                id: `recovery-${Date.now()}-${svcIdx}-${Math.random().toString(36).substr(2, 9)}`,
+                amount: missingAmount,
+                method: 'data-recovery',
+                notes: `Auto-created to sync service payment (was: ${serviceAmountPaid}€ paid, history had: ${totalPaidInHistory}€)`,
+                serviceId: serviceId,
+                serviceName: typeof service.name === 'object' ? (service.name.en || service.name.ro || 'Service') : (service.name || 'Service'),
+                date: new Date(),
+                createdAt: new Date(),
+                createdBy: 'system-recovery'
+              });
+            }
+          }
+        });
+        
         // 1. CALCULATE TOTAL FROM SERVICES (The only source of truth for price)
         let totalValue = services.reduce((sum, s) => {
           return sum + (parseFloat(s.price || 0) * parseInt(s.quantity || 1));
@@ -2222,7 +2501,7 @@ const UpcomingBookings = () => {
         // 2. CALCULATE PAID FROM CLEANED HISTORY (The only source of truth for money received)
         const totalPaidFromHistory = paymentHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
         
-        // 3. Update each service's payment status based on history (STRICT ID-ONLY Allocation)
+        // 3. Update each service's payment status based on history (STRICT ID + BOOKING Allocation)
         let remainingPayments = [...paymentHistory];
         
         const servicesWithExplicitPayments = services.map(s => {
@@ -2232,8 +2511,12 @@ const UpcomingBookings = () => {
           let sPaid = 0;
           
           remainingPayments = remainingPayments.filter(p => {
-            // ONLY match by exact service ID - never by name (services can share names!)
-            if (sId && p.serviceId && p.serviceId === sId) {
+            // Match by serviceId AND ensure payment belongs to this booking
+            // This prevents cross-booking payment matching when services share IDs
+            const matchesServiceId = sId && p.serviceId && p.serviceId === sId;
+            const matchesBooking = !p.bookingId || p.bookingId === booking.id;
+            
+            if (matchesServiceId && matchesBooking) {
               sPaid += parseFloat(p.amount || 0);
               return false;
             }
@@ -2650,6 +2933,7 @@ const UpcomingBookings = () => {
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
   const [notificationType, setNotificationType] = useState('success');
+  const [serviceFormError, setServiceFormError] = useState('');
   
   const handleQuickFilterJump = (targetFilter) => {
     setTimeFilter(targetFilter);
@@ -3147,7 +3431,17 @@ useEffect(() => {
   // Helper function to format long date
   const formatLongDate = (dateStr) => {
     if (!dateStr) return '';
-    const date = new Date(dateStr);
+    
+    // Handle Firestore Timestamp objects
+    const dateValue = dateStr?.toDate?.() || dateStr;
+    const date = new Date(dateValue);
+    
+    // Check for invalid date
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date encountered:', dateStr);
+      return ''; // Return empty string instead of "Invalid Date"
+    }
+    
     return date.toLocaleDateString(language === 'en' ? 'en-GB' : 'ro-RO', {
       day: '2-digit',
       month: '2-digit',
@@ -3209,7 +3503,7 @@ useEffect(() => {
     setShowNotification(true);
     setTimeout(() => {
       setShowNotification(false);
-    }, 3000);
+    }, type === 'error' ? 5000 : 3000);
   };
 
   const handleDownloadReceipt = (service) => {
@@ -3365,6 +3659,11 @@ const showBottomSheetWithContent = (content, item, secondaryItem = null) => {
   // Set state immediately - don't use setTimeout delays
   setBottomSheetContent(content);
   setSelectedItem(item);
+  
+  // Clear any previous service form errors when opening add-service
+  if (content === 'add-service') {
+    setServiceFormError('');
+  }
   
   if (content === 'edit-payment') {
     setSelectedPayment(secondaryItem);
@@ -3808,10 +4107,12 @@ const renderMainContent = (filteredClients) => {
         {bottomSheetContent === 'add-service' && selectedItem && (
           <div className="bg-white">
             <ServiceSelectionPanel 
-              onServiceAdded={handleServiceSelectionAdd}  
+              onServiceAdded={handleServiceSelectionAdd}
               onCancel={closeBottomSheet}
               userCompanyId={userCompanyId}
               t={t}
+              formError={serviceFormError}
+              bookings={selectedItem.bookings || []}
             />
           </div>
         )}
@@ -3971,8 +4272,9 @@ const renderMainContent = (filteredClients) => {
       return false;
     }
     
-    // Show confirmation dialog
-    if (!window.confirm(`${t.deleteServiceConfirm} "${service.name}"?`)) {
+    // Show confirmation dialog - use safeRender for multilingual service names
+    const serviceName = safeRender(service.name || service.type || 'service');
+    if (!window.confirm(`${t.deleteServiceConfirm} "${serviceName}"?`)) {
       return false;
     }
     
@@ -4431,13 +4733,35 @@ const renderMainContent = (filteredClients) => {
       console.error("Missing client or service data");
       return false;
     }
+
+    const isWithinBooking = (service, booking) => {
+      if (!service || !booking) return true;
+      const checkIn = booking.checkIn ? new Date(booking.checkIn) : null;
+      const checkOut = booking.checkOut ? new Date(booking.checkOut) : null;
+      if (!checkIn || !checkOut) return true;
+      const start = new Date(service.startDate || service.date);
+      const end = new Date(service.endDate || service.startDate || service.date || start);
+      if (Number.isNaN(start) || Number.isNaN(end)) return true;
+      [start, end, checkIn, checkOut].forEach(d => d.setHours(0, 0, 0, 0));
+      return start >= checkIn && end <= checkOut;
+    };
     
-    // Find the most recent booking
+    // Find the target booking - use the one specified by the user, or fall back to most recent
     let targetBooking = null;
     if (client.bookings.length > 0) {
-      targetBooking = [...client.bookings].sort((a, b) => {
-        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
-      })[0];
+      // If service has a targetBookingId (user selected a specific booking), use that
+      if (serviceData.targetBookingId) {
+        targetBooking = client.bookings.find(b => b.id === serviceData.targetBookingId);
+        if (!targetBooking) {
+          console.warn("Specified booking not found, falling back to most recent");
+        }
+      }
+      // Fall back to most recent booking if no specific booking was selected or found
+      if (!targetBooking) {
+        targetBooking = [...client.bookings].sort((a, b) => {
+          return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        })[0];
+      }
     } else {
       showNotificationMessage(t.noBookingFound || "No booking found for this client", "error");
       return false;
@@ -4458,11 +4782,20 @@ const renderMainContent = (filteredClients) => {
       if (bookingData.companyId !== userCompanyId) {
         throw new Error(t.notAuthorizedToModify || 'You are not authorized to modify this booking');
       }
+
+      // Guard: service dates must be within booking window
+      if (!isWithinBooking(serviceData, bookingData)) {
+        const msg = t.serviceOutsideBooking || 'Service dates must stay within the booking period.';
+        setServiceFormError(msg);
+        return false;
+      }
       
       const currentDate = new Date();
+      // CRITICAL: Always generate unique ID and include bookingId to prevent cross-booking issues
       const preparedService = {
         ...serviceData,
-        id: serviceData.type + '_' + Date.now(),
+        id: serviceData.type + '_' + Date.now() + '_' + Math.floor(Math.random() * 1e6),
+        bookingId: targetBooking.id, // Link service to specific booking
         createdAt: currentDate,
         companyId: userCompanyId,
         status: serviceData.status || 'confirmed',
@@ -4635,23 +4968,25 @@ const renderMainContent = (filteredClients) => {
   };
   
   // Handle add service from selection panel
- async function handleServiceSelectionAdd(service) {
-  if (!selectedItem) {
-    showNotificationMessage(t.noClientSelected || 'No client selected', 'error');
-    return;
-  }
+  async function handleServiceSelectionAdd(service) {
+    if (!selectedItem) {
+      showNotificationMessage(t.noClientSelected || 'No client selected', 'error');
+      return;
+    }
   
   try {
-    // Call the enhanced service add function
     const success = await handleQuickServiceAdd(selectedItem, service);
     
     if (success) {
+      setServiceFormError('');
       showNotificationMessage(t.serviceAddedSuccess || 'Service added successfully');
       closeBottomSheet();
+    } else if (!success) {
+      // keep modal open; any specific error should already be set
     }
   } catch (err) {
     console.error('Error adding service:', err);
-    showNotificationMessage(err.message || t.failedAddService || 'Failed to add service', 'error');
+    setServiceFormError(err.message || t.failedAddService || 'Failed to add service');
   }
 }
 
@@ -4789,15 +5124,18 @@ async function handleShoppingFormSubmit(shoppingExpense) {
       const services = Array.isArray(bookingData.services) ? [...bookingData.services] : [];
       let remainingPayments = [...paymentHistory];
       
-      // STRICT ID-ONLY matching - NO name matching (services can share names!)
+      // STRICT ID + BOOKING matching - NO name matching (services can share names!)
       const servicesWithExplicitPayments = services.map(s => {
         const sId = s.id || null;
         const sTotal = (parseFloat(s.price || 0) * parseInt(s.quantity || 1));
         
         let sPaid = 0;
         remainingPayments = remainingPayments.filter(p => {
-          // ONLY match by exact service ID - never by name
-          if (sId && p.serviceId && p.serviceId === sId) {
+          // Match by serviceId AND ensure payment belongs to this booking
+          const matchesServiceId = sId && p.serviceId && p.serviceId === sId;
+          const matchesBooking = !p.bookingId || p.bookingId === targetBooking.id;
+          
+          if (matchesServiceId && matchesBooking) {
             sPaid += parseFloat(p.amount || 0);
             return false; // Remove from pool so it's not double-counted
           }
@@ -5834,6 +6172,8 @@ async function handleShoppingFormSubmit(shoppingExpense) {
               onCancel={closeBottomSheet}
               userCompanyId={userCompanyId}
               t={t}
+              formError={serviceFormError}
+              bookings={selectedItem.bookings || []}
             />
           </div>
         )}
@@ -5960,9 +6300,9 @@ async function handleShoppingFormSubmit(shoppingExpense) {
   </BottomSheetPortal>
 )}
       
-      {/* Enhanced Toast Notification */}
+      {/* Enhanced Toast Notification - fixed top so it's always visible over modals */}
       {showNotification && (
-        <div className={`fixed bottom-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-md shadow-lg z-50 animate-fade-in-up flex items-center ${
+        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-md shadow-xl z-[120] animate-fade-in-up flex items-center max-w-md text-sm sm:text-base ${
           notificationType === 'success' ? 'bg-green-600 text-white' : 
           notificationType === 'error' ? 'bg-red-600 text-white' : 
           'bg-yellow-600 text-white'

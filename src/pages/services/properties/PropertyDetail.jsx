@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useDatabase } from '../../../context/DatabaseContext';
 import { 
-  doc, getDoc, deleteDoc, 
+  doc, getDoc, deleteDoc, updateDoc,
   collection, query, where, getDocs 
 } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 function PropertyDetail() {
   const { id } = useParams();
@@ -17,6 +18,7 @@ function PropertyDetail() {
   const [error, setError] = useState(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [showOwnerInfo, setShowOwnerInfo] = useState(false);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
   
   // Direct language handling
   const [language, setLanguage] = useState(() => {
@@ -182,6 +184,58 @@ function PropertyDetail() {
     
     fetchProperty();
   }, [id, t.propertyNotFound, t.errorLoadingProperty, db]);
+
+  const updatePropertyDocuments = async (newDocs) => {
+    if (!db?.firestore || !property?.id) return;
+    const docRef = doc(db.firestore, 'properties', property.id);
+    await updateDoc(docRef, { documents: newDocs });
+    setProperty(prev => ({ ...prev, documents: newDocs }));
+  };
+
+  const handleDeleteDocument = async (index) => {
+    if (!property?.documents || !property.documents[index]) return;
+    const docItem = property.documents[index];
+    const remaining = property.documents.filter((_, i) => i !== index);
+
+    try {
+      await updatePropertyDocuments(remaining);
+      if (docItem.path) {
+        const storageInstance = db?.storage || getStorage();
+        const storageRef = ref(storageInstance, docItem.path);
+        await deleteObject(storageRef);
+      }
+    } catch (err) {
+      console.error('Error deleting document:', err);
+      setError(t.errorDeletingProperty || 'Error deleting document');
+    }
+  };
+
+  const handleUploadDocument = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || file.type !== 'application/pdf') return;
+    if (!db?.firestore) return;
+
+    setIsUploadingDoc(true);
+    try {
+      const storageInstance = db?.storage || getStorage();
+      const fileName = `properties/shared/${Date.now()}_${file.name}`;
+      const storageRef = ref(storageInstance, fileName);
+      const uploadResult = await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(uploadResult.ref);
+
+      const newDocs = [
+        ...(property?.documents || []),
+        { name: file.name, url, type: file.type, path: fileName }
+      ];
+      await updatePropertyDocuments(newDocs);
+    } catch (err) {
+      console.error('Error uploading document:', err);
+      setError(t.errorDeletingProperty || 'Error uploading document');
+    } finally {
+      setIsUploadingDoc(false);
+      e.target.value = '';
+    }
+  };
   
   const handleDelete = async () => {
     if (window.confirm(t.confirmDeleteProperty)) {
@@ -403,27 +457,67 @@ function PropertyDetail() {
           </div>
           
           {/* Documents */}
-          {property.documents && property.documents.length > 0 && (
-            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">{t.documents}</h2>
+          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-3">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">{t.documents}</h2>
+              <label className="inline-flex items-center px-3 py-2 rounded-md border border-gray-200 text-gray-700 hover:border-indigo-200 hover:text-indigo-700 cursor-pointer text-sm">
+                {isUploadingDoc ? (language === 'ro' ? 'Se încarcă...' : 'Uploading...') : (language === 'ro' ? 'Încarcă PDF' : 'Upload PDF')}
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={handleUploadDocument}
+                  className="hidden"
+                  disabled={isUploadingDoc}
+                />
+              </label>
+            </div>
+            {property.documents && property.documents.length > 0 ? (
               <div className="space-y-3">
                 {property.documents.map((doc, index) => (
-                  <a 
+                  <div 
                     key={index}
-                    href={doc.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-md"
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
                   >
-                    <svg className="w-5 h-5 mr-3 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <span className="text-indigo-600 truncate">{doc.name || `${t.document} ${index + 1}`}</span>
-                  </a>
+                    <a 
+                      href={doc.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center flex-1 min-w-0"
+                    >
+                      <svg className="w-5 h-5 mr-3 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span className="text-indigo-600 truncate">{doc.name || `${t.document} ${index + 1}`}</span>
+                    </a>
+                    <button
+                      onClick={() => handleDeleteDocument(index)}
+                      className="ml-3 inline-flex items-center justify-center w-10 h-10 rounded-md border border-red-200 text-red-600 hover:text-red-700 hover:border-red-300"
+                      aria-label={t.delete}
+                      title={t.delete}
+                    >
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2" />
+                      </svg>
+                    </button>
+                  </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="text-sm text-gray-500">
+                {language === 'ro' ? 'Niciun document încărcat. Adaugă un PDF.' : 'No documents uploaded. Add a PDF.'}
+              </p>
+            )}
+          </div>
           
           {/* Type-specific details */}
           {property.type === 'villa' && property.amenities && property.amenities.length > 0 && (

@@ -2146,9 +2146,13 @@ const fetchCompanyAdminForPdf = async (companyId) => {
               }
               
               // Add this service to the included services
+              // CRITICAL: ALWAYS generate a new unique ID for each service in a booking
+              // Never reuse item.id - it can cause payment double-counting across bookings!
+              const uniqueServiceId = `${category}_${Date.now()}_${includedServices.length}_${Math.floor(Math.random() * 1e6)}`;
               includedServices.push({
                 ...item,
-                id: item.id || `${category}_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+                id: uniqueServiceId,
+                templateId: item.id || null, // Keep reference to original template ID
                 startDate: serviceStartDate,
                 endDate: serviceEndDate,
                 paymentStatus: item.paymentStatus || 'unpaid',
@@ -2169,7 +2173,7 @@ const fetchCompanyAdminForPdf = async (companyId) => {
       
       } else {
         // If services weren't explicitly selected, include all from the offer
-        offer.items.forEach(item => {
+        offer.items.forEach((item, itemIdx) => {
           // Get service dates from item or use defaults
           const serviceStartDate = item.startDate || new Date().toISOString().split('T')[0];
           const serviceEndDate = item.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -2182,14 +2186,36 @@ const fetchCompanyAdminForPdf = async (companyId) => {
             latestEndDate = serviceEndDate;
           }
           
+          // Calculate item total for payment tracking
+          const itemPrice = parseFloat(item.price || 0);
+          const itemQty = parseInt(item.quantity || 1);
+          const itemTotal = itemPrice * itemQty;
+          
+          // PRESERVE payment information from the offer item
+          const itemAmountPaid = parseFloat(item.amountPaid || 0);
+          let itemPaymentStatus = item.paymentStatus || 'unpaid';
+          
+          // Ensure paymentStatus is consistent with amountPaid
+          if (itemAmountPaid >= itemTotal && itemTotal > 0) {
+            itemPaymentStatus = 'paid';
+          } else if (itemAmountPaid > 0) {
+            itemPaymentStatus = 'partially_paid';
+          }
+          
+          // Track total paid
+          totalPaid += itemAmountPaid;
+          
+          // CRITICAL: ALWAYS generate unique ID - never reuse item.id
+          const uniqueServiceId = `${item.category || 'service'}_${Date.now()}_${itemIdx}_${Math.floor(Math.random() * 1e6)}`;
           includedServices.push({
             ...item,
-            id: item.id || `${item.category || 'service'}_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+            id: uniqueServiceId,
+            templateId: item.id || null, // Keep reference to original
             included: true,
             startDate: serviceStartDate,
             endDate: serviceEndDate,
-            paymentStatus: 'unpaid',
-            amountPaid: 0,
+            paymentStatus: itemPaymentStatus,
+            amountPaid: itemAmountPaid,
             offerId: offer.id
           });
           
@@ -2244,17 +2270,27 @@ const fetchCompanyAdminForPdf = async (companyId) => {
       const conversionPaymentDate = new Date();
       const initialPaymentHistory = includedServices
         .filter(item => (parseFloat(item.amountPaid) || 0) > 0)
-        .map((item, idx) => ({
-          id: `offer-payment-${Date.now()}-${idx}`,
-          amount: parseFloat(item.amountPaid) || 0,
-          method: 'offer-conversion',
-          notes: 'Imported from offer conversion',
-          serviceId: item.id,
-          serviceName: typeof item.name === 'object' ? getLocalizedText(item.name, language) : item.name,
-          date: conversionPaymentDate,
-          createdAt: conversionPaymentDate,
-          createdBy: currentUser.uid
-        }));
+        .map((item, idx) => {
+          // CRITICAL: Make sure the serviceId matches the service's id exactly
+          const serviceId = item.id;
+          const serviceName = typeof item.name === 'object' ? getLocalizedText(item.name, language) : item.name;
+          const paymentAmount = parseFloat(item.amountPaid) || 0;
+          
+          console.log(`Creating payment record: serviceId=${serviceId}, amount=${paymentAmount}, service=${serviceName}`);
+          
+          return {
+            id: `offer-payment-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 9)}`,
+            amount: paymentAmount,
+            method: 'offer-conversion',
+            notes: `Imported from offer conversion for ${serviceName}`,
+            serviceId: serviceId,
+            serviceName: serviceName,
+            date: conversionPaymentDate,
+            createdAt: conversionPaymentDate,
+            createdBy: currentUser.uid,
+            companyId: companyInfo.id
+          };
+        });
       
       // Save reservation to Firestore - using dates calculated from service dates
       const reservationsRef = collection(db, "reservations");
@@ -2277,10 +2313,20 @@ const fetchCompanyAdminForPdf = async (companyId) => {
         totalPaid: totalPaid,
         paidAmount: totalPaid,
         paymentStatus: overallPaymentStatus,
-        services: includedServices,
-        paymentHistory: initialPaymentHistory,
+        services: includedServices.map(s => ({ ...s, bookingId: null })), // Will be updated below
+        paymentHistory: initialPaymentHistory.map(p => ({ ...p, bookingId: null })), // Will be updated below
         lastPaymentDate: initialPaymentHistory.length ? conversionPaymentDate : null,
         lastPaymentMethod: initialPaymentHistory.length ? 'offer-conversion' : null
+      });
+      
+      // CRITICAL: Update services and payments with the booking ID to prevent cross-booking issues
+      const bookingId = docRef.id;
+      const servicesWithBookingId = includedServices.map(s => ({ ...s, bookingId }));
+      const paymentsWithBookingId = initialPaymentHistory.map(p => ({ ...p, bookingId }));
+      
+      await updateDoc(docRef, {
+        services: servicesWithBookingId,
+        paymentHistory: paymentsWithBookingId
       });
       
       // Update the offer status to 'booked'

@@ -147,8 +147,12 @@ function Villas() {
   const [isUploading, setIsUploading] = useState(false);
   const [photoFiles, setPhotoFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
-  const [brochureFile, setBrochureFile] = useState(null);
-  const [brochureUrl, setBrochureUrl] = useState('');
+const [brochureFile, setBrochureFile] = useState(null);
+const [brochureUrl, setBrochureUrl] = useState('');
+const clearBrochure = () => {
+  setBrochureFile(null);
+  setBrochureUrl('');
+};
   const [searchTerm, setSearchTerm] = useState('');
   const [priceFilter, setPriceFilter] = useState({ min: '', max: '' });
   const [bedroomFilter, setBedroomFilter] = useState('');
@@ -851,38 +855,71 @@ function Villas() {
                     </div>
                   )}
                 </div>
-                <div className="p-4 border-t flex items-center gap-3">
+                <div className="p-4 border-t flex items-center gap-3 flex-nowrap">
                   <button
                     onClick={() => {
                       setViewVilla({ ...villa, activePhotoIndex: 0 });
                       setIsDescriptionExpanded(false);
                     }}
-                    className="flex-1 btn-soft bg-white border border-gray-200 text-gray-700 hover:border-indigo-200 hover:text-indigo-700"
+                    className="flex-1 min-w-[96px] btn-soft bg-white border border-gray-200 text-gray-700 hover:border-indigo-200 hover:text-indigo-700"
                   >
                     {t.view}
-                  </button>
-                  <button
-                    onClick={() => startEditingVilla(villa)}
-                    className="flex-1 btn-soft"
-                  >
-                    {t.edit}
                   </button>
                   {villa.brochureUrl && (
                     <a
                       href={villa.brochureUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="w-9 h-9 inline-flex items-center justify-center rounded-md border border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 bg-white transition"
-                      title="Download brochure"
+                      className="inline-flex items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:text-gray-900 hover:border-gray-400 bg-white transition"
+                      style={{width: '44px', height: '44px'}}
+                      aria-label={language === 'ro' ? 'Descarcă PDF' : 'Download PDF'}
+                      title={language === 'ro' ? 'Descarcă PDF' : 'Download PDF'}
                     >
-                      ⇩
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <path d="M9 13h6" />
+                        <path d="M9 17h3" />
+                        <path d="M12 11v6" />
+                      </svg>
                     </a>
                   )}
                   <button
-                    onClick={() => handleDeleteVilla(villa.id)}
-                    className="flex-1 btn-soft btn-soft-danger"
+                    onClick={() => startEditingVilla(villa)}
+                    className="flex-1 min-w-[96px] btn-soft"
                   >
-                    {t.delete}
+                    {t.edit}
+                  </button>
+                  <button
+                    onClick={() => handleDeleteVilla(villa.id)}
+                    className="inline-flex items-center justify-center rounded-md border border-red-200 text-red-600 hover:text-red-700 hover:border-red-300 bg-white transition"
+                    style={{width: '44px', height: '44px'}}
+                    aria-label={t.delete}
+                    title={t.delete}
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6l-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2" />
+                    </svg>
                   </button>
                 </div>
               </div>
@@ -987,6 +1024,39 @@ function Villas() {
                   onChange={(e) => setBrochureFile(e.target.files?.[0] || null)}
                   className="mt-1"
                 />
+                {(brochureUrl || formData.brochureUrl) && (
+                  <div className="flex items-center justify-between mt-2 p-2 bg-gray-50 rounded border border-gray-200">
+                    <a
+                      href={brochureUrl || formData.brochureUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-indigo-600 text-sm truncate"
+                    >
+                      {language === 'ro' ? 'Deschide broșura existentă' : 'Open current brochure'}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={clearBrochure}
+                      className="inline-flex items-center justify-center w-10 h-10 rounded-md border border-red-200 text-red-600 hover:text-red-700 hover:border-red-300"
+                      aria-label={language === 'ro' ? 'Șterge broșura' : 'Remove brochure'}
+                      title={language === 'ro' ? 'Șterge broșura' : 'Remove brochure'}
+                    >
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
                 <label className="block text-sm font-medium text-gray-700 mt-2">Brochure URL (optional)</label>
                 <input
                   type="url"
@@ -1193,6 +1263,39 @@ function Villas() {
                   onChange={(e) => setBrochureFile(e.target.files?.[0] || null)}
                   className="mt-1"
                 />
+                {(brochureUrl || formData.brochureUrl) && (
+                  <div className="flex items-center justify-between mt-2 p-2 bg-gray-50 rounded border border-gray-200">
+                    <a
+                      href={brochureUrl || formData.brochureUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-indigo-600 text-sm truncate"
+                    >
+                      {language === 'ro' ? 'Deschide broșura existentă' : 'Open current brochure'}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={clearBrochure}
+                      className="inline-flex items-center justify-center w-10 h-10 rounded-md border border-red-200 text-red-600 hover:text-red-700 hover:border-red-300"
+                      aria-label={language === 'ro' ? 'Șterge broșura' : 'Remove brochure'}
+                      title={language === 'ro' ? 'Șterge broșura' : 'Remove brochure'}
+                    >
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
                 <label className="block text-sm font-medium text-gray-700 mt-2">Brochure URL (optional)</label>
                 <input
                   type="url"
