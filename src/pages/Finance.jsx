@@ -1152,7 +1152,7 @@ const Finance = () => {
   if (authChecked && !companyId) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-gray-100 p-6 text-center">
-        <div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <div className="w-12 h-12 border-4 border-rose-500 border-t-transparent rounded-full animate-spin mb-4"></div>
         <p className="text-gray-700 font-medium mb-2">{t.errorCompanyNotFound}</p>
         {error && <p className="text-gray-500 text-sm">{error}</p>}
       </div>
@@ -1181,8 +1181,8 @@ const Finance = () => {
             <h2 className="text-2xl font-semibold text-gray-900">{t.financeTitle}</h2>
             <div className="flex items-center gap-2 text-sm text-gray-600 mt-2">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
               </span>
               <span>{pendingFinance.length} {t.pendingPayments}</span>
             </div>
@@ -1249,7 +1249,7 @@ const Finance = () => {
               <p className="text-xs text-gray-500">{t.providerPayout}</p>
               <p className="text-2xl font-semibold mt-1">{formatCurrency(totalProviderCosts)}</p>
             </div>
-            <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-600 font-semibold">↧</div>
+            <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center text-rose-600 font-semibold">↧</div>
           </div>
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
@@ -1258,7 +1258,7 @@ const Finance = () => {
               <p className="text-xs text-gray-500">{t.grossProfit}</p>
               <p className="text-2xl font-semibold mt-1">{formatCurrency(grossProfit)}</p>
             </div>
-            <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-600 font-semibold">➕</div>
+            <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 font-semibold">➕</div>
           </div>
         </div>
       </div>
@@ -1277,7 +1277,7 @@ const Finance = () => {
           <div className="flex justify-between items-center">
             <div>
               <p className="text-xs text-gray-500">{t.trueProfit}</p>
-              <p className={`text-2xl font-semibold mt-1 ${trueProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`text-2xl font-semibold mt-1 ${trueProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                 {formatCurrency(trueProfit)}
               </p>
             </div>
@@ -1290,10 +1290,10 @@ const Finance = () => {
               <p className="text-xs text-gray-500">{t.pendingPayments}</p>
               <p className="text-2xl font-semibold mt-1">{pendingFinance.length}</p>
             </div>
-            <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center">
               <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
               </span>
             </div>
           </div>
@@ -1307,7 +1307,7 @@ const Finance = () => {
             <h3 className="text-lg font-semibold text-gray-900">{t.pendingPayments}</h3>
             <p className="text-sm text-gray-500">{t.pendingDotLabel}</p>
           </div>
-          <div className="text-sm bg-red-50 text-red-600 px-3 py-1 rounded-full">{pendingFinance.length} {t.pending}</div>
+          <div className="text-sm bg-rose-50 text-rose-600 px-3 py-1 rounded-full">{pendingFinance.length} {t.pending}</div>
         </div>
         {pendingFinance.length === 0 ? (
           <div className="text-center text-gray-500 py-6">{t.noPending}</div>
@@ -1323,7 +1323,7 @@ const Finance = () => {
                       <p className="text-xs text-gray-500">{item.clientName}</p>
                     )}
                   </div>
-                  <span className="h-3 w-3 rounded-full bg-red-500 mt-1"></span>
+                  <span className="h-3 w-3 rounded-full bg-rose-500 mt-1"></span>
                 </div>
                 <div className="flex items-center justify-between mt-3">
                   <div>
@@ -1344,7 +1344,7 @@ const Finance = () => {
                     onChange={(e) => setCostDrafts({...costDrafts, [item.id]: e.target.value})}
                   />
                   <button
-                    className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg"
+                    className="px-4 py-2 btn-success text-sm rounded-lg"
                     onClick={() => handleProviderCostUpdate(item.id, costDrafts[item.id])}
                     disabled={updatingRecord === item.id}
                   >
@@ -1381,7 +1381,7 @@ const Finance = () => {
               <div key={index} className="border border-gray-100 rounded-xl p-4 bg-gray-50">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold capitalize text-gray-900">{item.service}</p>
-                  <span className={`text-xs px-2 py-1 rounded-full ${item.margin >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  <span className={`text-xs px-2 py-1 rounded-full ${item.margin >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'}`}>
                     {item.margin.toFixed(1)}%
                   </span>
                 </div>
@@ -1396,7 +1396,7 @@ const Finance = () => {
                   </div>
                   <div className="flex justify-between">
                     <span>{t.profitPerService}</span>
-                    <span className={`font-semibold ${item.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <span className={`font-semibold ${item.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                       {formatCurrency(item.profit)}
                     </span>
                   </div>
@@ -1497,7 +1497,7 @@ const Finance = () => {
                 <div key={`${item.service}-${index}`} className="border border-gray-100 rounded-xl p-4 bg-gray-50">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold capitalize text-gray-900">{item.service}</p>
-                    <span className={`text-xs px-2 py-1 rounded-full ${item.margin >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    <span className={`text-xs px-2 py-1 rounded-full ${item.margin >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'}`}>
                       {item.margin.toFixed(1)}%
                     </span>
                   </div>
@@ -1512,7 +1512,7 @@ const Finance = () => {
                     </div>
                     <div className="flex justify-between">
                       <span>{t.profitPerService}</span>
-                      <span className={`font-semibold ${item.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      <span className={`font-semibold ${item.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                         {formatCurrency(item.profit)}
                       </span>
                     </div>
@@ -1681,7 +1681,7 @@ const Finance = () => {
                             €{item.amount.toLocaleString()}
                           </div>
                           <button
-                            className="text-xs text-red-600 hover:text-red-700 px-2 py-1 rounded"
+                            className="text-xs text-rose-600 hover:text-rose-600 px-2 py-1 rounded"
                             onClick={() => handleDeleteExpense(item.id)}
                             disabled={deletingExpenseId === item.id}
                           >
@@ -1874,12 +1874,12 @@ const Finance = () => {
             
             <div className="p-3 bg-blue-50 rounded-lg">
               <div className="text-sm text-gray-500">{t.netProfit}</div>
-              <div className={`text-xl font-bold mt-1 ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <div className={`text-xl font-bold mt-1 ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                 €{netProfit.toLocaleString()}
               </div>
               <div className="w-full bg-blue-100 mt-2 rounded-full h-2">
                 <div 
-                  className={`${netProfit >= 0 ? 'bg-green-600' : 'bg-red-600'} h-2 rounded-full`}
+                  className={`${netProfit >= 0 ? 'bg-emerald-600' : 'bg-rose-600'} h-2 rounded-full`}
                   style={{ width: `${totalRevenue > 0 ? Math.min(Math.abs(netProfit / totalRevenue * 100), 100) : 0}%` }}
                 ></div>
               </div>
@@ -1924,7 +1924,7 @@ const Finance = () => {
                   <div className="mt-2 pt-2 border-t border-gray-200">
                     <div className="flex justify-between items-center">
                       <div className="text-xs text-gray-500">{t.profit}</div>
-                      <div className={`font-medium ${data.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      <div className={`font-medium ${data.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                         €{data.profit.toLocaleString()}
                       </div>
                     </div>
@@ -2005,7 +2005,7 @@ const Finance = () => {
       </div>
       
       {/* Toast notification */}
-      <div className={`fixed bottom-20 left-4 right-4 bg-green-600 text-white rounded-lg px-4 py-3 shadow-lg transition-opacity duration-300 flex items-center z-20 ${toast.show ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`fixed bottom-20 left-4 right-4 btn-success rounded-lg px-4 py-3 shadow-lg transition-opacity duration-300 flex items-center z-20 ${toast.show ? 'opacity-100' : 'opacity-0'}`}>
         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
         </svg>

@@ -38,19 +38,19 @@ function safeRender(value) {
 }
 
 
-// Status colors with enhanced styling
+// Status colors - refined, premium look
 const statusColors = {
-  confirmed: { cssClass: 'bg-green-100 text-green-800 border-green-200' },
-  pending: { cssClass: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-  cancelled: { cssClass: 'bg-red-100 text-red-800 border-red-200' },
-  booked: { cssClass: 'bg-blue-100 text-blue-800 border-blue-200' }
+  confirmed: { cssClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  pending: { cssClass: 'bg-amber-50 text-amber-700 border-amber-200' },
+  cancelled: { cssClass: 'bg-slate-100 text-slate-500 border-slate-200' },
+  booked: { cssClass: 'bg-sky-50 text-sky-700 border-sky-200' }
 };
 
-// Payment status colors with enhanced styling
+// Payment status colors - softer palette (unpaid is neutral, not alarming red)
 const paymentStatusColors = {
-  paid: { cssClass: 'bg-green-100 text-green-800 border-green-200' },
-  partiallyPaid: { cssClass: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-  notPaid: { cssClass: 'bg-red-100 text-red-800 border-red-200' }
+  paid: { cssClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  partiallyPaid: { cssClass: 'bg-amber-50 text-amber-700 border-amber-200' },
+  notPaid: { cssClass: 'bg-slate-100 text-slate-500 border-slate-200' }
 };
 
 // Inline receipt strings must stay under Firestore doc size (~1MB).
@@ -58,9 +58,9 @@ const MAX_INLINE_RECEIPT_LENGTH = 900000; // ~900 KB buffer for other fields
 
 const serviceTagStyles = {
   villa: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-  villas: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  villas: 'bg-violet-50 text-violet-700 border-violet-200',
   'concierge-core': 'bg-amber-50 text-amber-700 border-amber-200',
-  cars: 'bg-red-50 text-red-700 border-red-200',
+  cars: 'bg-rose-50 text-rose-700 border-rose-200',
   boats: 'bg-blue-50 text-blue-700 border-blue-200',
   yacht: 'bg-blue-50 text-blue-700 border-blue-200',
   chefs: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -163,7 +163,7 @@ const CategoryIcon = ({ type, size = "small" }) => {
     case 'cars':
     case 'car':
       return (
-        <svg className={`${sizeClass} text-red-500`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className={`${sizeClass} text-rose-500`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
         </svg>
@@ -197,7 +197,7 @@ const PaymentIcon = ({ type, size = "small" }) => {
   switch(type) {
     case 'cash':
       return (
-        <svg className={`${sizeClass} text-green-600`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className={`${sizeClass} text-emerald-600`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
         </svg>
       );
@@ -679,7 +679,7 @@ const getServiceThumbnail = (service) => {
   const renderBookingSelection = () => (
     <div className="bg-white">
       {formError && (
-        <div className="mb-3 px-3 py-2 rounded-md border border-red-200 bg-red-50 text-red-700 text-sm flex items-center gap-2">
+        <div className="mb-3 px-3 py-2 rounded-md border border-rose-200 bg-rose-50 text-rose-600 text-sm flex items-center gap-2">
           <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
           </svg>
@@ -720,8 +720,8 @@ const getServiceThumbnail = (service) => {
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-gray-900">{accommodationName}</span>
                     {isCurrent && (
-                      <span className="px-2 py-0.5 text-xs font-bold bg-green-100 text-green-700 rounded-full">
-                        {t.currentBooking || 'CURRENT'}
+                      <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-full uppercase tracking-wide">
+                        {t.currentBooking || 'Current'}
                       </span>
                     )}
                     {isUpcoming && !isCurrent && (
@@ -773,7 +773,7 @@ const getServiceThumbnail = (service) => {
   const renderCategorySelection = () => (
     <div className="bg-white">
       {formError && (
-        <div className="mb-3 px-3 py-2 rounded-md border border-red-200 bg-red-50 text-red-700 text-sm">
+        <div className="mb-3 px-3 py-2 rounded-md border border-rose-200 bg-rose-50 text-rose-600 text-sm">
           {safeRender(formError)}
         </div>
       )}
@@ -975,7 +975,7 @@ const renderServicesList = () => (
     <div className="bg-white">
       {/* Form Error Display */}
       {formError && (
-        <div className="mb-3 px-3 py-2 rounded-md border border-red-200 bg-red-50 text-red-700 text-sm flex items-center gap-2">
+        <div className="mb-3 px-3 py-2 rounded-md border border-rose-200 bg-rose-50 text-rose-600 text-sm flex items-center gap-2">
           <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
           </svg>
@@ -1015,7 +1015,7 @@ const renderServicesList = () => (
         
         {/* Service Dates - Start and End */}
         <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-          <label className="block text-sm font-medium text-indigo-800 mb-2 flex items-center gap-2">
+          <label className="flex items-center gap-2 text-sm font-medium text-indigo-800 mb-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16" />
             </svg>
@@ -1216,7 +1216,7 @@ const renderServicesList = () => (
           )}
           
           {serviceData.paymentStatus === 'paid' && (
-            <div className="flex items-center text-sm text-green-600">
+            <div className="flex items-center text-sm text-emerald-600">
               <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
@@ -1269,7 +1269,7 @@ const renderServicesList = () => (
     <div className="bg-white">
       {/* Form Error Display */}
       {formError && (
-        <div className="mb-3 px-3 py-2 rounded-md border border-red-200 bg-red-50 text-red-700 text-sm flex items-center gap-2">
+        <div className="mb-3 px-3 py-2 rounded-md border border-rose-200 bg-rose-50 text-rose-600 text-sm flex items-center gap-2">
           <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
           </svg>
@@ -1334,7 +1334,7 @@ const renderServicesList = () => (
         
         {/* Service Dates - Start and End */}
         <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-          <label className="block text-sm font-medium text-indigo-800 mb-2 flex items-center gap-2">
+          <label className="flex items-center gap-2 text-sm font-medium text-indigo-800 mb-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16" />
             </svg>
@@ -1505,7 +1505,7 @@ const renderServicesList = () => (
       {step === 'custom' && renderCustomForm()}
       
       {error && (
-        <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-md">
+        <div className="mt-4 p-3 bg-rose-50 text-rose-600 rounded-md">
           {error}
         </div>
       )}
@@ -1808,7 +1808,7 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
           )}
           
           {shoppingData.paymentStatus === 'paid' && (
-            <div className="flex items-center text-sm text-green-600 mb-4">
+            <div className="flex items-center text-sm text-emerald-600 mb-4">
               <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
@@ -1852,7 +1852,7 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
               <button
                 type="button"
                 onClick={() => handleReceiptChange(null)}
-                className="text-red-600 hover:text-red-700 text-xs font-medium"
+                className="text-rose-600 hover:text-rose-700 text-xs font-medium"
               >
                 {t.remove || 'Remove'}
               </button>
@@ -1874,7 +1874,7 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
         </div>
         
         {error && (
-          <div className="p-3 bg-red-100 text-red-700 rounded-md">
+          <div className="p-3 bg-rose-50 text-rose-600 rounded-md">
             {error}
           </div>
         )}
@@ -2125,17 +2125,17 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
   
   const getPaymentStatusBadgeClass = (status) => {
     const paymentStatusColors = {
-      paid: { cssClass: 'bg-green-100 text-green-800 border-green-200' },
-      partiallyPaid: { cssClass: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-      notPaid: { cssClass: 'bg-red-100 text-red-800 border-red-200' }
+      paid: { cssClass: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+      partiallyPaid: { cssClass: 'bg-amber-50 text-amber-700 border-amber-200' },
+      notPaid: { cssClass: 'bg-slate-100 text-slate-500 border-slate-200' }
     };
-    return paymentStatusColors[status]?.cssClass || 'bg-gray-100 text-gray-800';
+    return paymentStatusColors[status]?.cssClass || 'bg-slate-100 text-slate-500';
   };
   
   const getBorderColorClass = (status) => {
-    if (status === 'paid') return 'border-green-500';
-    if (status === 'partiallyPaid') return 'border-yellow-500';
-    return 'border-red-500';
+    if (status === 'paid') return 'border-emerald-400';
+    if (status === 'partiallyPaid') return 'border-amber-400';
+    return 'border-slate-300';
   };
   
   return (
@@ -2145,9 +2145,9 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
         <div className="flex justify-between">
           <div className="flex items-center flex-1 min-w-0">
             <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-white text-sm font-semibold ${
-              client.paymentStatus === 'paid' ? 'bg-green-500' : 
-              client.paymentStatus === 'partiallyPaid' ? 'bg-yellow-500' : 
-              'bg-red-500'
+              client.paymentStatus === 'paid' ? 'bg-emerald-500' : 
+              client.paymentStatus === 'partiallyPaid' ? 'bg-amber-500' : 
+              'bg-slate-400'
             }`}>
               {getClientInitials(client.clientName)}
             </div>
@@ -2178,7 +2178,7 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
           <div className="text-right">
             <div className="text-lg font-bold">{client.totalValue.toLocaleString()} €</div>
             {client.paymentStatus !== 'paid' && (
-              <div className="text-xs text-red-600 font-medium mt-1">
+              <div className="text-xs text-rose-600 font-medium mt-1">
                 {getDaysLeft(earliestBooking.checkIn)}
               </div>
             )}
@@ -2201,10 +2201,10 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div 
-                className={`h-2 rounded-full ${
-                  client.paidAmount >= client.totalValue ? 'bg-green-500' : 
-                  client.paidAmount > 0 ? 'bg-yellow-500' : 
-                  'bg-red-500'
+                className={`h-2 rounded-full transition-all duration-500 ${
+                  client.paidAmount >= client.totalValue ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' : 
+                  client.paidAmount > 0 ? 'bg-gradient-to-r from-amber-500 to-amber-400' : 
+                  'bg-slate-300'
                 }`}
                 style={{ width: `${Math.min(100, (client.paidAmount / client.totalValue) * 100)}%` }}
               ></div>
@@ -2342,10 +2342,10 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
   </button>
   
   <button 
-    className={`flex flex-col items-center justify-center py-3 transition-colors active:bg-gray-200 ${
+    className={`flex flex-col items-center justify-center py-3 transition-colors active:bg-slate-100 ${
       client.paymentStatus === 'paid' 
-        ? 'text-green-700 bg-green-50'
-        : 'text-gray-700 hover:bg-gray-100'
+        ? 'text-emerald-700 bg-emerald-50'
+        : 'text-slate-600 hover:bg-slate-50'
     }`}
     onClick={(e) => {
       e.preventDefault();
@@ -3096,13 +3096,13 @@ useEffect(() => {
   };
   
   const getPaymentStatusBadgeClass = (status) => {
-    return paymentStatusColors[status]?.cssClass || 'bg-gray-100 text-gray-800';
+    return paymentStatusColors[status]?.cssClass || 'bg-slate-100 text-slate-500';
   };
   
   const getBorderColorClass = (status) => {
-    if (status === 'paid') return 'border-green-500';
-    if (status === 'partiallyPaid') return 'border-yellow-500';
-    return 'border-red-500';
+    if (status === 'paid') return 'border-emerald-400';
+    if (status === 'partiallyPaid') return 'border-amber-400';
+    return 'border-slate-300';
   };
   
   // 1. USER AUTHENTICATION AND COMPANY ASSOCIATION
@@ -3994,8 +3994,8 @@ const renderMainContent = (filteredClients) => {
               <button 
                 className={`py-3 rounded-lg font-medium ${
                   selectedItem.paymentStatus === 'paid'
-                    ? 'bg-gray-200 text-gray-500'
-                    : 'bg-green-500 text-white hover:bg-green-600'
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    : 'btn-success'
                 }`}
                 onClick={() => {
                   closeBottomSheet();
@@ -4026,12 +4026,15 @@ const renderMainContent = (filteredClients) => {
                     </h2>
                     
                     {isAlreadyFullyPaid ? (
-                      <div className="mt-3 p-3 bg-green-100 border border-green-300 rounded-lg">
-                        <p className="text-green-700 font-bold text-lg">✅ {t.alreadyFullyPaid || 'Already Fully Paid!'}</p>
-                        <p className="text-green-600 text-sm mt-1">{t.noPaymentNeeded || 'No additional payment is needed for this booking.'}</p>
+                      <div className="mt-3 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+                        <p className="text-emerald-700 font-semibold text-lg flex items-center gap-2">
+                          <span className="w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center text-white text-xs">✓</span>
+                          {t.alreadyFullyPaid || 'Already Fully Paid!'}
+                        </p>
+                        <p className="text-emerald-600 text-sm mt-1 ml-7">{t.noPaymentNeeded || 'No additional payment is needed for this booking.'}</p>
                       </div>
                     ) : (
-                      <p className="text-red-600 font-bold text-xl">
+                      <p className="text-rose-600 font-bold text-xl">
                         {t.amountDue || 'Due'}: {paymentContext.due.toLocaleString()} €
                       </p>
                     )}
@@ -4079,7 +4082,7 @@ const renderMainContent = (filteredClients) => {
                         <button
                           onClick={() => handleQuickPayment(selectedItem, paymentData.amount)}
                           disabled={!paymentData.amount || paymentData.amount <= 0 || isProcessingPayment}
-                          className="flex-2 py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium"
+                          className="flex-2 py-3 btn-success disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none rounded-xl font-semibold"
                         >
                           {isProcessingPayment ? (t.processing || 'Processing...') : (t.completePayment || 'Complete Payment')}
                         </button>
@@ -5572,7 +5575,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                       setDateFilterEnd('');
                       setTimeFilter('active');
                     }}
-                    className="px-3 py-2.5 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                    className="px-3 py-2.5 text-sm bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors font-medium"
                   >
                     {t.clearFilter}
                   </button>
@@ -5744,10 +5747,10 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                           
                           const status = due <= 0 ? 'paid' : (paid > 0 ? 'partial' : 'unpaid');
                           const statusStyles = status === 'paid'
-                            ? 'bg-green-100 text-green-800 border-green-200'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                             : status === 'partial'
-                              ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
-                              : 'bg-red-100 text-red-800 border-red-200';
+                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : 'bg-slate-100 text-slate-500 border-slate-200';
                           
                           const statusLabel = status === 'paid' ? (t.paid || 'Paid') : (status === 'partial' ? (t.partiallyPaid || 'Partially Paid') : (t.notPaid || 'Not Paid'));
 
@@ -5763,11 +5766,11 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                           const isTomorrow = serviceStartDate.getTime() === tomorrow.getTime();
                           const isPast = serviceStartDate < today;
                           
-                          // Determine card styling based on urgency
+                          // Determine card styling based on urgency - refined premium look
                           const urgencyBorder = isToday 
-                            ? 'border-l-4 border-l-red-500 border-red-200 bg-red-50/30' 
+                            ? 'border-l-4 border-l-rose-400 border-rose-100 bg-gradient-to-r from-rose-50/80 to-white' 
                             : isTomorrow 
-                              ? 'border-l-4 border-l-orange-400 border-orange-200 bg-orange-50/30' 
+                              ? 'border-l-4 border-l-amber-400 border-amber-100 bg-gradient-to-r from-amber-50/80 to-white' 
                               : isPast
                                 ? 'border-l-4 border-l-gray-300 bg-gray-50/50 opacity-75'
                                 : 'border-gray-100 bg-gray-50/50';
@@ -5776,9 +5779,9 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                             <div key={sIdx} className={`p-3 border rounded-lg hover:bg-white hover:border-blue-200 transition-all group ${urgencyBorder}`}>
                               {/* Urgency indicator badge */}
                               {(isToday || isTomorrow) && (
-                                <div className={`text-[9px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1 ${isToday ? 'text-red-600' : 'text-orange-600'}`}>
-                                  <span className={`w-2 h-2 rounded-full ${isToday ? 'bg-red-500 animate-pulse' : 'bg-orange-400'}`}></span>
-                                  {isToday ? '🔴 TODAY' : '🟠 TOMORROW'}
+                                <div className={`text-[10px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5 ${isToday ? 'text-rose-600' : 'text-amber-600'}`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${isToday ? 'bg-rose-500 animate-pulse' : 'bg-amber-400'}`}></span>
+                                  {isToday ? 'Today' : 'Tomorrow'}
                                 </div>
                               )}
                               
@@ -5792,7 +5795,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                                     </svg>
                                     {service.startDate && service.endDate ? (
                                       <>
-                                        <span className={`font-medium ${isToday ? 'text-red-600' : isTomorrow ? 'text-orange-600' : 'text-indigo-600'}`}>{formatShortDate(service.startDate)}</span>
+                                        <span className={`font-medium ${isToday ? 'text-rose-600' : isTomorrow ? 'text-orange-600' : 'text-indigo-600'}`}>{formatShortDate(service.startDate)}</span>
                                         <span className="text-gray-400">→</span>
                                         <span className="font-medium text-indigo-600">{formatShortDate(service.endDate)}</span>
                                         {(() => {
@@ -5807,7 +5810,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                                         })()}
                                       </>
                                     ) : service.startDate ? (
-                                      <span className={`font-medium ${isToday ? 'text-red-600' : isTomorrow ? 'text-orange-600' : 'text-indigo-600'}`}>{formatShortDate(service.startDate)}</span>
+                                      <span className={`font-medium ${isToday ? 'text-rose-600' : isTomorrow ? 'text-orange-600' : 'text-indigo-600'}`}>{formatShortDate(service.startDate)}</span>
                                     ) : (
                                       <span>{formatShortDate(service.date)}</span>
                                     )}
@@ -5822,8 +5825,8 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                               </div>
 
                               <div className="flex justify-between items-center text-[10px] border-t border-gray-100 pt-2 mt-2">
-                                <span className="text-gray-500">{t.paid || 'Paid'}: <span className="text-green-700 font-bold">{paid.toLocaleString()} €</span></span>
-                                <span className={due <= 0 ? 'text-green-700 font-bold' : 'text-red-600 font-bold'}>
+                                <span className="text-gray-500">{t.paid || 'Paid'}: <span className="text-emerald-700 font-bold">{paid.toLocaleString()} €</span></span>
+                                <span className={due <= 0 ? 'text-emerald-700 font-bold' : 'text-rose-600 font-bold'}>
                                   {t.amountDue || 'Due'}: {due.toLocaleString()} €
                                 </span>
                               </div>
@@ -5881,7 +5884,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                       {t.editDates || 'Edit Dates'}
                     </button>
                     <button 
-                      className="py-1.5 px-3 text-red-600 rounded text-[10px] font-bold hover:bg-red-50 uppercase tracking-tight flex items-center gap-1 transition-colors"
+                      className="py-1.5 px-3 text-rose-600 rounded-lg text-[10px] font-semibold hover:bg-rose-50 uppercase tracking-wide flex items-center gap-1 transition-colors"
                       onClick={() => handleDeleteBooking(selectedItem, booking)}
                     >
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5911,7 +5914,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                       const { total, paid, due } = getServicePaymentInfo(service, selectedItem.paymentHistory || [], safeRender);
                       
                       const status = due <= 0 ? 'paid' : (paid > 0 ? 'partial' : 'unpaid');
-                      const statusStyles = status === 'paid' ? 'bg-green-100 text-green-800 border-green-200' : (status === 'partial' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : 'bg-red-100 text-red-800 border-red-200');
+                      const statusStyles = status === 'paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : (status === 'partial' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-100 text-slate-500 border-slate-200');
                       const statusLabel = status === 'paid' ? (t.paid || 'Paid') : (status === 'partial' ? (t.partiallyPaid || 'Partially Paid') : (t.notPaid || 'Not Paid'));
 
                       return (
@@ -5987,10 +5990,10 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                       </div>
                     </div>
                   ))}
-                  <div className="p-3 bg-green-50 rounded-xl border border-green-100 mt-4 shadow-sm">
+                  <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 mt-4 shadow-sm">
                     <div className="flex justify-between items-center">
-                      <span className="font-bold text-green-800 text-sm uppercase tracking-wide">{t.paymentsTotal || 'Total Paid'}:</span>
-                      <span className="font-black text-green-800 text-lg">{selectedItem.paidAmount.toLocaleString()} €</span>
+                      <span className="font-semibold text-emerald-700 text-sm uppercase tracking-wide">{t.paymentsTotal || 'Total Paid'}:</span>
+                      <span className="font-black text-emerald-700 text-lg">{selectedItem.paidAmount.toLocaleString()} €</span>
                     </div>
                   </div>
                 </div>
@@ -6000,7 +6003,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
             {/* Action Buttons */}
             <div className="grid grid-cols-2 gap-3 pt-4 border-t sticky bottom-0 bg-white pb-2">
               <button 
-                className="py-3 bg-blue-600 text-white rounded-xl font-bold shadow-md hover:bg-blue-700 active:transform active:scale-95 transition-all"
+                className="py-3 btn-primary rounded-xl font-semibold active:scale-[0.98] transition-all"
                 onClick={() => {
                   closeBottomSheet();
                   setTimeout(() => openAddServiceModal(selectedItem), 300);
@@ -6009,10 +6012,10 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                 {t.addService || 'Add Service'}
               </button>
               <button 
-                className={`py-3 rounded-xl font-bold shadow-md active:transform active:scale-95 transition-all ${
+                className={`py-3 rounded-xl font-semibold active:scale-[0.98] transition-all ${
                   selectedItem.paymentStatus === 'paid'
-                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed shadow-none'
-                    : 'bg-green-600 text-white hover:bg-green-700'
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                    : 'btn-success'
                 }`}
                 onClick={() => {
                   if (selectedItem.paymentStatus !== 'paid') {
@@ -6039,12 +6042,12 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                 <h2 className="text-lg font-semibold text-gray-900">{t.client || 'Client'}: {safeRender(selectedItem.clientName)}</h2>
                 
                 {isAlreadyFullyPaid ? (
-                  <div className="mt-3 p-3 bg-green-100 border border-green-300 rounded-lg">
-                    <p className="text-green-700 font-bold text-lg">✅ {t.alreadyFullyPaid || 'Already Fully Paid!'}</p>
-                    <p className="text-green-600 text-sm mt-1">{t.noPaymentNeeded || 'No additional payment is needed.'}</p>
+                  <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                    <p className="text-emerald-700 font-bold text-lg">✅ {t.alreadyFullyPaid || 'Already Fully Paid!'}</p>
+                    <p className="text-emerald-600 text-sm mt-1">{t.noPaymentNeeded || 'No additional payment is needed.'}</p>
                   </div>
                 ) : (
-                  <p className="text-red-600 font-bold text-xl">{t.amountDue || 'Due'}: {clientDue.toLocaleString()} €</p>
+                  <p className="text-rose-600 font-bold text-xl">{t.amountDue || 'Due'}: {clientDue.toLocaleString()} €</p>
                 )}
               </div>
 
@@ -6135,14 +6138,14 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                   <div className="flex gap-3">
                     <button
                       onClick={closeBottomSheet}
-                      className="flex-1 py-3 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300"
+                      className="flex-1 py-3 btn-ghost rounded-xl font-medium"
                     >
                       {t.cancel || 'Cancel'}
                     </button>
                     <button
                       onClick={() => handleQuickPayment(selectedItem, paymentData.amount)}
                       disabled={!paymentData.amount || paymentData.amount <= 0 || isProcessingPayment}
-                      className="flex-2 py-3 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg font-medium"
+                      className="flex-2 py-3 btn-success disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:shadow-none rounded-xl font-semibold"
                     >
                       {isProcessingPayment ? (t.processing || 'Processing...') : (t.completePayment || 'Complete Payment')}
                     </button>
@@ -6274,7 +6277,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
             </div>
             
             <button
-              className="w-full py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium"
+              className="w-full py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-lg font-medium"
               onClick={() => handleDeleteService(selectedItem, selectedService)}
             >
               {t.deleteService || 'Delete Service'}
@@ -6303,8 +6306,8 @@ async function handleShoppingFormSubmit(shoppingExpense) {
       {/* Enhanced Toast Notification - fixed top so it's always visible over modals */}
       {showNotification && (
         <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-md shadow-xl z-[120] animate-fade-in-up flex items-center max-w-md text-sm sm:text-base ${
-          notificationType === 'success' ? 'bg-green-600 text-white' : 
-          notificationType === 'error' ? 'bg-red-600 text-white' : 
+          notificationType === 'success' ? 'bg-emerald-600 text-white' : 
+          notificationType === 'error' ? 'bg-rose-600 text-white' : 
           'bg-yellow-600 text-white'
         }`}>
           {notificationType === 'success' && (

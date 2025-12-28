@@ -768,7 +768,7 @@ const clearBrochure = () => {
     <div className="p-4">
       {/* Success Message Popup */}
       {successMessage && (
-        <div className="fixed top-5 right-5 bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg z-50 animate-slide-in flex items-center gap-2">
+        <div className="fixed top-5 right-5 bg-emerald-500 text-white px-6 py-4 rounded-lg shadow-lg z-50 animate-slide-in flex items-center gap-2">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
@@ -902,7 +902,7 @@ const clearBrochure = () => {
                   </button>
                   <button
                     onClick={() => handleDeleteVilla(villa.id)}
-                    className="inline-flex items-center justify-center rounded-md border border-red-200 text-red-600 hover:text-red-700 hover:border-red-300 bg-white transition"
+                    className="inline-flex items-center justify-center rounded-md border border-rose-200 text-rose-600 hover:text-rose-700 hover:border-rose-300 bg-white transition"
                     style={{width: '44px', height: '44px'}}
                     aria-label={t.delete}
                     title={t.delete}
@@ -1007,7 +1007,7 @@ const clearBrochure = () => {
                         </div>
                       </div>
                       <div className="text-right mt-2">
-                        <button type="button" onClick={() => removePriceConfiguration(index)} className="text-red-600 text-sm">Remove</button>
+                        <button type="button" onClick={() => removePriceConfiguration(index)} className="text-rose-600 text-sm">Remove</button>
                       </div>
                     </div>
                   ))}
@@ -1037,7 +1037,7 @@ const clearBrochure = () => {
                     <button
                       type="button"
                       onClick={clearBrochure}
-                      className="inline-flex items-center justify-center w-10 h-10 rounded-md border border-red-200 text-red-600 hover:text-red-700 hover:border-red-300"
+                      className="inline-flex items-center justify-center w-10 h-10 rounded-md border border-rose-200 text-rose-600 hover:text-rose-700 hover:border-rose-300"
                       aria-label={language === 'ro' ? 'Șterge broșura' : 'Remove brochure'}
                       title={language === 'ro' ? 'Șterge broșura' : 'Remove brochure'}
                     >
@@ -1066,7 +1066,7 @@ const clearBrochure = () => {
                   placeholder="https://..."
                 />
                 {brochureUrl && (
-                  <div className="text-sm text-green-700 mt-1">
+                  <div className="text-sm text-emerald-600 mt-1">
                     Brochure link saved
                   </div>
                 )}
@@ -1168,7 +1168,7 @@ const clearBrochure = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      Owner Name <span className="text-red-500">*</span>
+                      Owner Name <span className="text-rose-500">*</span>
                     </label>
                     <input
                       name="owner_name"
@@ -1179,7 +1179,7 @@ const clearBrochure = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      Owner Email <span className="text-red-500">*</span>
+                      Owner Email <span className="text-rose-500">*</span>
                     </label>
                     <input
                       name="owner_email"
@@ -1190,7 +1190,7 @@ const clearBrochure = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      Owner Phone <span className="text-red-500">*</span>
+                      Owner Phone <span className="text-rose-500">*</span>
                     </label>
                     <input
                       name="owner_phone"
@@ -1246,7 +1246,7 @@ const clearBrochure = () => {
                         </div>
                       </div>
                       <div className="text-right mt-2">
-                        <button type="button" onClick={() => removePriceConfiguration(index)} className="text-red-600 text-sm">Remove</button>
+                        <button type="button" onClick={() => removePriceConfiguration(index)} className="text-rose-600 text-sm">Remove</button>
                       </div>
                     </div>
                   ))}
@@ -1276,7 +1276,7 @@ const clearBrochure = () => {
                     <button
                       type="button"
                       onClick={clearBrochure}
-                      className="inline-flex items-center justify-center w-10 h-10 rounded-md border border-red-200 text-red-600 hover:text-red-700 hover:border-red-300"
+                      className="inline-flex items-center justify-center w-10 h-10 rounded-md border border-rose-200 text-rose-600 hover:text-rose-700 hover:border-rose-300"
                       aria-label={language === 'ro' ? 'Șterge broșura' : 'Remove brochure'}
                       title={language === 'ro' ? 'Șterge broșura' : 'Remove brochure'}
                     >
@@ -1305,7 +1305,7 @@ const clearBrochure = () => {
                   placeholder="https://..."
                 />
                 {brochureUrl && (
-                  <div className="text-sm text-green-700 mt-1">
+                  <div className="text-sm text-emerald-600 mt-1">
                     Brochure link saved
                   </div>
                 )}

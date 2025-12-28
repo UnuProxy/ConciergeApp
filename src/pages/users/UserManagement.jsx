@@ -437,13 +437,13 @@ function UserManagement() {
       
       {/* Error and Success messages */}
       {error && (
-        <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4">
+        <div className="bg-rose-50 text-rose-600 p-3 rounded-md mb-4">
           {error}
         </div>
       )}
       
       {success && (
-        <div className="bg-green-100 text-green-700 p-3 rounded-md mb-4">
+        <div className="bg-emerald-50 text-emerald-700 p-3 rounded-md mb-4">
           {success}
         </div>
       )}
@@ -483,7 +483,7 @@ function UserManagement() {
                 }`}
               />
               {formErrors.email ? (
-                <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>
+                <p className="text-rose-500 text-sm mt-1">{formErrors.email}</p>
               ) : (
                 <p className="text-gray-500 text-sm mt-1">{t.emailInstructions}</p>
               )}

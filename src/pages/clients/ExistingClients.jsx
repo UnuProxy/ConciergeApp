@@ -3765,7 +3765,7 @@ const getUserName = async (userId) => {
     }
     
     if (status === 'active') {
-      return <span className="inline-block px-2 py-1 text-xs font-medium uppercase rounded bg-green-100 text-green-800">{t.filterActive}</span>;
+      return <span className="inline-block px-2 py-1 text-xs font-medium uppercase rounded bg-emerald-50 text-emerald-700">{t.filterActive}</span>;
     } else {
       return <span className="inline-block px-2 py-1 text-xs font-medium uppercase rounded bg-gray-100 text-gray-700">{t.filterInactive}</span>;
     }
@@ -3774,11 +3774,11 @@ const getUserName = async (userId) => {
   // Render offer status badge
   const renderOfferStatusBadge = (status) => {
     if (status === 'accepted') {
-      return <span className="inline-block px-2 py-1 text-xs font-medium uppercase rounded bg-green-100 text-green-800">{status.toUpperCase()}</span>;
+      return <span className="inline-block px-2 py-1 text-xs font-medium uppercase rounded bg-emerald-50 text-emerald-700">{status.toUpperCase()}</span>;
     } else if (status === 'declined') {
-      return <span className="inline-block px-2 py-1 text-xs font-medium uppercase rounded bg-red-100 text-red-800">{status.toUpperCase()}</span>;
+      return <span className="inline-block px-2 py-1 text-xs font-medium uppercase rounded bg-slate-100 text-slate-500">{status.toUpperCase()}</span>;
     } else if (status === 'booked') {
-      return <span className="inline-block px-2 py-1 text-xs font-medium uppercase rounded bg-green-700 text-white">BOOKED</span>;
+      return <span className="inline-block px-2 py-1 text-xs font-medium uppercase rounded bg-emerald-600 text-white">BOOKED</span>;
     } else {
       return <span className="inline-block px-2 py-1 text-xs font-medium uppercase rounded bg-amber-100 text-amber-800">{status.toUpperCase()}</span>;
     }
@@ -3867,7 +3867,7 @@ const getUserName = async (userId) => {
             <div className="text-xs text-gray-400 mt-1">No image available</div>
           )}
           {service.imageUrl && imageErrors[service.id] && (
-            <div className="text-xs text-red-400 mt-1">Image failed to load</div>
+            <div className="text-xs text-rose-400 mt-1">Image failed to load</div>
           )}
         </div>
       </div>
@@ -4144,7 +4144,7 @@ const getUserName = async (userId) => {
       
       {/* Error message */}
       {(error || contextError) && (
-        <div className="bg-red-100 text-red-700 p-3 rounded-md mb-6">
+        <div className="bg-rose-50 text-rose-600 p-3 rounded-md mb-6">
           {error || contextError}
         </div>
       )}
@@ -4734,7 +4734,7 @@ const getUserName = async (userId) => {
                                   <button
                                     type="button"
                                     onClick={() => removeEditContactPerson(index)}
-                                    className="text-sm text-red-500 hover:underline"
+                                    className="text-sm text-rose-500 hover:underline"
                                   >
                                     {t.removeContact || 'Remove'}
                                   </button>
@@ -4796,7 +4796,7 @@ const getUserName = async (userId) => {
               className="bg-indigo-600 text-white rounded-full w-10 h-10 flex items-center justify-center relative"
             >
               🛒
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                 {offerItems.length}
               </span>
             </button>
@@ -4958,7 +4958,7 @@ const getUserName = async (userId) => {
                       </h4>
                       <button 
                         onClick={() => setOfferItems(prev => prev.filter(i => i.id !== item.id))}
-                        className="text-red-500 hover:text-red-700 text-lg"
+                        className="text-rose-500 hover:text-rose-600 text-lg"
                       >
                         ✕
                       </button>
@@ -5188,7 +5188,7 @@ const getUserName = async (userId) => {
       <span className="text-gray-500 line-through">
         Original: € {(item.originalPrice * item.quantity).toFixed(2)}
       </span>
-      <span className="font-bold text-green-600">
+      <span className="font-bold text-emerald-600">
         After discount: €{calculateItemPrice(item).toFixed(2)}
       </span>
     </div>
@@ -5469,8 +5469,8 @@ const getUserName = async (userId) => {
     
     {/* ADD MONTH SELECTOR FOR VILLAS */}
     {monthOptions.length > 0 && (
-      <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
-        <label className="block text-xs font-medium text-green-800 mb-1">
+      <div className="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded">
+        <label className="block text-xs font-medium text-emerald-700 mb-1">
           📅 {selectSeasonLabel}
         </label>
         <select
@@ -5481,7 +5481,7 @@ const getUserName = async (userId) => {
               [service.id]: e.target.value
             }));
           }}
-          className="w-full p-1 text-xs border border-green-300 rounded bg-white"
+          className="w-full p-1 text-xs border border-emerald-300 rounded bg-white"
         >
           <option value="daily">
             {useStandardLabel} (€{baseDailyRate.toLocaleString(undefined, { minimumFractionDigits: 0 })})
@@ -5639,7 +5639,7 @@ const getUserName = async (userId) => {
                           </h4>
                           <button 
                             onClick={() => setOfferItems(prev => prev.filter(i => i.id !== item.id))}
-                            className="text-red-500 hover:text-red-700 text-sm flex-shrink-0"
+                            className="text-rose-500 hover:text-rose-600 text-sm flex-shrink-0"
                           >
                             ✕
                           </button>
@@ -5778,7 +5778,7 @@ const getUserName = async (userId) => {
       <span className="text-gray-500 line-through">
         Original: €{(item.originalPrice * item.quantity).toFixed(2)}
       </span>
-      <span className="font-bold text-green-600">
+      <span className="font-bold text-emerald-600">
         After: € {calculateItemPrice(item).toFixed(2)}
       </span>
     </div>
@@ -6236,7 +6236,7 @@ const getUserName = async (userId) => {
                               
                               setReservationFromOffer(updatedItems);
                             }}
-                            className={`bg-green-100 text-green-800 border-none rounded-md text-xs cursor-pointer ${isMobile ? 'w-full py-2.5 px-3' : 'py-2 px-3'}`}
+                            className={`bg-emerald-50 text-emerald-700 border-none rounded-md text-xs cursor-pointer ${isMobile ? 'w-full py-2.5 px-3' : 'py-2 px-3'}`}
                           >
                             {t.markAllAsFullyPaid}
                           </button>
@@ -6346,13 +6346,13 @@ const getUserName = async (userId) => {
                                         {item.discountValue ? (
                                           <>
                                             <span>= € {((item.originalPrice || item.price) * item.quantity).toFixed(2)}</span>
-                                            <span className="text-red-600">
+                                            <span className="text-rose-600">
                                               - € {item.discountType === 'percentage' 
                                                 ? (((item.originalPrice || item.price) * item.quantity) * (item.discountValue / 100)).toFixed(2)
                                                 : item.discountValue.toFixed(2)}
                                               {item.discountType === 'percentage' ? ` (${item.discountValue}%)` : ''}
                                             </span>
-                                            <span className="font-medium text-green-700">= € {calculateItemPrice(item).toFixed(2)}</span>
+                                            <span className="font-medium text-emerald-600">= € {calculateItemPrice(item).toFixed(2)}</span>
                                           </>
                                         ) : (
                                           <span>= € {(item.price * item.quantity).toFixed(2)}</span>
@@ -6582,7 +6582,7 @@ const getUserName = async (userId) => {
                                               py-${isMobile ? '2' : '1'} px-3
                                               rounded text-xs
                                               border-none
-                                              ${item.paymentStatus === 'paid' ? 'bg-green-100 text-green-800 font-semibold' : 'bg-transparent'}
+                                              ${item.paymentStatus === 'paid' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'bg-transparent'}
                                               cursor-pointer
                                               ${isMobile ? 'flex-1' : ''}
                                             `}
@@ -6803,7 +6803,7 @@ const getUserName = async (userId) => {
                         onClick={handleFinalizeReservationFromOffer}
                         className={`
                           py-${isMobile ? '3' : '2.5'} px-4 
-                          bg-green-600 text-white 
+                          btn-success 
                           border-none rounded-md 
                           text-${isMobile ? 'base' : 'sm'} 
                           font-medium cursor-pointer
@@ -6844,7 +6844,7 @@ const getUserName = async (userId) => {
                       </button>
                       <button 
                         onClick={handleDeleteClient} 
-                        className="bg-red-100 text-red-500 border-none rounded-md p-2 text-base cursor-pointer"
+                        className="bg-rose-50 text-rose-500 border-none rounded-md p-2 text-base cursor-pointer"
                         title={t.deleteClient}
                       >
                         🗑️
@@ -7131,19 +7131,19 @@ const getUserName = async (userId) => {
                         </h3>
                         <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3'} gap-3`}>
                           {selectedClient.upcomingReservations.map((res, index) => (
-                            <div key={res.id || `upcoming-res-${index}`} className="bg-green-50 rounded-lg p-3 border border-green-200">
+                            <div key={res.id || `upcoming-res-${index}`} className="bg-emerald-50 rounded-lg p-3 border border-emerald-200">
                               <div className="flex flex-col gap-2">
                                 <div className="flex justify-between items-center">
-                                  <span className="text-xs text-green-700">{t.from}</span>
-                                  <span className="text-sm text-green-900 font-medium">{formatDate(res.checkIn)}</span>
+                                  <span className="text-xs text-emerald-600">{t.from}</span>
+                                  <span className="text-sm text-emerald-800 font-medium">{formatDate(res.checkIn)}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                  <span className="text-xs text-green-700">{t.to}</span>
-                                  <span className="text-sm text-green-900 font-medium">{formatDate(res.checkOut)}</span>
+                                  <span className="text-xs text-emerald-600">{t.to}</span>
+                                  <span className="text-sm text-emerald-800 font-medium">{formatDate(res.checkOut)}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                  <span className="text-xs text-green-700">{t.accommodationType}</span>
-                                  <span className="text-sm text-green-900 font-medium">{res.accommodationType}</span>
+                                  <span className="text-xs text-emerald-600">{t.accommodationType}</span>
+                                  <span className="text-sm text-emerald-800 font-medium">{res.accommodationType}</span>
                                 </div>
                               </div>
                             </div>
@@ -7210,7 +7210,7 @@ const getUserName = async (userId) => {
                                         </span>
                                         <span className="text-gray-600">
                                           {item.discountValue > 0 ? (
-                                            <span className="text-red-600">
+                                            <span className="text-rose-600">
                                               € {(item.discountType === 'percentage' 
                                                 ? ((item.originalPrice || item.price) * item.quantity) * (1 - item.discountValue/100) 
                                                 : ((item.originalPrice || item.price) * item.quantity) - item.discountValue).toFixed(2)}
@@ -7241,13 +7241,13 @@ const getUserName = async (userId) => {
                                       <>
                                         <button 
                                           onClick={() => handleConvertOfferToReservation(offer)} 
-                                          className="bg-green-600 text-white text-xs font-medium py-1.5 px-2 rounded border-none cursor-pointer"
+                                          className="btn-success text-xs font-medium py-1.5 px-2 rounded border-none cursor-pointer"
                                         >
                                           {t.convertToBooking}
                                         </button>
                                         <button 
                                           onClick={() => handleDeleteOffer(offer)}
-                                          className="bg-red-100 text-red-600 text-xs font-medium py-1.5 px-2 rounded border-none cursor-pointer"
+                                          className="bg-rose-50 text-rose-600 text-xs font-medium py-1.5 px-2 rounded border-none cursor-pointer"
                                         >
                                           {t.deleteOffer}
                                         </button>
@@ -7407,7 +7407,7 @@ const getUserName = async (userId) => {
                     <div className="mt-4">
                       <button 
                         type="submit" 
-                        className="w-full py-3 px-4 bg-green-600 text-white border-none rounded-md text-base font-medium cursor-pointer"
+                        className="w-full py-3 px-4 btn-success border-none rounded-md text-base font-medium cursor-pointer"
                       >
                         {t.createBooking}
                       </button>

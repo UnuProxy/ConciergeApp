@@ -445,18 +445,18 @@ function AddClient() {
     <div className="p-6 font-sans">
       {toast && (
         <div
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-white shadow-lg border border-green-200 rounded-lg px-4 py-3 text-sm text-green-800"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-white shadow-lg border border-emerald-200 rounded-lg px-4 py-3 text-sm text-emerald-700"
           role="status"
           aria-live="polite"
         >
-          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-700">
+          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-100 text-emerald-700">
             ✓
           </span>
           <div className="font-medium">{toast.message}</div>
           <button
             type="button"
             onClick={() => setToast(null)}
-            className="ml-2 text-green-700 hover:text-green-900"
+            className="ml-2 text-emerald-600 hover:text-emerald-800"
             aria-label="Dismiss notification"
           >
             ×
@@ -475,14 +475,14 @@ function AddClient() {
       
       {/* Error messages */}
       {(error || contextError) && (
-        <div className="bg-red-100 text-red-700 p-3 rounded-md mb-6">
+        <div className="bg-rose-50 text-rose-600 p-3 rounded-md mb-6">
           {error || contextError}
         </div>
       )}
       
       {/* Success message */}
       {success && (
-        <div className="bg-green-100 text-green-800 p-3 rounded-md mb-6">
+        <div className="bg-emerald-50 text-emerald-700 p-3 rounded-md mb-6">
           {t.successSaving}
         </div>
       )}
@@ -655,7 +655,7 @@ function AddClient() {
                   
                   {/* Error message */}
                   {teamMembersError && (
-                    <div className="text-sm text-red-500 mt-1">
+                    <div className="text-sm text-rose-500 mt-1">
                       {teamMembersError}
                     </div>
                   )}
@@ -893,7 +893,7 @@ function AddClient() {
                     <button 
                       type="button" 
                       onClick={() => removeContactPerson(index)} 
-                      className="mt-3 py-2 px-4 bg-red-500 text-white border-none rounded-md cursor-pointer font-medium transition-colors hover:bg-red-600"
+                      className="mt-3 py-2 px-4 bg-rose-500 text-white border-none rounded-md cursor-pointer font-medium transition-colors hover:bg-rose-600"
                     >
                       {t.removeContact}
                     </button>
@@ -903,7 +903,7 @@ function AddClient() {
               <button 
                 type="button" 
                 onClick={addContactPerson} 
-                className="py-2 px-4 bg-green-500 text-white border-none rounded-md cursor-pointer font-medium transition-colors hover:bg-green-600"
+                className="py-2 px-4 btn-success border-none rounded-md cursor-pointer font-medium transition-colors hover:bg-emerald-600"
               >
                 {t.addContact}
               </button>

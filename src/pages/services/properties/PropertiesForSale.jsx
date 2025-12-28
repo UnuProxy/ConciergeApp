@@ -268,12 +268,12 @@ const PropertiesForSale = () => {
   const getStatusColor = status => {
     switch (status.toLowerCase()) {
       case 'available':
-        return 'bg-green-500';
+        return 'bg-emerald-500';
       case 'pending':
       case 'under_offer':
         return 'bg-yellow-500';
       case 'sold':
-        return 'bg-red-500';
+        return 'bg-rose-500';
       default:
         return 'bg-blue-500';
     }
@@ -381,7 +381,7 @@ const PropertiesForSale = () => {
                     setBathroomFilter('');
                     setStatusFilter('');
                   }}
-                  className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
+                  className="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
                 >
                   ✕ {t.clearFilters}
                 </button>
@@ -530,7 +530,7 @@ const PropertiesForSale = () => {
                     </span>
                   )}
                   {(priceFilter.min || priceFilter.max) && (
-                    <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs border border-green-200">
+                    <span className="bg-emerald-50 text-emerald-700 px-2 py-1 rounded text-xs border border-emerald-200">
                       €{priceFilter.min || '0'} - €{priceFilter.max || '∞'}
                     </span>
                   )}
@@ -545,7 +545,7 @@ const PropertiesForSale = () => {
                     </span>
                   )}
                   {bathroomFilter && (
-                    <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs border border-red-200">
+                    <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs border border-slate-200">
                       {bathroomFilter} Bath
                     </span>
                   )}
@@ -667,7 +667,7 @@ const PropertiesForSale = () => {
                         </div>
                       )}
                       {prop.gardenArea > 0 && (
-                        <div className="flex items-center bg-green-50 text-green-700 rounded px-2 py-1 text-xs font-medium">
+                        <div className="flex items-center bg-emerald-50 text-emerald-700 rounded px-2 py-1 text-xs font-medium">
                           <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
@@ -721,7 +721,7 @@ const PropertiesForSale = () => {
                     </button>
                     <button
                       onClick={e => handleDelete(prop.id, e)}
-                      className="p-2 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
+                      className="p-2 bg-rose-50 text-rose-600 rounded hover:bg-rose-100 transition-colors"
                       aria-label="Delete"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

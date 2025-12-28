@@ -275,7 +275,7 @@ function PropertyDetail() {
   
   if (error || !property) {
     return (
-      <div className="bg-red-50 text-red-600 p-6 rounded-lg">
+      <div className="bg-rose-50 text-rose-600 p-6 rounded-lg">
         <h2 className="text-xl font-semibold mb-2">{t.error}</h2>
         <p>{error || t.propertyNotFound}</p>
         <Link to="/services/properties-for-sale" className="mt-4 inline-block text-indigo-600 hover:underline">
@@ -364,7 +364,7 @@ function PropertyDetail() {
           </Link>
           <button 
             onClick={handleDelete}
-            className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+            className="inline-flex items-center px-4 py-2 bg-rose-600 text-white rounded-md hover:bg-rose-700"
           >
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -491,7 +491,7 @@ function PropertyDetail() {
                     </a>
                     <button
                       onClick={() => handleDeleteDocument(index)}
-                      className="ml-3 inline-flex items-center justify-center w-10 h-10 rounded-md border border-red-200 text-red-600 hover:text-red-700 hover:border-red-300"
+                      className="ml-3 inline-flex items-center justify-center w-10 h-10 rounded-md border border-rose-200 text-rose-600 hover:text-rose-700 hover:border-rose-300"
                       aria-label={t.delete}
                       title={t.delete}
                     >
@@ -563,9 +563,9 @@ function PropertyDetail() {
               <div className="flex justify-between border-b border-gray-100 pb-2">
                 <span className="text-gray-600">{t.status}</span>
                 <span className={`font-medium ${
-                  property.status === 'available' ? 'text-green-600' : 
+                  property.status === 'available' ? 'text-emerald-600' : 
                   property.status === 'under_offer' ? 'text-yellow-600' : 
-                  'text-red-600'
+                  'text-rose-600'
                 }`}>
                   {property.status === 'available' ? t.available :
                    property.status === 'under_offer' ? t.underOffer : 
