@@ -1,16 +1,32 @@
 :root {
-  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'DM Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   line-height: 1.5;
   color: #0f172a;
   background-color: #f4f6fb;
   font-weight: 400;
-  --app-bg: linear-gradient(135deg, #f8fafc 0%, #eef2ff 45%, #ffffff 100%);
-  --app-panel: rgba(255, 255, 255, 0.96);
-  --app-border: rgba(15, 23, 42, 0.08);
+  
+  /* Premium color palette */
+  --app-bg: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #ffffff 100%);
+  --app-panel: rgba(255, 255, 255, 0.98);
+  --app-border: rgba(15, 23, 42, 0.06);
   --app-muted: #64748b;
   --app-primary: #4f46e5;
-  --app-primary-soft: rgba(79, 70, 229, 0.08);
-  --app-radius: 18px;
+  --app-primary-soft: rgba(79, 70, 229, 0.06);
+  --app-radius: 16px;
+  
+  /* Brand gold */
+  --brand-gold: #c9922f;
+  --brand-gold-light: #f9f0dc;
+  
+  /* Refined status colors */
+  --status-success: #16a34a;
+  --status-success-bg: #dcfce7;
+  --status-warning: #d97706;
+  --status-warning-bg: #fef3c7;
+  --status-danger: #dc2626;
+  --status-danger-bg: #fef2f2;
+  --status-neutral: #64748b;
+  --status-neutral-bg: #f1f5f9;
 }
 
 *,

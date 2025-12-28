@@ -133,7 +133,7 @@ const OffersOverview = ({ offers = [], loading, language, onRefresh }) => {
       draft: 'bg-gray-100 text-gray-700 border-gray-300',
       sent: 'bg-blue-50 text-blue-700 border-blue-300',
       viewed: 'bg-purple-50 text-purple-700 border-purple-300',
-      accepted: 'bg-green-50 text-green-700 border-green-300',
+      accepted: 'bg-emerald-50 text-emerald-700 border-emerald-300',
       booked: 'bg-emerald-50 text-emerald-700 border-emerald-300',
       rejected: 'bg-rose-50 text-rose-700 border-rose-300',
       expired: 'bg-orange-50 text-orange-700 border-orange-300'

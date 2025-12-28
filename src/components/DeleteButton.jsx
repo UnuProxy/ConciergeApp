@@ -3,7 +3,7 @@ import { usePermissions } from '../hooks/usePermissions';
 function DeleteButton({ 
   onDelete, 
   permission, 
-  className = "bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors",
+  className = "bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg transition-colors",
   children = "Delete",
   confirmMessage = "Are you sure you want to delete this item?"
 }) {

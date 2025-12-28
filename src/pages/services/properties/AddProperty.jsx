@@ -721,7 +721,7 @@ function AddProperty() {
         </h1>
         
         {error && (
-          <div className="bg-red-50 text-red-600 p-4 rounded-md mb-4 sm:mb-6">
+          <div className="bg-rose-50 text-rose-600 p-4 rounded-md mb-4 sm:mb-6">
             {error}
           </div>
         )}
@@ -986,7 +986,7 @@ function AddProperty() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                {language === 'ro' ? 'Nume Proprietar' : 'Owner Name'} <span className="text-red-500">*</span>
+                {language === 'ro' ? 'Nume Proprietar' : 'Owner Name'} <span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
@@ -998,7 +998,7 @@ function AddProperty() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                {language === 'ro' ? 'Email Proprietar' : 'Owner Email'} <span className="text-red-500">*</span>
+                {language === 'ro' ? 'Email Proprietar' : 'Owner Email'} <span className="text-rose-500">*</span>
               </label>
               <input
                 type="email"
@@ -1010,7 +1010,7 @@ function AddProperty() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                {language === 'ro' ? 'Telefon Proprietar' : 'Owner Phone'} <span className="text-red-500">*</span>
+                {language === 'ro' ? 'Telefon Proprietar' : 'Owner Phone'} <span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
@@ -1105,7 +1105,7 @@ function AddProperty() {
                   <button
                     type="button"
                     onClick={() => removeImage(index)}
-                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                    className="absolute top-2 right-2 bg-rose-500 text-white rounded-full p-1 opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1160,7 +1160,7 @@ function AddProperty() {
                     <button
                       type="button"
                       onClick={() => removeDocument(index)}
-                      className="flex-shrink-0 ml-2 inline-flex items-center justify-center w-10 h-10 rounded-md border border-red-200 text-red-600 hover:text-red-700 hover:border-red-300"
+                      className="flex-shrink-0 ml-2 inline-flex items-center justify-center w-10 h-10 rounded-md border border-rose-200 text-rose-600 hover:text-rose-700 hover:border-rose-300"
                       aria-label="Remove document"
                       title="Remove document"
                     >
