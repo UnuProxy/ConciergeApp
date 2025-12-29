@@ -134,6 +134,7 @@ const buildBrochurePath = (file) => {
 };
 
 function Villas() {
+  const scrollRef = React.useRef(null);
   const dbContext = useDatabase();
   const userCompanyId = dbContext?.companyId || dbContext?.companyInfo?.id || null;
   const userRole = dbContext?.userRole || dbContext?.role || dbContext?.currentUser?.role || null;
@@ -181,6 +182,24 @@ const clearBrochure = () => {
     owner_notes_ro: '',
     owner_confidential: false,
   });
+
+  // Reset modal scroll and lock background when viewing a villa
+  useEffect(() => {
+    if (viewVilla) {
+      // Lock background scroll
+      const original = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      // Reset modal scroll after mount
+      requestAnimationFrame(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = 0;
+        }
+      });
+      return () => {
+        document.body.style.overflow = original;
+      };
+    }
+  }, [viewVilla]);
   
   const [priceConfigs, setPriceConfigs] = useState([{
     id: Date.now(),
@@ -860,6 +879,9 @@ const clearBrochure = () => {
                     onClick={() => {
                       setViewVilla({ ...villa, activePhotoIndex: 0 });
                       setIsDescriptionExpanded(false);
+                      if (scrollRef.current) {
+                        scrollRef.current.scrollTop = 0;
+                      }
                     }}
                     className="flex-1 min-w-[96px] btn-soft bg-white border border-gray-200 text-gray-700 hover:border-indigo-200 hover:text-indigo-700"
                   >
@@ -1335,10 +1357,10 @@ const clearBrochure = () => {
       )}
 
       {viewVilla && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black/50 flex items-stretch justify-center z-50 p-0 md:p-4">
+          <div className="bg-white shadow-2xl w-full h-full md:h-[90vh] md:max-w-6xl md:rounded-xl overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b bg-white flex-shrink-0">
+            <div className="flex items-center justify-between px-6 py-4 border-b bg-white flex-shrink-0 sticky top-0 z-10">
               <button
                 onClick={() => setViewVilla(null)}
                 className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 text-sm font-semibold transition-colors"
@@ -1373,7 +1395,7 @@ const clearBrochure = () => {
             </div>
 
             {/* Scrollable Content */}
-            <div className="overflow-y-auto p-6 bg-gray-50 flex-grow">
+            <div className="overflow-y-auto p-6 bg-gray-50 flex-grow" ref={scrollRef}>
               {/* Title & Location */}
               <div className="mb-6">
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">{getLoc(viewVilla.name) || 'Villa'}</h1>
