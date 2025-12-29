@@ -398,6 +398,25 @@ const Finance = () => {
     return financeList.filter(r => !orphanIds.has(r.id));
   };
 
+  // If there is no client or booking data at all, clear finance and category payments
+  const wipeFinanceIfEmpty = async (reservationsList, clientsList, financeList, paymentsList) => {
+    if (reservationsList.length === 0 && clientsList.length === 0) {
+      try {
+        if (financeList.length > 0) {
+          await Promise.all(financeList.map(record => deleteDoc(doc(db, 'financeRecords', record.id))));
+        }
+        if (paymentsList.length > 0) {
+          await Promise.all(paymentsList.map(payment => deleteDoc(doc(db, 'categoryPayments', payment.id))));
+        }
+        return { finance: [], payments: [] };
+      } catch (error) {
+        console.error('Error wiping finance/category payments:', error);
+        return { finance: financeList, payments: paymentsList };
+      }
+    }
+    return { finance: financeList, payments: paymentsList };
+  };
+
   // Ensure each booking has a finance record with a pending provider cost
   // Also updates existing records if the booking amount changed
   const syncFinanceRecords = async (reservationsList, existingFinanceRecords = [], clientsList = []) => {
@@ -443,10 +462,15 @@ const Finance = () => {
 
         const clientAmount = rawAmount ?? 0;
         
+        // Get client name from booking or lookup from clients list
+        const client = booking.clientId ? clientsList.find(c => c.id === booking.clientId) : null;
+        const clientName = booking.clientName || getClientDisplayName(client, '');
+        
         // Calculate expected data
         const payloadData = {
           bookingId: booking.id,
           clientId: booking.clientId,
+          clientName,
           bookingServiceKey: serviceKey,
           serviceKey,
           service: serviceLabel,
@@ -460,12 +484,14 @@ const Finance = () => {
         };
 
         if (existingRecordMap.has(recordKey)) {
-          // Check if update is needed (e.g. client price changed in booking)
+          // Check if update is needed (e.g. client price changed in booking or clientName missing)
           const existing = existingRecordMap.get(recordKey);
           
-          // Only update if critical financial info mismatch and record isn't manually locked/edited
-          // For now, we assume if clientAmount changed in booking, it should update in finance
-          if (existing.clientAmount !== clientAmount) {
+          // Update if clientAmount changed OR if clientName is missing/different
+          const needsUpdate = existing.clientAmount !== clientAmount || 
+                              (clientName && existing.clientName !== clientName);
+          
+          if (needsUpdate) {
              toUpdate.push({
                id: existing.id,
                ...payloadData,
@@ -692,7 +718,6 @@ const Finance = () => {
         });
         
         const cleanedFinance = await pruneOrphanFinanceRecords(reservationsList, financeList, clientsList);
-        setFinanceRecords(cleanedFinance);
 
         // Fetch category payments (legacy support)
         const paymentsRef = collection(db, 'categoryPayments');
@@ -712,9 +737,17 @@ const Finance = () => {
             description: data.description || ''
           };
         });
-        
-        setCategoryPayments(paymentsList);
-        
+
+        const { finance: finalFinance, payments: finalPayments } = await wipeFinanceIfEmpty(
+          reservationsList,
+          clientsList,
+          cleanedFinance,
+          paymentsList
+        );
+
+        setFinanceRecords(finalFinance);
+        setCategoryPayments(finalPayments);
+
         // Fetch expenses
         const expensesRef = collection(db, 'expenses');
         const expensesQuery = query(expensesRef, where("companyId", "==", companyId));
@@ -736,7 +769,7 @@ const Finance = () => {
         setExpenses(expensesList);
 
         // Backfill finance records for bookings that do not have one yet
-        await syncFinanceRecords(reservationsList, financeList, clientsList);
+        await syncFinanceRecords(reservationsList, finalFinance, clientsList);
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -1300,9 +1333,101 @@ const Finance = () => {
 
   if (!hasFinancialData) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-gray-100 p-6 text-center">
-        <div className="w-12 h-12 border-4 border-gray-300 border-t-transparent rounded-full animate-spin mb-4 opacity-60"></div>
-        <p className="text-gray-700 font-medium">{t.noFinancialData}</p>
+      <div className="min-h-screen bg-gray-100 p-6">
+        {/* Empty State Header */}
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mb-4">
+            <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <p className="text-gray-700 font-medium">{t.noFinancialData}</p>
+          <p className="text-gray-500 text-sm mt-1 mb-6">{language === 'ro' ? 'Poți începe să adaugi cheltuieli chiar acum' : 'You can start adding expenses right now'}</p>
+        </div>
+
+        {/* Add Expense Form */}
+        <div className="max-w-md mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            {t.addExpense}
+          </h3>
+          
+          <form onSubmit={(e) => { e.preventDefault(); handleAddExpense(); }} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t.expenseCategory}</label>
+              <select
+                value={newExpense.category}
+                onChange={(e) => setNewExpense({...newExpense, category: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="office">{t.office}</option>
+                <option value="utilities">{t.utilities}</option>
+                <option value="marketing">{t.marketing}</option>
+                <option value="salary">{t.salary}</option>
+                <option value="travel">{t.travel}</option>
+                <option value="other">{t.other}</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t.expenseAmount}</label>
+              <input
+                type="number"
+                step="0.01"
+                value={newExpense.amount}
+                onChange={(e) => setNewExpense({...newExpense, amount: e.target.value})}
+                placeholder="0.00"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t.date}</label>
+              <input
+                type="date"
+                value={newExpense.date}
+                onChange={(e) => setNewExpense({...newExpense, date: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t.expenseDescription}</label>
+              <input
+                type="text"
+                value={newExpense.description}
+                onChange={(e) => setNewExpense({...newExpense, description: e.target.value})}
+                placeholder={t.expensePlaceholder}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            
+            <button
+              type="submit"
+              disabled={loading || !newExpense.amount}
+              className="w-full py-3 px-4 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              {t.saveExpense}
+            </button>
+          </form>
+        </div>
+
+        {/* Toast notification */}
+        {toast.show && (
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-emerald-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            {toast.message}
+          </div>
+        )}
       </div>
     );
   }
@@ -1485,11 +1610,11 @@ const Finance = () => {
               <div key={item.id} className="border border-gray-100 rounded-xl p-4 bg-gray-50">
                 <div className="flex items-start justify-between">
                   <div>
+                    {item.clientName && (
+                      <p className="text-xs font-semibold text-indigo-600 mb-1">{item.clientName}</p>
+                    )}
                     <p className="text-sm font-semibold capitalize text-gray-900">{item.service}</p>
                     <p className="text-xs text-gray-500 mt-1">{formatDate(item.date)}</p>
-                    {item.clientName && (
-                      <p className="text-xs font-semibold text-indigo-700">{item.clientName}</p>
-                    )}
                   </div>
                   <span className="h-3 w-3 rounded-full bg-rose-500 mt-1"></span>
                 </div>
@@ -1610,7 +1735,7 @@ const Finance = () => {
                       <div className="font-medium text-sm capitalize">{item.service}</div>
                       <div className="text-xs text-gray-500">{formatDate(item.date)}</div>
                     </div>
-                    {item.clientName && <p className="text-xs font-semibold text-indigo-700 mt-0.5">{item.clientName}</p>}
+                    {item.clientName && <p className="text-xs font-semibold text-indigo-600">{item.clientName}</p>}
                     <div className="text-xs text-gray-500 mt-1 mb-2 line-clamp-1">{item.description}</div>
                     <div className="text-right font-bold text-lg">
                       {formatCurrency(item.clientAmount)}
@@ -1973,6 +2098,13 @@ const Finance = () => {
             <h2 className="font-bold">{t.financialSummary}</h2>
             <div className="flex flex-wrap gap-2 items-center justify-end">
               <input
+                type="text"
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                placeholder={t.clientFilter}
+                value={filters.client}
+                onChange={(e) => setFilters({ ...filters, client: e.target.value })}
+              />
+              <input
                 type="date"
                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
                 value={filters.startDate}
@@ -1999,7 +2131,7 @@ const Finance = () => {
               </select>
               <button
                 className="px-3 py-2 bg-gray-100 text-sm rounded-lg"
-                onClick={() => setFilters({ service: 'all', startDate: '', endDate: '', timeRange: 'all' })}
+                onClick={() => setFilters({ service: 'all', startDate: '', endDate: '', timeRange: 'all', client: '' })}
               >
                 {t.clearFilters}
               </button>

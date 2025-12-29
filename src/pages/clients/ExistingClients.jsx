@@ -240,6 +240,11 @@ const translations = {
     email: 'Email',
     phone: 'Phone',
     address: 'Address',
+    callPhone: 'Call',
+    copyPhone: 'Copy number',
+    sendEmail: 'Send email',
+    copyEmail: 'Copy email',
+    copied: 'Copied!',
     nationality: 'Nationality',
     clientSince: 'Client Since',
     preferredLanguage: 'Preferred Language',
@@ -451,6 +456,11 @@ const translations = {
     phone: 'Număr de Telefon',
     address: 'Adresă',
     nationality: 'Naționalitate',
+    callPhone: 'Sună',
+    copyPhone: 'Copiază numărul',
+    sendEmail: 'Trimite email',
+    copyEmail: 'Copiază email',
+    copied: 'Copiat!',
     deleteOffer: 'Șterge Oferta',
     offerDeletedSuccess: 'Oferta a fost ștearsă cu succes.',
     cannotDeleteBookedOffer: 'Nu se poate șterge o ofertă care a fost convertită în rezervare.',
@@ -734,6 +744,8 @@ const extractImageUrl = (data) => {
   const [assignedUserName, setAssignedUserName] = useState('-');
   const [usersData, setUsersData] = useState({});
   const [usersLoading, setUsersLoading] = useState(false);
+  const [contactActionMenu, setContactActionMenu] = useState({ show: false, type: null, value: null });
+  const [copiedToast, setCopiedToast] = useState(false);
   
   // Mobile UI states
   const [isMobile, setIsMobile] = useState(false);
@@ -3689,6 +3701,34 @@ const generateOfferPdf = async (offer) => {
       return dateString;
     }
   };
+
+  // Contact action handlers
+  const handleContactClick = (type, value) => {
+    if (!value || value === '-') return;
+    setContactActionMenu({ show: true, type, value });
+  };
+
+  const handleCopyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedToast(true);
+      setTimeout(() => setCopiedToast(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+    setContactActionMenu({ show: false, type: null, value: null });
+  };
+
+  const handleCallPhone = (phone) => {
+    window.location.href = `tel:${phone}`;
+    setContactActionMenu({ show: false, type: null, value: null });
+  };
+
+  const handleSendEmail = (email) => {
+    window.location.href = `mailto:${email}`;
+    setContactActionMenu({ show: false, type: null, value: null });
+  };
+
 const [userCache, setUserCache] = useState({});
 const [loadingUsers, setLoadingUsers] = useState(false);
 
@@ -3767,7 +3807,7 @@ const getUserName = async (userId) => {
     if (status === 'active') {
       return <span className="inline-block px-2 py-1 text-xs font-medium uppercase rounded bg-emerald-50 text-emerald-700">{t.filterActive}</span>;
     } else {
-      return <span className="inline-block px-2 py-1 text-xs font-medium uppercase rounded bg-gray-100 text-gray-700">{t.filterInactive}</span>;
+      return <span className="inline-block px-2 py-1 text-xs font-medium uppercase rounded bg-rose-100 text-rose-700">{t.filterInactive}</span>;
     }
   };
   
@@ -4040,7 +4080,16 @@ const getUserName = async (userId) => {
   };
 
   return (
-    <div className="p-4 font-sans max-w-7xl mx-auto">
+    <div className="p-4 font-sans max-w-7xl mx-auto" onClick={() => contactActionMenu.show && setContactActionMenu({ show: false, type: null, value: null })}>
+      {/* Copied Toast */}
+      {copiedToast && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center gap-2 animate-fade-in">
+          <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          {t.copied}
+        </div>
+      )}
       {/* Header with language toggle */}
       <div className={`flex ${isMobile ? 'flex-col gap-3' : 'flex-row justify-between items-center'} mb-6`}>
         <h1 className="text-2xl font-bold text-gray-800">{t.title}</h1>
@@ -6860,13 +6909,91 @@ const getUserName = async (userId) => {
                       </h3>
                       <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                         <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2 md:grid-cols-3'} gap-4`}>
-                          <div>
+                          {/* Email - Clickable */}
+                          <div className="relative">
                             <p className="text-xs text-gray-500 font-medium mb-1">{t.email}</p>
-                            <p className="text-sm text-gray-900 break-words">{selectedClient.email || '-'}</p>
+                            {selectedClient.email && selectedClient.email !== '-' ? (
+                              <button
+                                onClick={() => handleContactClick('email', selectedClient.email)}
+                                className="text-sm text-indigo-600 hover:text-indigo-800 break-words text-left font-medium flex items-center gap-1.5 group"
+                              >
+                                {selectedClient.email}
+                                <svg className="w-3.5 h-3.5 text-gray-400 group-hover:text-indigo-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </button>
+                            ) : (
+                              <p className="text-sm text-gray-900">-</p>
+                            )}
+                            {/* Email Action Menu */}
+                            {contactActionMenu.show && contactActionMenu.type === 'email' && (
+                              <div 
+                                className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 min-w-[160px]"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <button
+                                  onClick={() => handleSendEmail(contactActionMenu.value)}
+                                  className="w-full px-4 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                >
+                                  <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                  </svg>
+                                  {t.sendEmail}
+                                </button>
+                                <button
+                                  onClick={() => handleCopyToClipboard(contactActionMenu.value)}
+                                  className="w-full px-4 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                >
+                                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                  </svg>
+                                  {t.copyEmail}
+                                </button>
+                              </div>
+                            )}
                           </div>
-                          <div>
+                          {/* Phone - Clickable */}
+                          <div className="relative">
                             <p className="text-xs text-gray-500 font-medium mb-1">{t.phone}</p>
-                            <p className="text-sm text-gray-900 break-words">{selectedClient.phone || '-'}</p>
+                            {selectedClient.phone && selectedClient.phone !== '-' ? (
+                              <button
+                                onClick={() => handleContactClick('phone', selectedClient.phone)}
+                                className="text-sm text-indigo-600 hover:text-indigo-800 break-words text-left font-medium flex items-center gap-1.5 group"
+                              >
+                                {selectedClient.phone}
+                                <svg className="w-3.5 h-3.5 text-gray-400 group-hover:text-indigo-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </button>
+                            ) : (
+                              <p className="text-sm text-gray-900">-</p>
+                            )}
+                            {/* Phone Action Menu */}
+                            {contactActionMenu.show && contactActionMenu.type === 'phone' && (
+                              <div 
+                                className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 min-w-[160px]"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <button
+                                  onClick={() => handleCallPhone(contactActionMenu.value)}
+                                  className="w-full px-4 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                >
+                                  <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                  </svg>
+                                  {t.callPhone}
+                                </button>
+                                <button
+                                  onClick={() => handleCopyToClipboard(contactActionMenu.value)}
+                                  className="w-full px-4 py-2 text-sm text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                >
+                                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                  </svg>
+                                  {t.copyPhone}
+                                </button>
+                              </div>
+                            )}
                           </div>
                           <div>
                             <p className="text-xs text-gray-500 font-medium mb-1">{t.address}</p>
