@@ -72,26 +72,16 @@ export const drawServiceIcon = (doc, x, y, width, height, category) => {
   doc.setLineWidth(1.5);
   doc.circle(cx, cy, radius * 0.85, 'S');
   
-  // 2. Typography
+  // 2. Typography - Just the label centered in the circle
   
-  // Large Monogram Letter (Serif)
-  doc.setFont("times", "bold");
-  doc.setFontSize(22);
-  doc.setTextColor(...palette.navy); // Navy text looks more expensive than black
+  // Label centered in the medallion
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...palette.navy); // Navy text for elegance
   
-  // Center alignment fix for different letters
-  // Note: PDF text alignment is sometimes tricky, manual tweaking for specific letters might be needed
-  // but 'center' align usually works well.
-  doc.text(letter, cx, cy + 2, { align: 'center', baseline: 'middle' });
-  
-  // Small Label Below (Sans-Serif, Spaced)
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(6);
-  doc.setTextColor(120, 120, 130); // Muted gray
-  
-  // Add spacing by injecting spaces (hacky but works in basic jsPDF without kerning support)
+  // Add letter spacing for luxury feel
   const spacedLabel = label.split('').join(' ');
-  doc.text(spacedLabel, cx, cy + 9, { align: 'center', baseline: 'middle' });
+  doc.text(spacedLabel, cx, cy + 1, { align: 'center' });
 
   doc.restoreGraphicsState();
 };
