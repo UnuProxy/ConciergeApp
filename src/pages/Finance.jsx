@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { collection, getDocs, query, where, getFirestore, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
@@ -17,6 +18,8 @@ const Finance = () => {
   const [expensesPage, setExpensesPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
+  const [exportMonth, setExportMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activeSubView, setActiveSubView] = useState(null);
@@ -118,6 +121,11 @@ const Finance = () => {
       savePayment: 'Salvează Plată',
       payment: 'Plată',
       paymentHistory: 'Istoric Plăți',
+      exportTitle: 'Export',
+      exportMonth: 'Luna',
+      exportCsv: 'Export CSV',
+      exportXlsx: 'Export XLSX',
+      exportEmpty: 'Nu există date pentru luna selectată',
       
       // Expenses
       noExpenses: 'Nu există cheltuieli',
@@ -232,6 +240,11 @@ const Finance = () => {
       savePayment: 'Save Payment',
       payment: 'Payment',
       paymentHistory: 'Payment History',
+      exportTitle: 'Export',
+      exportMonth: 'Month',
+      exportCsv: 'Export CSV',
+      exportXlsx: 'Export XLSX',
+      exportEmpty: 'No data for selected month',
       
       // Expenses
       noExpenses: 'No expenses found',
@@ -316,6 +329,23 @@ const Finance = () => {
     if (full) return full;
     const composed = [client.firstName, client.lastName].filter(Boolean).join(' ');
     return composed || fallback;
+  };
+  const parseDateSafe = (input) => {
+    if (!input) return null;
+    if (input.seconds) {
+      return new Date(input.seconds * 1000);
+    }
+    const d = new Date(input);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const getMonthBounds = (monthStr) => {
+    if (!monthStr) return null;
+    const start = new Date(`${monthStr}-01T00:00:00`);
+    if (Number.isNaN(start.getTime())) return null;
+    const end = new Date(start);
+    end.setMonth(end.getMonth() + 1);
+    return { start, end };
   };
 
   // Remove finance records whose linked booking/client no longer exists.
@@ -766,7 +796,8 @@ const Finance = () => {
 
   const pendingFinance = filteredFinanceRecords.filter(r => (r.status === 'pending') || r.providerCost === null);
   const totalClientRevenue = filteredFinanceRecords.reduce((sum, r) => sum + (r.clientAmount || 0), 0);
-  const totalProviderCosts = filteredFinanceRecords.reduce((sum, r) => sum + (r.providerCost || 0), 0);
+  const totalLegacyProviderPayments = categoryPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+  const totalProviderCosts = filteredFinanceRecords.reduce((sum, r) => sum + (r.providerCost || 0), 0) + totalLegacyProviderPayments;
   const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
   const grossProfit = totalClientRevenue - totalProviderCosts;
   const totalRevenue = grossProfit;
@@ -774,6 +805,107 @@ const Finance = () => {
   const totalIncome = totalClientRevenue;
   const totalPayments = totalProviderCosts;
   const trueProfit = netProfit;
+
+  const buildMonthlyExportRows = () => {
+    const bounds = getMonthBounds(exportMonth);
+    if (!bounds) return [];
+    const inRange = (date) => {
+      const parsed = parseDateSafe(date);
+      return parsed && parsed >= bounds.start && parsed < bounds.end;
+    };
+
+    const rows = [];
+
+    financeRecords.forEach(record => {
+      if (!inRange(record.date)) return;
+      rows.push({
+        Date: record.date || '',
+        Type: 'financeRecord',
+        Category: getServiceLabel(record.service, 'Finance'),
+        Description: record.description || '',
+        AmountIn: Number(record.clientAmount || 0),
+        AmountOut: Number(record.providerCost || 0),
+        Status: record.status || '',
+        Source: 'financeRecords'
+      });
+    });
+
+    categoryPayments.forEach(payment => {
+      if (!inRange(payment.date)) return;
+      rows.push({
+        Date: payment.date || '',
+        Type: 'categoryPayment',
+        Category: getServiceLabel(payment.category, 'Payment'),
+        Description: payment.description || '',
+        AmountIn: 0,
+        AmountOut: Number(payment.amount || 0),
+        Status: payment.status || '',
+        Source: 'categoryPayments'
+      });
+    });
+
+    expenses.forEach(exp => {
+      if (!inRange(exp.date)) return;
+      rows.push({
+        Date: exp.date || '',
+        Type: 'expense',
+        Category: getServiceLabel(exp.category, 'Expense'),
+        Description: exp.description || '',
+        AmountIn: 0,
+        AmountOut: Number(exp.amount || 0),
+        Status: 'expense',
+        Source: 'expenses'
+      });
+    });
+
+    return rows.sort((a, b) => {
+      const ad = parseDateSafe(a.Date)?.getTime() || 0;
+      const bd = parseDateSafe(b.Date)?.getTime() || 0;
+      return ad - bd;
+    });
+  };
+
+  const downloadCsv = (rows) => {
+    const headers = ['Date', 'Type', 'Category', 'Description', 'AmountIn', 'AmountOut', 'Status', 'Source'];
+    const escape = (val) => {
+      const str = (val ?? '').toString().replace(/"/g, '""');
+      return `"${str}"`;
+    };
+    const csv = [headers.join(',')]
+      .concat(rows.map(row => headers.map(h => escape(row[h])).join(',')))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `finance-${exportMonth || 'all'}.csv`;
+    link.click();
+  };
+
+  const downloadXlsx = (rows) => {
+    const headers = ['Date', 'Type', 'Category', 'Description', 'AmountIn', 'AmountOut', 'Status', 'Source'];
+    const worksheet = XLSX.utils.json_to_sheet(rows, { header: headers });
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Finance');
+    XLSX.writeFile(workbook, `finance-${exportMonth || 'all'}.xlsx`);
+  };
+
+  const handleExport = (format) => {
+    const rows = buildMonthlyExportRows();
+    if (!rows.length) {
+      window.alert(t.exportEmpty);
+      return;
+    }
+    setExporting(true);
+    try {
+      if (format === 'csv') {
+        downloadCsv(rows);
+      } else {
+        downloadXlsx(rows);
+      }
+    } finally {
+      setExporting(false);
+    }
+  };
   
   // Format date for display
   const formatDate = (dateString) => {
@@ -1227,6 +1359,30 @@ const Finance = () => {
               onClick={() => setFilters({ service: 'all', startDate: '', endDate: '', timeRange: 'all' })}
             >
               {t.clearFilters}
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="text-sm text-gray-600">{t.exportTitle}</span>
+            <input
+              type="month"
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              value={exportMonth}
+              onChange={(e) => setExportMonth(e.target.value)}
+              aria-label={t.exportMonth}
+            />
+            <button
+              className="px-3 py-2 bg-gray-100 text-sm rounded-lg disabled:opacity-60"
+              onClick={() => handleExport('csv')}
+              disabled={exporting}
+            >
+              {t.exportCsv}
+            </button>
+            <button
+              className="px-3 py-2 bg-indigo-600 text-white text-sm rounded-lg disabled:opacity-60"
+              onClick={() => handleExport('xlsx')}
+              disabled={exporting}
+            >
+              {t.exportXlsx}
             </button>
           </div>
         </div>
