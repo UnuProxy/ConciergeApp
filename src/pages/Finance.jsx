@@ -28,7 +28,7 @@ const Finance = () => {
   const [userId, setUserId] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const [syncingFinance, setSyncingFinance] = useState(false);
-  const [filters, setFilters] = useState({ service: 'all', startDate: '', endDate: '', timeRange: 'all' });
+  const [filters, setFilters] = useState({ service: 'all', startDate: '', endDate: '', timeRange: 'all', client: '' });
   const [updatingRecord, setUpdatingRecord] = useState(null);
   const [costDrafts, setCostDrafts] = useState({});
   const [showAllPending, setShowAllPending] = useState(false);
@@ -152,6 +152,7 @@ const Finance = () => {
       serviceProfit: 'Profit pe serviciu',
       profitByService: 'Profit pe servicii',
       profitPerService: 'Profit pe serviciu',
+      clientFilter: 'Client',
       
       // Messages
       loading: 'Se încarcă...',
@@ -271,6 +272,7 @@ const Finance = () => {
       serviceProfit: 'Service profit',
       profitByService: 'Profit by service',
       profitPerService: 'Profit per service',
+      clientFilter: 'Client',
       
       // Messages
       loading: 'Loading...',
@@ -756,7 +758,10 @@ const Finance = () => {
     const recordDate = record.date ? new Date(record.date) : null;
     const startOk = !filters.startDate || (recordDate && recordDate >= new Date(filters.startDate));
     const endOk = !filters.endDate || (recordDate && recordDate <= new Date(filters.endDate));
-    return matchesService && startOk && endOk;
+    const matchesClient =
+      !filters.client ||
+      (record.clientName && record.clientName.toLowerCase().includes(filters.client.toLowerCase()));
+    return matchesService && startOk && endOk && matchesClient;
   });
 
   const filteredExpenses = expenses.filter(expense => {
@@ -1319,11 +1324,18 @@ const Finance = () => {
               <span>{pendingFinance.length} {t.pendingPayments}</span>
             </div>
           </div>
-        <div className="flex flex-wrap gap-3 items-center">
-          <select
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-            value={filters.service}
-            onChange={(e) => setFilters({...filters, service: e.target.value})}
+          <div className="flex flex-wrap gap-3 items-center">
+            <input
+              type="text"
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              placeholder={t.clientFilter}
+              value={filters.client}
+              onChange={(e) => setFilters({ ...filters, client: e.target.value })}
+            />
+            <select
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              value={filters.service}
+              onChange={(e) => setFilters({...filters, service: e.target.value})}
             >
               <option value="all">{t.serviceType}</option>
               {serviceOptions.map(option => (
@@ -1356,7 +1368,7 @@ const Finance = () => {
             </select>
             <button
               className="px-3 py-2 bg-gray-100 text-sm rounded-lg"
-              onClick={() => setFilters({ service: 'all', startDate: '', endDate: '', timeRange: 'all' })}
+              onClick={() => setFilters({ service: 'all', startDate: '', endDate: '', timeRange: 'all', client: '' })}
             >
               {t.clearFilters}
             </button>
@@ -1476,7 +1488,7 @@ const Finance = () => {
                     <p className="text-sm font-semibold capitalize text-gray-900">{item.service}</p>
                     <p className="text-xs text-gray-500 mt-1">{formatDate(item.date)}</p>
                     {item.clientName && (
-                      <p className="text-xs text-gray-500">{item.clientName}</p>
+                      <p className="text-xs font-semibold text-indigo-700">{item.clientName}</p>
                     )}
                   </div>
                   <span className="h-3 w-3 rounded-full bg-rose-500 mt-1"></span>
@@ -1575,7 +1587,16 @@ const Finance = () => {
       <div className="space-y-4 pb-20">
         <div className="bg-white rounded-xl shadow-sm">
           <div className="px-4 py-3 border-b border-gray-100">
-            <h2 className="font-bold">{t.transactions}</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <h2 className="font-bold">{t.transactions}</h2>
+              <input
+                type="text"
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm w-full sm:w-64"
+                placeholder={t.clientFilter}
+                value={filters.client}
+                onChange={(e) => setFilters({ ...filters, client: e.target.value })}
+              />
+            </div>
           </div>
           
           <div className="p-4">
@@ -1589,6 +1610,7 @@ const Finance = () => {
                       <div className="font-medium text-sm capitalize">{item.service}</div>
                       <div className="text-xs text-gray-500">{formatDate(item.date)}</div>
                     </div>
+                    {item.clientName && <p className="text-xs font-semibold text-indigo-700 mt-0.5">{item.clientName}</p>}
                     <div className="text-xs text-gray-500 mt-1 mb-2 line-clamp-1">{item.description}</div>
                     <div className="text-right font-bold text-lg">
                       {formatCurrency(item.clientAmount)}

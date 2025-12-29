@@ -278,18 +278,6 @@ function Sidebar({ open, setOpen }) {
                 active={location.pathname === '/services/cars'}
                 onClick={handleLinkClick}
               />
-              <SidebarLink
-                to="/services/security"
-                label={t.security}
-                active={location.pathname === '/services/security'}
-                onClick={handleLinkClick}
-              />
-              <SidebarLink
-                to="/services/chef"
-                label={t.chef}
-                active={location.pathname === '/services/chef'}
-                onClick={handleLinkClick}
-              />
             </div>
           )}
 
