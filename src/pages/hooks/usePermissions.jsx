@@ -2,21 +2,22 @@ import { useDatabase } from '../context/DatabaseContext';
 
 export function usePermissions() {
   const { userRole } = useDatabase();
+  const isAdmin = userRole === 'admin';
   
   // Define permissions based on userRole from your DatabaseContext
   const permissions = {
-    // Finance permissions - only admin can access
-    canViewFinance: userRole === 'admin',
-    canEditFinance: userRole === 'admin',
+    // Finance permissions - keep restricted to admins, employees excluded
+    canViewFinance: isAdmin,
+    canEditFinance: isAdmin,
     
     // Delete permissions - only admin can delete
-    canDeleteClients: userRole === 'admin',
-    canDeleteServices: userRole === 'admin', 
-    canDeleteReservations: userRole === 'admin',
-    canDeleteUsers: userRole === 'admin',
-    canDeleteProperties: userRole === 'admin',
+    canDeleteClients: isAdmin,
+    canDeleteServices: isAdmin, 
+    canDeleteReservations: isAdmin,
+    canDeleteUsers: isAdmin,
+    canDeleteProperties: isAdmin,
     
-    // Edit permissions - both admin and regular users can edit
+    // Edit permissions - admins and employees/agents can add/edit operational data
     canEditClients: true,
     canEditServices: true, 
     canEditReservations: true,
@@ -27,12 +28,12 @@ export function usePermissions() {
     canViewServices: true,
     canViewReservations: true,
     canViewSettings: true,
-    canViewUserManagement: userRole === 'admin',
+    canViewUserManagement: isAdmin,
     
     // System permissions - admin only
-    canManageUsers: userRole === 'admin',
-    canChangeSystemSettings: userRole === 'admin',
-    canViewSecurityLogs: userRole === 'admin',
+    canManageUsers: isAdmin,
+    canChangeSystemSettings: isAdmin,
+    canViewSecurityLogs: isAdmin,
   };
   
   return permissions;

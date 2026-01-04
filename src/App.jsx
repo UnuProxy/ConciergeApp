@@ -26,6 +26,7 @@ import Finance from './pages/Finance'
 import Login from './pages/Login'
 import SelectCompany from './pages/SelectCompany'
 import PrivateRoute from './components/PrivateRoute'
+import RoleProtectedRoute from './components/RoleProtectedRoute'
 // User Management
 import UserManagement from './pages/users/UserManagement'
 import PropertiesForSale from './pages/services/properties/PropertiesForSale';
@@ -166,12 +167,14 @@ function App() {
                   path="/finance"
                   element={
                     <PrivateRoute>
-                      <ProtectedLayout
-                        sidebarOpen={sidebarOpen}
-                        setSidebarOpen={setSidebarOpen}
-                      >
-                        <Finance />
-                      </ProtectedLayout>
+                      <RoleProtectedRoute requiredRole="admin">
+                        <ProtectedLayout
+                          sidebarOpen={sidebarOpen}
+                          setSidebarOpen={setSidebarOpen}
+                        >
+                          <Finance />
+                        </ProtectedLayout>
+                      </RoleProtectedRoute>
                     </PrivateRoute>
                   }
                 />
