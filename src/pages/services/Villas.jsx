@@ -166,6 +166,7 @@ const clearBrochure = () => {
   const [formData, setFormData] = useState({
     name_en: '',
     name_ro: '',
+    referenceNumber: '',
     address_en: '',
     address_ro: '',
     bedrooms: '',
@@ -386,6 +387,7 @@ const clearBrochure = () => {
   const resetForm = () => {
     setFormData({
       name_en: '', name_ro: '',
+      referenceNumber: '',
       address_en: '', address_ro: '',
       bedrooms: '', bathrooms: '',
       description_en: '', description_ro: '',
@@ -521,6 +523,7 @@ const clearBrochure = () => {
     }
     return {
       name: { en: formData.name_en || '', ro: formData.name_ro || '' },
+      referenceNumber: formData.referenceNumber || '',
       address: { en: formData.address_en || '', ro: formData.address_ro || '' },
       bedrooms: formData.bedrooms || '',
       bathrooms: formData.bathrooms || '',
@@ -670,6 +673,7 @@ const clearBrochure = () => {
     setFormData({
       name_en: typeof villa.name === 'string' ? villa.name : (villa.name?.en || ''),
       name_ro: typeof villa.name === 'string' ? villa.name : (villa.name?.ro || ''),
+      referenceNumber: villa.referenceNumber || '',
       address_en: typeof villa.address === 'string' ? villa.address : (villa.address?.en || ''),
       address_ro: typeof villa.address === 'string' ? villa.address : (villa.address?.ro || ''),
       bedrooms: villa.bedrooms || '',
@@ -965,6 +969,16 @@ const clearBrochure = () => {
                   <input name={`name_${formLanguage}`} value={formData[`name_${formLanguage}`]} onChange={handleInputChange} className="w-full border rounded px-3 py-2" required />
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-gray-700">Reference #</label>
+                  <input
+                    name="referenceNumber"
+                    value={formData.referenceNumber}
+                    onChange={handleInputChange}
+                    className="w-full border rounded px-3 py-2"
+                    placeholder="e.g. VIL-1024"
+                  />
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700">Address ({formLanguage.toUpperCase()})</label>
                   <input name={`address_${formLanguage}`} value={formData[`address_${formLanguage}`]} onChange={handleInputChange} className="w-full border rounded px-3 py-2" />
                 </div>
@@ -979,6 +993,16 @@ const clearBrochure = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Property Link</label>
                   <input name="propertyLink" value={formData.propertyLink} onChange={handleInputChange} className="w-full border rounded px-3 py-2" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700">Description ({formLanguage.toUpperCase()})</label>
+                  <textarea
+                    name={`description_${formLanguage}`}
+                    value={formData[`description_${formLanguage}`]}
+                    onChange={handleInputChange}
+                    className="w-full border rounded px-3 py-2"
+                    rows={3}
+                  />
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700">Amenities ({formLanguage.toUpperCase()})</label>
@@ -1131,6 +1155,16 @@ const clearBrochure = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Name ({formLanguage.toUpperCase()})</label>
                   <input name={`name_${formLanguage}`} value={formData[`name_${formLanguage}`]} onChange={handleInputChange} className="w-full border rounded px-3 py-2" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Reference #</label>
+                  <input
+                    name="referenceNumber"
+                    value={formData.referenceNumber}
+                    onChange={handleInputChange}
+                    className="w-full border rounded px-3 py-2"
+                    placeholder="e.g. VIL-1024"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Address ({formLanguage.toUpperCase()})</label>
@@ -1399,6 +1433,11 @@ const clearBrochure = () => {
               {/* Title & Location */}
               <div className="mb-6">
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">{getLoc(viewVilla.name) || 'Villa'}</h1>
+                {viewVilla.referenceNumber && (
+                  <div className="inline-flex items-center px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold mb-2">
+                    Reference: {viewVilla.referenceNumber}
+                  </div>
+                )}
                 <div className="flex items-center text-gray-600">
                   <svg className="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />

@@ -950,11 +950,7 @@ const extractImageUrl = (data) => {
     { id: 'concierge-core', name: t.conciergeCore, icon: '⭐', collection: null, staticServices: CORE_CONCIERGE_SERVICES_FILTERED },
     { id: 'villas', name: t.villas, icon: '🏠', collection: 'villas' },
     { id: 'boats', name: t.boats, icon: '🛥️', collection: 'boats' },
-    { id: 'cars', name: t.cars, icon: '🚗', collection: 'cars' },
-    { id: 'security', name: t.security, icon: '🔒', collection: 'security' },
-    { id: 'nannies', name: t.nannies, icon: '👶', collection: 'services', filter: 'nannies' },
-    { id: 'chefs', name: t.chefs, icon: '🍽️', collection: 'chefs' },
-    { id: 'excursions', name: t.excursions, icon: '🏔️', collection: 'services', filter: 'excursions' },
+    { id: 'cars', name: t.cars, icon: '🚗', collection: 'cars' }
   ], [t]);
   
   // Check for mobile screen size
@@ -5845,20 +5841,13 @@ const getUserName = async (userId) => {
 
                 {/* Custom Service - Now inside scrollable area */}
                 <div className="border-t border-gray-200 pt-4 pb-2 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                      <span>➕</span> {t.addCustomService}
-                    </h4>
-                    {!customServiceOpen && (
-                      <button
-                        type="button"
-                        onClick={() => setCustomServiceOpen(true)}
-                        className="text-xs text-indigo-600 font-medium"
-                      >
-                        {t.addCustom}
-                      </button>
-                    )}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCustomServiceOpen((prev) => !prev)}
+                    className="flex items-center gap-2 text-sm font-semibold text-gray-800"
+                  >
+                    <span>➕</span> {t.addCustomService}
+                  </button>
                   
                   {customServiceOpen && (
                     <>

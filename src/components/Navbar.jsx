@@ -26,7 +26,8 @@ const NAVBAR_TRANSLATIONS = {
       user: 'User',
       admin: 'Administrator',
       manager: 'Manager',
-      agent: 'Agent'
+      agent: 'Agent',
+      employee: 'Employee'
     }
   },
   ro: {
@@ -51,7 +52,8 @@ const NAVBAR_TRANSLATIONS = {
       user: 'Utilizator',
       admin: 'Administrator',
       manager: 'Manager',
-      agent: 'Agent'
+      agent: 'Agent',
+      employee: 'Angajat'
     }
   }
 };

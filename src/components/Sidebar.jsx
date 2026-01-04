@@ -33,6 +33,7 @@ function Sidebar({ open, setOpen }) {
   }, [language]);
 
   const isAdmin = userRole === 'admin';
+  const canViewFinance = userRole === 'admin';
 
   const translations = {
     ro: {
@@ -44,9 +45,9 @@ function Sidebar({ open, setOpen }) {
       collaborators: 'Colaboratori',
       services: 'Servicii',
       rentalVillas: 'Vile de Închiriat',
-      propertiesForSale: 'Proprietăți de Vânzare',
       boats: 'Bărci',
       cars: 'Mașini',
+      propertiesForSale: 'Proprietăți de Vânzare',
       security: 'Securitate',
       chef: 'Bucătar',
       finance: 'Finanțe',
@@ -67,9 +68,9 @@ function Sidebar({ open, setOpen }) {
       collaborators: 'Collaborators',
       services: 'Services',
       rentalVillas: 'Rental Villas',
-      propertiesForSale: 'Properties For Sale',
       boats: 'Boats',
       cars: 'Cars',
+      propertiesForSale: 'Properties For Sale',
       security: 'Security',
       chef: 'Chef',
       finance: 'Finance',
@@ -261,12 +262,6 @@ function Sidebar({ open, setOpen }) {
                 onClick={handleLinkClick}
               />
               <SidebarLink
-                to="/services/properties-for-sale"
-                label={t.propertiesForSale}
-                active={location.pathname === '/services/properties-for-sale'}
-                onClick={handleLinkClick}
-              />
-              <SidebarLink
                 to="/services/boats"
                 label={t.boats}
                 active={location.pathname === '/services/boats'}
@@ -278,18 +273,28 @@ function Sidebar({ open, setOpen }) {
                 active={location.pathname === '/services/cars'}
                 onClick={handleLinkClick}
               />
+              <SidebarLink
+                to="/services/properties-for-sale"
+                label={t.propertiesForSale}
+                active={location.pathname === '/services/properties-for-sale'}
+                onClick={handleLinkClick}
+              />
             </div>
           )}
 
-          <div className="app-sidebar__category">{t.finance}</div>
-          <Link
-            to="/finance"
-            className={`app-sidebar__item ${location.pathname.startsWith('/finance') ? 'app-sidebar__item--active' : ''}`}
-            onClick={handleLinkClick}
-          >
-            <SidebarIcon path="M11 11V5a1 1 0 112 0v6a4 4 0 11-2 0z" />
-            {t.financeOverview}
-          </Link>
+          {canViewFinance && (
+            <>
+              <div className="app-sidebar__category">{t.finance}</div>
+              <Link
+                to="/finance"
+                className={`app-sidebar__item ${location.pathname.startsWith('/finance') ? 'app-sidebar__item--active' : ''}`}
+                onClick={handleLinkClick}
+              >
+                <SidebarIcon path="M11 11V5a1 1 0 112 0v6a4 4 0 11-2 0z" />
+                {t.financeOverview}
+              </Link>
+            </>
+          )}
 
           <div className="app-sidebar__category">{t.system}</div>
           <div
