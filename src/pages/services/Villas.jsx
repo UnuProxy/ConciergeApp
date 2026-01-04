@@ -162,6 +162,7 @@ const clearBrochure = () => {
   const [expandedRates, setExpandedRates] = useState({});
 
   const [successMessage, setSuccessMessage] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     name_en: '',
@@ -195,6 +196,7 @@ const clearBrochure = () => {
         if (scrollRef.current) {
           scrollRef.current.scrollTop = 0;
         }
+        window.scrollTo({ top: 0, behavior: 'auto' });
       });
       return () => {
         document.body.style.overflow = original;
@@ -556,6 +558,8 @@ const clearBrochure = () => {
 
   const handleAddVilla = async (e) => {
     e.preventDefault();
+    if (isSaving) return;
+    setIsSaving(true);
     try {
       const photoUrls = await uploadPhotos();
       const brochureDownload = await uploadBrochure();
@@ -577,16 +581,20 @@ const clearBrochure = () => {
       fetchVillas();
     } catch (error) {
       console.error('Error adding villa: ', error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleUpdateVilla = async (e) => {
     e.preventDefault();
+    if (isSaving) return;
+    if (!currentVilla || !currentVilla.id) {
+      console.error('No current villa selected for update');
+      return;
+    }
+    setIsSaving(true);
     try {
-      if (!currentVilla || !currentVilla.id) {
-        console.error('No current villa selected for update');
-        return;
-      }
       const newPhotoUrls = await uploadPhotos();
       const brochureDownload = await uploadBrochure();
       // Place newly uploaded photos first so cover updates when editing
@@ -610,6 +618,8 @@ const clearBrochure = () => {
       fetchVillas();
     } catch (error) {
       console.error('Error updating villa: ', error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1134,7 +1144,13 @@ const clearBrochure = () => {
 
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={() => { resetForm(); setIsAddingVilla(false); }} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded">Save</button>
+                <button
+                  type="submit"
+                  disabled={isSaving || isUploading}
+                  className={`px-4 py-2 rounded text-white ${isSaving || isUploading ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                >
+                  {isSaving ? 'Saving...' : 'Save'}
+                </button>
               </div>
             </form>
           </div>
@@ -1383,7 +1399,13 @@ const clearBrochure = () => {
 
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={() => { resetForm(); setIsEditingVilla(false); setCurrentVilla(null); }} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded">Save</button>
+                <button
+                  type="submit"
+                  disabled={isSaving || isUploading}
+                  className={`px-4 py-2 rounded text-white ${isSaving || isUploading ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                >
+                  {isSaving ? 'Saving...' : 'Save'}
+                </button>
               </div>
             </form>
           </div>
@@ -1391,8 +1413,8 @@ const clearBrochure = () => {
       )}
 
       {viewVilla && (
-        <div className="fixed inset-0 bg-black/50 flex items-stretch justify-center z-50 p-0 md:p-4">
-          <div className="bg-white shadow-2xl w-full h-full md:h-[90vh] md:max-w-6xl md:rounded-xl overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black/50 flex items-stretch justify-center z-50 p-0 md:p-4 overflow-hidden">
+          <div className="bg-white shadow-2xl w-full md:max-w-6xl md:rounded-xl flex flex-col h-screen md:h-auto md:max-h-[90vh]">
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b bg-white flex-shrink-0 sticky top-0 z-10">
               <button
@@ -1429,7 +1451,11 @@ const clearBrochure = () => {
             </div>
 
             {/* Scrollable Content */}
-            <div className="overflow-y-auto p-6 bg-gray-50 flex-grow" ref={scrollRef}>
+            <div
+              ref={scrollRef}
+              className="p-6 pb-24 bg-gray-50 flex-grow overflow-y-auto"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
               {/* Title & Location */}
               <div className="mb-6">
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">{getLoc(viewVilla.name) || 'Villa'}</h1>
