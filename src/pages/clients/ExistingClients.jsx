@@ -5407,6 +5407,24 @@ const getUserName = async (userId) => {
               </div>
             </div>
 
+            {/* Mobile: quick access to add custom service (opens the same sheet as cart) */}
+            {isMobile && (
+              <div className="p-3 border-b border-gray-200 bg-white flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomService({ name: '', price: '', quantity: 1, description: '' });
+                    setCustomServiceUnit('service');
+                    setPendingService(null);
+                    setCustomServiceOpen(true);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-gray-300 rounded-lg font-semibold text-gray-800 bg-gray-50"
+                >
+                  <span>➕</span> {t.addCustomService}
+                </button>
+              </div>
+            )}
+
             {/* Services Grid - FIXED WITH PROPER SCROLLING */}
             <div className={`flex-1 overflow-y-auto ${isMobile ? 'p-3 pb-6' : 'p-4'}`} style={{minHeight: 0}}>
               {loadingServices ? (
