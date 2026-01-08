@@ -126,7 +126,7 @@ function Security() {
             return { ...s, bookingCount: assigns.length, totalRevenue };
           } catch (err) {
             // If permission error, return security staff without stats
-            console.warn('Could not load stats for security staff:', s.id, err.message);
+  // console.warn('Could not load stats for security staff:', s.id, err.message); // Removed for production
             return { ...s, bookingCount: 0, totalRevenue: 0 };
           }
         })

@@ -278,7 +278,7 @@ function AddClient() {
         });
       });
       
-      console.log("Fetched team members:", members.length);
+  // console.log("Fetched team members:", members.length); // Removed for production
       setTeamMembers(members);
     } catch (error) {
       console.error("Error fetching team members:", error);
@@ -356,8 +356,8 @@ function AddClient() {
       return;
     }
     
-    console.log("Starting client save...");
-    console.log("Company info:", companyInfo);
+  // console.log("Starting client save..."); // Removed for production
+  // console.log("Company info:", companyInfo); // Removed for production
     
     // Start saving process
     setSaving(true);
@@ -379,13 +379,13 @@ function AddClient() {
         status: 'active', // Default status for new clients
       };
       
-      console.log("Client data to save:", clientToSave);
+  // console.log("Client data to save:", clientToSave); // Removed for production
       
       // Add to Firestore clients collection
       const clientsRef = collection(db, "clients");
       const docRef = await addDoc(clientsRef, clientToSave);
       
-      console.log("Client saved successfully with ID:", docRef.id);
+  // console.log("Client saved successfully with ID:", docRef.id); // Removed for production
       
       // Reset form
       setClientData({

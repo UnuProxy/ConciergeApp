@@ -923,7 +923,7 @@ function Boats() {
         const auth = getAuth();
         if (!auth.currentUser) {
           await signInAnonymously(auth);
-          console.log("Signed in anonymously for storage access");
+  // console.log("Signed in anonymously for storage access"); // Removed for production
         }
       } catch (error) {
         console.error("Auth error:", error);
@@ -1203,7 +1203,7 @@ function Boats() {
       const auth = getAuth();
       if (!auth.currentUser) {
         await signInAnonymously(auth);
-        console.log("Signed in anonymously for photo upload");
+  // console.log("Signed in anonymously for photo upload"); // Removed for production
       }
     } catch (error) {
       console.error("Auth error:", error);

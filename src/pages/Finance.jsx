@@ -387,7 +387,7 @@ const Finance = () => {
     if (orphans.length === 0) return financeList;
 
     try {
-      console.log(`Pruning ${orphans.length} orphan finance records...`);
+  // console.log(`Pruning ${orphans.length} orphan finance records...`); // Removed for production
       await Promise.all(orphans.map(record => deleteDoc(doc(db, 'financeRecords', record.id))));
     } catch (error) {
       console.error('Error pruning orphan finance records:', error);
@@ -600,7 +600,7 @@ const Finance = () => {
             setCompanyId(resolvedCompanyId);
             setUserRole(resolvedUserRole);
             setError(null);
-            console.log("User role:", resolvedUserRole);
+  // console.log("User role:", resolvedUserRole); // Removed for production
           } else {
             setError(t.errorCompanyNotFound);
           }
@@ -1174,16 +1174,16 @@ const Finance = () => {
                });
                
                await updateDoc(bookingRef, { services: updatedServices });
-               console.log('Synced provider cost back to booking service:', record.bookingId);
+  // console.log('Synced provider cost back to booking service:', record.bookingId); // Removed for production
              } 
              // If it's a simple single-service booking (legacy structure)
              else if (!record.serviceKey || record.serviceKey === 'booking') {
                await updateDoc(bookingRef, { providerCost: numericCost });
-               console.log('Synced provider cost back to booking root:', record.bookingId);
+  // console.log('Synced provider cost back to booking root:', record.bookingId); // Removed for production
              }
            }
         } catch (syncErr) {
-           console.warn('Failed to sync provider cost back to booking:', syncErr);
+  // console.warn('Failed to sync provider cost back to booking:', syncErr); // Removed for production
            // Don't block the UI for this background sync
         }
       }

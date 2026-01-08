@@ -95,7 +95,7 @@ const resolvePhotoDownloads = async (photos = [], storageInstance) => {
         const downloadUrl = await getDownloadURL(ref(storageInstance, candidatePath));
         return { ...photo, url: ensureStorageDownloadUrl(downloadUrl), path: candidatePath };
       } catch (err) {
-        console.warn('Failed to fetch download URL for photo', candidatePath, err);
+  // console.warn('Failed to fetch download URL for photo', candidatePath, err); // Removed for production
         return photo;
       }
     })
@@ -241,7 +241,7 @@ const clearBrochure = () => {
         const auth = getAuth();
         if (!auth.currentUser) {
           await signInAnonymously(auth);
-          console.log('Signed in anonymously for storage access');
+  // console.log('Signed in anonymously for storage access'); // Removed for production
         }
       } catch (error) {
         console.error('Auth error:', error);
@@ -438,7 +438,7 @@ const clearBrochure = () => {
       const auth = getAuth();
       if (!auth.currentUser) {
         await signInAnonymously(auth);
-        console.log('Signed in anonymously for photo upload');
+  // console.log('Signed in anonymously for photo upload'); // Removed for production
       }
     } catch (error) {
       console.error('Auth error:', error);

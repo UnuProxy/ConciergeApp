@@ -33,7 +33,7 @@ export const DatabaseProvider = ({ children }) => {
         setLoading(true);
         
         try {
-          console.log("Current user:", user.email);
+  // console.log("Current user:", user.email); // Removed for production
           // Always try the signed-in user's document first (rules allow self-reads)
           const userDocRef = doc(db, "users", user.uid);
           const userSnapshot = await getDoc(userDocRef);
@@ -55,7 +55,7 @@ export const DatabaseProvider = ({ children }) => {
                 companyName: userData?.companyName || fallbackData.companyName
               };
               fallbackCompanyName = fallbackCompanyName || fallbackData.companyName || null;
-              console.log("User found via authorized_users:", emailSnapshot.docs[0].id);
+  // console.log("User found via authorized_users:", emailSnapshot.docs[0].id); // Removed for production
 
               // If user doc missing, create/merge it so future reads succeed
               if (!userSnapshot.exists() && userData.companyId) {
@@ -66,20 +66,20 @@ export const DatabaseProvider = ({ children }) => {
                     companyName: userData.companyName || userData.companyId,
                     role: userData.role || "agent"
                   }, { merge: true });
-                  console.log("Created users doc from authorized_users fallback");
+  // console.log("Created users doc from authorized_users fallback"); // Removed for production
                 } catch (writeErr) {
-                  console.warn("Failed to create users doc from authorized_users:", writeErr);
+  // console.warn("Failed to create users doc from authorized_users:", writeErr); // Removed for production
                 }
               }
             }
           }
 
           if (userData?.companyId && userData?.role) {
-            console.log("User data:", userData);
+  // console.log("User data:", userData); // Removed for production
 
             const resolvedRole = userData.role || "employee";
             setUserRole(resolvedRole);
-            console.log("Setting userRole state to:", resolvedRole);
+  // console.log("Setting userRole state to:", resolvedRole); // Removed for production
             
             const companyId = userData.companyId;
             try {
@@ -87,7 +87,7 @@ export const DatabaseProvider = ({ children }) => {
               const companySnapshot = await getDoc(companyDocRef);
               
               if (companySnapshot.exists()) {
-                console.log("Company found:", companyId);
+  // console.log("Company found:", companyId); // Removed for production
                 setCompanyInfo({
                   id: companyId,
                   ...companySnapshot.data()
@@ -98,7 +98,7 @@ export const DatabaseProvider = ({ children }) => {
               }
             } catch (companyError) {
               if (companyError?.code === "permission-denied") {
-                console.warn("Permission denied reading company doc, falling back to authorized_users data");
+  // console.warn("Permission denied reading company doc, falling back to authorized_users data"); // Removed for production
                 if (companyId) {
                   setCompanyInfo({
                     id: companyId,
@@ -124,7 +124,7 @@ export const DatabaseProvider = ({ children }) => {
                 id: debugForceCompanyId,
                 name: debugForceCompanyName || debugForceCompanyId
               });
-              console.warn("DEBUG: Forced company/role applied from env vars.");
+  // console.warn("DEBUG: Forced company/role applied from env vars."); // Removed for production
             }
           } else {
             console.error("Error fetching user or company data:", error);
@@ -149,7 +149,7 @@ export const DatabaseProvider = ({ children }) => {
     if (!file) throw new Error("No file provided");
     if (!currentUser) throw new Error("User not authenticated");
 
-    console.log("Starting upload process");
+  // console.log("Starting upload process"); // Removed for production
     
     // Create sanitized filename
     const timestamp = Date.now();
@@ -158,14 +158,14 @@ export const DatabaseProvider = ({ children }) => {
     
     // Create a more permissive path for testing
     const path = `public/${folder}/${filename}`;
-    console.log("Upload path:", path);
+  // console.log("Upload path:", path); // Removed for production
     
     // Create storage reference
     const storageRef = ref(storage, path);
     
     // Upload file
     const snapshot = await uploadBytes(storageRef, file);
-    console.log("Upload successful");
+  // console.log("Upload successful"); // Removed for production
     
     // Get download URL
     const url = await getDownloadURL(snapshot.ref);

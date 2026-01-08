@@ -7,13 +7,31 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showError, setShowError] = useState(false);
+  const [configWarning, setConfigWarning] = useState('');
   const { loginWithGoogle, currentUser } = useAuth();
   const navigate = useNavigate();
+
+  // Check Firebase configuration on mount
+  useEffect(() => {
+    const requiredEnvVars = [
+      'VITE_FIREBASE_API_KEY',
+      'VITE_FIREBASE_AUTH_DOMAIN',
+      'VITE_FIREBASE_PROJECT_ID',
+      'VITE_FIREBASE_APP_ID'
+    ];
+    
+    const missing = requiredEnvVars.filter(varName => !import.meta.env[varName]);
+    
+    if (missing.length > 0) {
+      setConfigWarning(`Firebase configuration incomplete. Missing: ${missing.join(', ')}. Please create a .env.local file with your Firebase credentials.`);
+      console.error('Missing Firebase environment variables:', missing);
+    }
+  }, []);
 
   // Redirect if already logged in
   useEffect(() => {
     if (currentUser) {
-      navigate('/');
+      navigate('/', { replace: true });
     }
   }, [currentUser, navigate]);
 
@@ -31,21 +49,29 @@ const Login = () => {
       setError('');
       setLoading(true);
       
-      // Force account selection by passing forceAccountSelection: true
-      const { newUser } = await loginWithGoogle({ forceAccountSelection: true });
+      const { newUser } = await loginWithGoogle();
       
       // Since we're auto-assigning users to their company based on email,
       // we don't need the company selection screen anymore
       // Just redirect to dashboard
-      navigate('/');
+      navigate('/', { replace: true });
       
     } catch (error) {
       console.error('Login error:', error);
       
+      // Handle popup cancellation
+      if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+        setError('Sign-in was cancelled. Please try again.');
+      }
       // Special handling for unauthorized users
-      if (error.message.includes('Unauthorized email')) {
+      else if (error.message.includes('Unauthorized email')) {
         setError('Access denied. Your email is not authorized to use this application.');
-      } else {
+      }
+      // Handle popup blocked
+      else if (error.code === 'auth/popup-blocked') {
+        setError('Popup was blocked by your browser. Please allow popups for this site and try again.');
+      }
+      else {
         setError('Failed to log in: ' + error.message);
       }
     } finally {
@@ -85,8 +111,22 @@ const Login = () => {
           </p>
         </div>
 
+        {/* Configuration Warning */}
+        {configWarning && (
+          <div style={{
+            ...styles.errorMessage,
+            ...styles.errorVisible,
+            background: 'rgba(245, 158, 11, 0.1)',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
+            color: '#fbbf24'
+          }}>
+            <div style={styles.errorIcon}>⚙️</div>
+            <span>{configWarning}</span>
+          </div>
+        )}
+
         {/* Error Message */}
-        {error && (
+        {error && !configWarning && (
           <div style={{
             ...styles.errorMessage,
             ...(showError ? styles.errorVisible : styles.errorHidden)

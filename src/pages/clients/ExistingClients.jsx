@@ -663,7 +663,7 @@ function ExistingClients() {
   // Function to extract image URLs from service data
  // Function to extract image URLs from service data
 const extractImageUrl = (data) => {
-  console.log(`Extracting image for service:`, data.name?.en || data.name || 'Unknown', data.photos);
+  // console.log(`Extracting image for service:`, data.name?.en || data.name || 'Unknown', data.photos); // Removed for production
   
   // Priority 1: Check photos array (your main structure)
   if (data.photos && Array.isArray(data.photos) && data.photos.length > 0) {
@@ -672,33 +672,33 @@ const extractImageUrl = (data) => {
       photo && typeof photo === 'object' && photo.url && typeof photo.url === 'string' && photo.url.trim() !== '');
     
     if (photoWithUrl) {
-      console.log(`Found image in photos array:`, photoWithUrl.url);
+  // console.log(`Found image in photos array:`, photoWithUrl.url); // Removed for production
       return photoWithUrl.url;
     }
     
     // Fallback to string URLs directly in the array
     const firstValidPhoto = data.photos.find(photo => typeof photo === 'string' && photo.trim() !== '');
     if (firstValidPhoto) {
-      console.log(`Found string image in photos array:`, firstValidPhoto);
+  // console.log(`Found string image in photos array:`, firstValidPhoto); // Removed for production
       return firstValidPhoto;
     }
   }
   
   // Priority 2: Check imageUrl field
   if (data.imageUrl && typeof data.imageUrl === 'string' && data.imageUrl.trim() !== '') {
-    console.log(`Found imageUrl:`, data.imageUrl);
+  // console.log(`Found imageUrl:`, data.imageUrl); // Removed for production
     return data.imageUrl;
   } 
   
   // Priority 3: Check image field
   if (data.image && typeof data.image === 'string' && data.image.trim() !== '') {
-    console.log(`Found image field:`, data.image);
+  // console.log(`Found image field:`, data.image); // Removed for production
     return data.image;
   }
   
   // Priority 4: Check thumbnail field
   if (data.thumbnail && typeof data.thumbnail === 'string' && data.thumbnail.trim() !== '') {
-    console.log(`Found thumbnail:`, data.thumbnail);
+  // console.log(`Found thumbnail:`, data.thumbnail); // Removed for production
     return data.thumbnail;
   }
   
@@ -709,19 +709,19 @@ const extractImageUrl = (data) => {
       img && typeof img === 'object' && img.url && typeof img.url === 'string' && img.url.trim() !== '');
     
     if (imageWithUrl) {
-      console.log(`Found image in images array:`, imageWithUrl.url);
+  // console.log(`Found image in images array:`, imageWithUrl.url); // Removed for production
       return imageWithUrl.url;
     }
     
     // Fallback to string URLs
     const firstValidImage = data.images.find(img => typeof img === 'string' && img.trim() !== '');
     if (firstValidImage) {
-      console.log(`Found string image in images array:`, firstValidImage);
+  // console.log(`Found string image in images array:`, firstValidImage); // Removed for production
       return firstValidImage;
     }
   }
   
-  console.log(`No image found for service:`, data.name?.en || data.name || 'Unknown');
+  // console.log(`No image found for service:`, data.name?.en || data.name || 'Unknown'); // Removed for production
   return null;
 };
 
@@ -856,7 +856,7 @@ const extractImageUrl = (data) => {
             displayName: userData.displayName || userData.name || userData.email || 'User' 
           };
         } else {
-          console.log(`User with ID ${userId} not found`);
+  // console.log(`User with ID ${userId} not found`); // Removed for production
           return { id: userId, displayName: userId.slice(0, 8) + '...' };
         }
       } catch (err) {
@@ -1035,15 +1035,13 @@ useEffect(() => {
     setError(null);
     
     try {
-      console.log("Fetching clients for company:", companyInfo.id);
+  // console.log("Fetching clients for company:", companyInfo.id); // Removed for production
       const clientsRef = collection(db, "clients");
       const q = query(clientsRef, where("companyId", "==", companyInfo.id));
       const querySnapshot = await getDocs(q);
       
       // Log the raw data for debugging
-      console.log("Raw client data from Firestore:", 
-        querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-      );
+      // console.log("Raw client data from Firestore:", querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       
       const clientsData = querySnapshot.docs.map(doc => {
         const data = doc.data();
@@ -1095,7 +1093,7 @@ useEffect(() => {
         return nameA.localeCompare(nameB);
       });
       
-      console.log("Processed clients with all fields:", clientsData);
+  // console.log("Processed clients with all fields:", clientsData); // Removed for production
       setClients(clientsData);
     } catch (error) {
       console.error("Error fetching clients:", error);
@@ -1114,7 +1112,7 @@ useEffect(() => {
       if (!companyInfo) return;
       
       setLoadingServices(true);
-      console.log("Fetching services for company:", companyInfo.id);
+  // console.log("Fetching services for company:", companyInfo.id); // Removed for production
       
       try {
         const services = {};
@@ -1143,15 +1141,15 @@ useEffect(() => {
             }
             
             const snapshot = await getDocs(queryRef);
-            console.log(`Found ${snapshot.docs.length} items in ${category.collection}${category.filter ? ` with type ${category.filter}` : ''}`);
+  // console.log(`Found ${snapshot.docs.length} items in ${category.collection}${category.filter ? ` with type ${category.filter}` : ''}`); // Removed for production
             
             // Process the data based on collection type
             if (category.id === 'villas') {
   services[category.id] = snapshot.docs.map(doc => {
     const data = doc.data();
     
-    console.log(`Processing villa: ${data.name?.en || data.name || 'Unknown'}`);
-    console.log('Raw villa data structure:', JSON.stringify(data, null, 2));
+  // console.log(`Processing villa: ${data.name?.en || data.name || 'Unknown'}`); // Removed for production
+  // console.log('Raw villa data structure:', JSON.stringify(data, null, 2)); // Removed for production
     
     const imageUrl = extractImageUrl(data);
     
@@ -1262,13 +1260,7 @@ useEffect(() => {
       selectedPriceSource = 'dailyPrice';
     }
     
-    console.log(`Villa pricing for ${data.name?.en || 'Unknown'}:`, {
-      selectedPrice: priceValue,
-      selectedUnit: unit,
-      selectedPriceSource: selectedPriceSource,
-      hasPricingStructure: !!data.pricing,
-      hasPriceConfigurations: !!data.priceConfigurations
-    });
+    // console.log(`Villa pricing for ${data.name?.en || 'Unknown'}:`, { selectedPrice: priceValue, selectedUnit: unit, selectedPriceSource: selectedPriceSource, hasPricingStructure: !!data.pricing, hasPriceConfigurations: !!data.priceConfigurations });
     
     return {
       id: doc.id,
@@ -1379,18 +1371,7 @@ useEffect(() => {
     }
     
     // DEBUG: Log the pricing data found
-    console.log(`Boat pricing for ${data.name?.en || data.name || 'Unknown'}:`, {
-      rawPricingData: data.pricing,
-      currentMonth: currentMonth,
-      currentMonthName: monthNames[currentMonth],
-      currentMonthPrice: data.pricing?.monthly?.[monthNames[currentMonth]],
-      selectedPrice: priceValue,
-      selectedUnit: unit,
-      selectedPriceSource: selectedPriceSource,
-      availableMonthlyPrices: data.pricing?.monthly ? Object.keys(data.pricing.monthly).filter(month => 
-        data.pricing.monthly[month] && parseFloat(data.pricing.monthly[month]) > 0
-      ) : []
-    });
+    // console.log(`Boat pricing for ${data.name?.en || data.name || 'Unknown'}:`, { rawPricingData: data.pricing, currentMonth, currentMonthName: monthNames[currentMonth], currentMonthPrice: data.pricing?.monthly?.[monthNames[currentMonth]], selectedPrice: priceValue, selectedUnit: unit, selectedPriceSource, availableMonthlyPrices: data.pricing?.monthly ? Object.keys(data.pricing.monthly).filter(month => data.pricing.monthly[month] && parseFloat(data.pricing.monthly[month]) > 0) : [] });
     
     return {
       id: doc.id,
@@ -1464,12 +1445,7 @@ useEffect(() => {
       selectedPriceSource = 'dailyRate';
     }
     
-    console.log(`Car pricing for ${data.make} ${data.model}:`, {
-      selectedPrice: priceValue,
-      selectedUnit: unit,
-      selectedPriceSource: selectedPriceSource,
-      hasPricingStructure: !!data.pricing
-    });
+    // console.log(`Car pricing for ${data.make} ${data.model}:`, { selectedPrice: priceValue, selectedUnit: unit, selectedPriceSource, hasPricingStructure: !!data.pricing });
     
     return {
       id: doc.id,
@@ -1547,15 +1523,15 @@ useEffect(() => {
           }
         }
         
-        console.log("All services:", services);
-console.log("=== IMAGE DEBUG ===");
+  // console.log("All services:", services); // Removed for production
+  // console.log("=== IMAGE DEBUG ==="); // Removed for production
 Object.entries(services).forEach(([category, items]) => {
-  console.log(`${category}: ${items.length} items`);
+  // console.log(`${category}: ${items.length} items`); // Removed for production
   items.forEach(item => {
-    console.log(`  - ${item.name?.en || item.name}: ${item.imageUrl || 'NO IMAGE'}`);
+  // console.log(`  - ${item.name?.en || item.name}: ${item.imageUrl || 'NO IMAGE'}`); // Removed for production
   });
 });
-console.log("=== END DEBUG ===");
+  // console.log("=== END DEBUG ==="); // Removed for production
 setAvailableServices(services);
       } catch (error) {
         console.error("Error fetching services:", error);
@@ -1616,7 +1592,7 @@ setAvailableServices(services);
         offersData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         setOffersHistory(offersData);
       } catch (error) {
-        console.warn("Offer history unavailable:", error?.message || error);
+  // console.warn("Offer history unavailable:", error?.message || error); // Removed for production
         setOffersHistory([]);
       }
     };
@@ -1656,7 +1632,7 @@ setAvailableServices(services);
         
         setTeamMembers(members);
       } catch (error) {
-        console.warn("Team members unavailable:", error?.message || error);
+  // console.warn("Team members unavailable:", error?.message || error); // Removed for production
         setTeamMembers([]);
         setTeamMembersError(error?.message || 'Unable to load team');
       } finally {
@@ -1687,13 +1663,13 @@ setAvailableServices(services);
   useEffect(() => {
     const fetchClientReservationsAndFinances = async () => {
       if (!selectedClient || !companyInfo) {
-        console.log("Skipping reservation fetch - missing client or company info");
+  // console.log("Skipping reservation fetch - missing client or company info"); // Removed for production
         return;
       }
       
       try {
-        console.log("🔍 Fetching reservations for client:", selectedClient.name, selectedClient.id);
-        console.log("Company ID:", companyInfo.id);
+  // console.log("🔍 Fetching reservations for client:", selectedClient.name, selectedClient.id); // Removed for production
+  // console.log("Company ID:", companyInfo.id); // Removed for production
         
         // Fetch all reservations for this client from the reservations collection
         const reservationsQuery = query(
@@ -1703,16 +1679,16 @@ setAvailableServices(services);
         );
         
         const reservationsSnapshot = await getDocs(reservationsQuery);
-        console.log(`✅ Found ${reservationsSnapshot.docs.length} reservations for client ${selectedClient.name}`);
+  // console.log(`✅ Found ${reservationsSnapshot.docs.length} reservations for client ${selectedClient.name}`); // Removed for production
         
         if (reservationsSnapshot.docs.length > 0) {
-          console.log("Reservation data:", reservationsSnapshot.docs.map(doc => doc.data()));
+  // console.log("Reservation data:", reservationsSnapshot.docs.map(doc => doc.data())); // Removed for production
         }
         
         // If no reservations found with clientId, try alternative queries
         let alternativeReservations = [];
         if (reservationsSnapshot.docs.length === 0) {
-          console.log("🔍 No reservations found with clientId, trying alternative search by clientName...");
+  // console.log("🔍 No reservations found with clientId, trying alternative search by clientName..."); // Removed for production
           
           // Try searching by clientName
           const altQuery = query(
@@ -1722,10 +1698,10 @@ setAvailableServices(services);
           );
           
           const altSnapshot = await getDocs(altQuery);
-          console.log(`Found ${altSnapshot.docs.length} reservations by clientName`);
+  // console.log(`Found ${altSnapshot.docs.length} reservations by clientName`); // Removed for production
           
           if (altSnapshot.docs.length > 0) {
-            console.log("⚠️ Warning: Reservations found by clientName but not clientId. Update them to include clientId.");
+  // console.log("⚠️ Warning: Reservations found by clientName but not clientId. Update them to include clientId."); // Removed for production
             alternativeReservations = altSnapshot.docs;
           }
         }
@@ -1811,11 +1787,7 @@ setAvailableServices(services);
           currentStay
         }));
         
-        console.log("Updated client with reservations:", {
-          upcoming: upcomingReservations.length,
-          past: pastStays.length,
-          current: currentStay ? 'Yes' : 'No'
-        });
+        // console.log("Updated client with reservations:", { upcoming: upcomingReservations.length, past: pastStays.length, current: currentStay ? 'Yes' : 'No' });
         
       } catch (error) {
         console.error("Error fetching client reservations:", error);
@@ -1942,7 +1914,7 @@ setAvailableServices(services);
   });
   const fetchAdminUserFromDb = async (companyId) => {
   try {
-    console.log(`Fetching admin user for company: ${companyId}`);
+  // console.log(`Fetching admin user for company: ${companyId}`); // Removed for production
     
     const usersRef = collection(db, "users");
     const adminQuery = query(
@@ -1956,7 +1928,7 @@ setAvailableServices(services);
     if (!adminSnapshot.empty) {
       const adminDoc = adminSnapshot.docs[0];
       const adminData = adminDoc.data();
-      console.log("Found admin user:", adminData);
+  // console.log("Found admin user:", adminData); // Removed for production
       
       return {
         name: adminData.displayName || adminData.name || '',
@@ -1966,7 +1938,7 @@ setAvailableServices(services);
         address: adminData.address || ''
       };
     } else {
-      console.warn(`No admin user found for company ${companyId}`);
+  // console.warn(`No admin user found for company ${companyId}`); // Removed for production
       return null;
     }
   } catch (error) {
@@ -1977,7 +1949,7 @@ setAvailableServices(services);
 
 const fetchCompanyAdminForPdf = async (companyId) => {
   try {
-    console.log(`Getting PDF info for company: ${companyId}`);
+  // console.log(`Getting PDF info for company: ${companyId}`); // Removed for production
     
     // Fetch both company details and admin user
     const [companyDetails, adminUser] = await Promise.all([
@@ -1985,8 +1957,8 @@ const fetchCompanyAdminForPdf = async (companyId) => {
       fetchAdminUserFromDb(companyId)
     ]);
     
-    console.log("Company details from DB:", companyDetails);
-    console.log("Admin user from DB:", adminUser);
+  // console.log("Company details from DB:", companyDetails); // Removed for production
+  // console.log("Admin user from DB:", adminUser); // Removed for production
     
     // Combine the information, preferring admin user details where available
     const pdfInfo = {
@@ -1999,7 +1971,7 @@ const fetchCompanyAdminForPdf = async (companyId) => {
       logoUrl: companyDetails?.logoUrl || companyInfo?.logoUrl || null
     };
     
-    console.log("Final PDF info:", pdfInfo);
+  // console.log("Final PDF info:", pdfInfo); // Removed for production
     return pdfInfo;
     
   } catch (error) {
@@ -2284,7 +2256,7 @@ const fetchCompanyAdminForPdf = async (companyId) => {
           const serviceName = typeof item.name === 'object' ? getLocalizedText(item.name, language) : item.name;
           const paymentAmount = parseFloat(item.amountPaid) || 0;
           
-          console.log(`Creating payment record: serviceId=${serviceId}, amount=${paymentAmount}, service=${serviceName}`);
+  // console.log(`Creating payment record: serviceId=${serviceId}, amount=${paymentAmount}, service=${serviceName}`); // Removed for production
           
           return {
             id: `offer-payment-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 9)}`,
@@ -2409,7 +2381,7 @@ const handleSelectClient = async (client) => {
     
     if (clientDoc.exists()) {
       const data = clientDoc.data();
-      console.log("Full client data from Firestore:", { id: clientDoc.id, ...data });
+  // console.log("Full client data from Firestore:", { id: clientDoc.id, ...data }); // Removed for production
       
       // Process any timestamps
       const createdAt = data.createdAt ? 
@@ -2453,10 +2425,10 @@ const handleSelectClient = async (client) => {
         currentStay: data.currentStay || null
       };
       
-      console.log("Complete processed client:", completeClient);
+  // console.log("Complete processed client:", completeClient); // Removed for production
       setSelectedClient(completeClient);
     } else {
-      console.warn("Client document not found for ID:", client.id);
+  // console.warn("Client document not found for ID:", client.id); // Removed for production
       setSelectedClient(client);
     }
     
@@ -2553,7 +2525,7 @@ const handleSelectClient = async (client) => {
           // Skip bookings that don't belong to this company to avoid permission errors
           const bookingData = bookingDoc.data();
           if (bookingData?.companyId !== companyInfo.id) {
-            console.warn("Skipping booking from another company:", bookingDoc.id);
+  // console.warn("Skipping booking from another company:", bookingDoc.id); // Removed for production
             return null;
           }
           
@@ -2599,7 +2571,7 @@ const handleSelectClient = async (client) => {
           .map(oDoc => deleteDoc(oDoc.ref));
         await Promise.all(deleteOffersPromises);
         
-        console.log(`Deleted ${offersSnapshot.docs.length} offers for client ${selectedClient.name}`);
+  // console.log(`Deleted ${offersSnapshot.docs.length} offers for client ${selectedClient.name}`); // Removed for production
         
         // 4. Delete the client document
         const clientRef = doc(db, "clients", selectedClient.id);
@@ -3043,11 +3015,11 @@ const generateOfferPdf = async (offer) => {
     for (const currentItem of offer.items) {
       if (currentItem.imageUrl) {
         try {
-          console.log(`Pre-loading image for item: ${currentItem.id || 'unknown'}`);
+  // console.log(`Pre-loading image for item: ${currentItem.id || 'unknown'}`); // Removed for production
           const imageData = await fetchImageWithAuth(currentItem.imageUrl, currentItem.id || 'unknown');
           if (imageData) {
             imageCache[currentItem.imageUrl] = imageData;
-            console.log(`Successfully loaded image for item: ${currentItem.id || 'unknown'}`);
+  // console.log(`Successfully loaded image for item: ${currentItem.id || 'unknown'}`); // Removed for production
           }
         } catch (error) {
           console.error(`Failed to pre-load image for item: ${currentItem.id || 'unknown'}`, error);
@@ -3533,7 +3505,7 @@ const generateOfferPdf = async (offer) => {
     // Save the PDF
     doc.save(`Luxury_Offer_${offer.id.slice(-5)}_${offer.clientName}.pdf`);
     
-    console.log("Luxury PDF offer generated successfully");
+  // console.log("Luxury PDF offer generated successfully"); // Removed for production
     alert("Luxury PDF offer generated successfully.");
   } catch (error) {
     console.error("Error generating PDF:", error);
@@ -3548,11 +3520,11 @@ const generateOfferPdf = async (offer) => {
   if (!url) return null;
   
   try {
-    console.log(`Attempting to fetch image for item ${itemId}: ${url}`);
+  // console.log(`Attempting to fetch image for item ${itemId}: ${url}`); // Removed for production
     
     // For Firebase Storage URLs, try direct approach without proxy
     if (url.includes('firebasestorage.googleapis.com')) {
-      console.log(`Attempting direct fetch for Firebase image: ${url}`);
+  // console.log(`Attempting direct fetch for Firebase image: ${url}`); // Removed for production
       
       // Use Image element with canvas conversion
       return new Promise((resolve, reject) => {
@@ -3569,7 +3541,7 @@ const generateOfferPdf = async (offer) => {
             ctx.drawImage(img, 0, 0);
             
             const dataURL = canvas.toDataURL('image/jpeg', 0.8);
-            console.log(`Successfully converted image to base64 for item ${itemId}`);
+  // console.log(`Successfully converted image to base64 for item ${itemId}`); // Removed for production
             resolve(dataURL);
           } catch (canvasError) {
             console.error(`Canvas conversion failed for item ${itemId}:`, canvasError);
@@ -3785,10 +3757,10 @@ const getUserName = async (userId) => {
       return userName;
     }
 
-    console.log(`User with ID ${userId} not found in users or authorized_users`);
+  // console.log(`User with ID ${userId} not found in users or authorized_users`); // Removed for production
     return userId.slice(0, 8) + '...'; // Show truncated ID if user not found
   } catch (error) {
-    console.warn("User lookup failed:", error?.message || error);
+  // console.warn("User lookup failed:", error?.message || error); // Removed for production
     return userId.slice(0, 8) + '...'; // Show truncated ID on error
   } finally {
     setLoadingUsers(false);
@@ -3872,7 +3844,7 @@ const getUserName = async (userId) => {
           setImageErrors(prev => ({...prev, [service.id]: true}));
         }}
         onLoad={() => {
-          console.log(`Successfully loaded image for ${typeof service.name === 'object' ? getLocalizedText(service.name, language) : service.name}`);
+  // console.log(`Successfully loaded image for ${typeof service.name === 'object' ? getLocalizedText(service.name, language) : service.name}`); // Removed for production
           // Clear any previous error
           setImageErrors(prev => {
             const newErrors = {...prev};

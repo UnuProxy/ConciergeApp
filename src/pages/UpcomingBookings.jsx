@@ -414,7 +414,7 @@ const getServiceThumbnail = (service) => {
       
       try {
         setLoading(true);
-        console.log(`Fetching services for category ${selectedCategory.id} and company ${userCompanyId}...`);
+  // console.log(`Fetching services for category ${selectedCategory.id} and company ${userCompanyId}...`); // Removed for production
         
         // Create a query to fetch services from the selected category
         const serviceQuery = query(
@@ -454,12 +454,12 @@ const getServiceThumbnail = (service) => {
           });
         });
         
-        console.log(`Found ${servicesData.length} services in 'services' collection`);
+  // console.log(`Found ${servicesData.length} services in 'services' collection`); // Removed for production
         
         // If this is a standard category, also try to fetch from its dedicated collection
         if (['cars', 'boats', 'villas', 'chefs', 'security'].includes(selectedCategory.id)) {
           try {
-            console.log(`Fetching from dedicated '${selectedCategory.id}' collection...`);
+  // console.log(`Fetching from dedicated '${selectedCategory.id}' collection...`); // Removed for production
             
             const dedicatedQuery = query(
               collection(db, selectedCategory.id)
@@ -468,7 +468,7 @@ const getServiceThumbnail = (service) => {
             const dedicatedSnapshot = await getDocs(dedicatedQuery);
             const dedicatedCount = dedicatedSnapshot.size;
             
-            console.log(`Found ${dedicatedCount} items in '${selectedCategory.id}' collection`);
+  // console.log(`Found ${dedicatedCount} items in '${selectedCategory.id}' collection`); // Removed for production
             
             dedicatedSnapshot.forEach(doc => {
               const data = doc.data();
@@ -496,10 +496,7 @@ const getServiceThumbnail = (service) => {
                   : (selectedCategory.id === 'cars' || selectedCategory.id === 'boats' ? 'daily' : 'service');
               })();
               
-              console.log(`Processing item: ${doc.id}`, {
-                name: data.name?.en || data.name || doc.id,
-                price: price
-              });
+              // console.log(`Processing item: ${doc.id}`, { name: data.name?.en || data.name || doc.id, price: price });
               
               servicesData.push({
                 id: doc.id,
@@ -551,7 +548,7 @@ const getServiceThumbnail = (service) => {
           return nameA.localeCompare(nameB);
         });
         
-        console.log(`Total services after merging collections: ${servicesData.length}`);
+  // console.log(`Total services after merging collections: ${servicesData.length}`); // Removed for production
         setServices(normalizedServices);
         setLoading(false);
       } catch (err) {
@@ -2331,7 +2328,7 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
     onClick={(e) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log('Details button clicked for client:', client.clientId);
+  // console.log('Details button clicked for client:', client.clientId); // Removed for production
       onViewDetails?.(client.clientId);
     }}
   >
@@ -2350,7 +2347,7 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
     onClick={(e) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log('Pay button clicked for client:', client.clientName, 'Due amount:', client.dueAmount);
+  // console.log('Pay button clicked for client:', client.clientName, 'Due amount:', client.dueAmount); // Removed for production
       if (client.paymentStatus !== 'paid') {
         onOpenPayment?.(client);
       }
@@ -2368,7 +2365,7 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
     onClick={(e) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log('Service button clicked for client:', client.clientName);
+  // console.log('Service button clicked for client:', client.clientName); // Removed for production
       onOpenService?.(client);
     }}
   >
@@ -2383,7 +2380,7 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
     onClick={(e) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log('Shop button clicked for client:', client.clientName);
+  // console.log('Shop button clicked for client:', client.clientName); // Removed for production
       onOpenShopping?.(client);
     }}
   >
@@ -2412,7 +2409,7 @@ const UpcomingBookings = () => {
     
     try {
       showNotificationMessage(t.recalculating || 'Recalculating and cleaning duplicates...');
-      console.log("🔄 Recalculating Source of Truth for client:", client.clientName);
+  // console.log("🔄 Recalculating Source of Truth for client:", client.clientName); // Removed for production
       
       const updatedBookings = await Promise.all(client.bookings.map(async (booking) => {
         const bookingRef = doc(db, 'reservations', booking.id);
@@ -2444,7 +2441,7 @@ const UpcomingBookings = () => {
             
             // If within 60 seconds, it's likely a duplicate - skip it
             if (timeDiff < 60000) {
-              console.log(`⚠️ Removing duplicate payment: ${amount}€ for service ${serviceId}`);
+  // console.log(`⚠️ Removing duplicate payment: ${amount}€ for service ${serviceId}`); // Removed for production
               return; // Skip this duplicate
             }
           }
@@ -2456,7 +2453,7 @@ const UpcomingBookings = () => {
         
         const duplicatesRemoved = paymentHistory.length - cleanedPaymentHistory.length;
         if (duplicatesRemoved > 0) {
-          console.log(`🧹 Removed ${duplicatesRemoved} duplicate payment(s) from booking ${booking.id}`);
+  // console.log(`🧹 Removed ${duplicatesRemoved} duplicate payment(s) from booking ${booking.id}`); // Removed for production
         }
         
         paymentHistory = cleanedPaymentHistory;
@@ -2476,7 +2473,7 @@ const UpcomingBookings = () => {
             // If service shows paid but no payment record exists, create one
             if (totalPaidInHistory < serviceAmountPaid) {
               const missingAmount = serviceAmountPaid - totalPaidInHistory;
-              console.log(`🔧 Creating missing payment record: ${missingAmount}€ for service ${service.name || serviceId}`);
+  // console.log(`🔧 Creating missing payment record: ${missingAmount}€ for service ${service.name || serviceId}`); // Removed for production
               
               paymentHistory.push({
                 id: `recovery-${Date.now()}-${svcIdx}-${Math.random().toString(36).substr(2, 9)}`,
@@ -2655,7 +2652,7 @@ const UpcomingBookings = () => {
         maximumFractionDigits: 0
       }).format(value || 0);
     } catch (err) {
-      console.warn('Currency format fallback', err);
+  // console.warn('Currency format fallback', err); // Removed for production
       return `${(value || 0).toLocaleString()} €`;
     }
   };
@@ -2681,7 +2678,7 @@ const UpcomingBookings = () => {
       const stored = localStorage.getItem('reservationsTimeFilter');
       return validFilters.includes(stored) ? stored : 'active';
     } catch (err) {
-      console.warn('Unable to read stored time filter', err);
+  // console.warn('Unable to read stored time filter', err); // Removed for production
       return 'active';
     }
   };
@@ -2804,7 +2801,7 @@ const UpcomingBookings = () => {
     try {
       localStorage.setItem('reservationsTimeFilter', timeFilter);
     } catch (err) {
-      console.warn('Unable to persist time filter', err);
+  // console.warn('Unable to persist time filter', err); // Removed for production
     }
   }, [timeFilter]);
 
@@ -3148,7 +3145,7 @@ useEffect(() => {
           throw new Error(t.noCompanyAssociation);
         }
         
-        console.log(`User authenticated with company: ${companyId}, role: ${role}`);
+  // console.log(`User authenticated with company: ${companyId}, role: ${role}`); // Removed for production
         
         setUserCompanyId(companyId);
         setUserRole(role);
@@ -3173,7 +3170,7 @@ useEffect(() => {
     const fetchBookingsData = async () => {
       try {
         setLoading(true);
-        console.log(`Fetching data for company: ${userCompanyId}`);
+  // console.log(`Fetching data for company: ${userCompanyId}`); // Removed for production
         
         if (!userCompanyId) {
           throw new Error("No company ID available - cannot load data");
@@ -3210,7 +3207,7 @@ useEffect(() => {
               }
             }
           } else {
-            console.warn(`Booking ${doc.id} has wrong company ID: ${data.companyId} vs ${userCompanyId}`);
+  // console.warn(`Booking ${doc.id} has wrong company ID: ${data.companyId} vs ${userCompanyId}`); // Removed for production
           }
         });
 
@@ -3239,7 +3236,7 @@ useEffect(() => {
               if (clientData.companyId === userCompanyId) {
                 clientDetailsObj[clientId] = clientData;
               } else {
-                console.warn(`Client ${clientId} has wrong company ID: ${clientData.companyId} vs ${userCompanyId}`);
+  // console.warn(`Client ${clientId} has wrong company ID: ${clientData.companyId} vs ${userCompanyId}`); // Removed for production
               }
             }
           } catch (err) {
@@ -3249,7 +3246,7 @@ useEffect(() => {
               err?.code === 'PERMISSION_DENIED' ||
               (typeof err?.message === 'string' && err.message.toLowerCase().includes('permission'));
             if (permDenied) {
-              console.warn(`Permission denied reading client ${clientId}; using booking fallback name.`);
+  // console.warn(`Permission denied reading client ${clientId}; using booking fallback name.`); // Removed for production
               clientDetailsObj[clientId] = { name: clientNameFallbacks[clientId] || 'Client' };
             } else {
               console.error(`Error fetching client ${clientId}:`, err);
@@ -3438,7 +3435,7 @@ useEffect(() => {
     
     // Check for invalid date
     if (isNaN(date.getTime())) {
-      console.warn('Invalid date encountered:', dateStr);
+  // console.warn('Invalid date encountered:', dateStr); // Removed for production
       return ''; // Return empty string instead of "Invalid Date"
     }
     
@@ -3635,15 +3632,11 @@ useEffect(() => {
 const showBottomSheetWithContent = (content, item, secondaryItem = null) => {
   const allowedContent = ['client-details','quick-payment','edit-payment','add-service','edit-service','add-shopping', 'edit-booking'];
   if (!allowedContent.includes(content)) {
-    console.warn('Attempted to open unsupported bottom sheet content:', content);
+  // console.warn('Attempted to open unsupported bottom sheet content:', content); // Removed for production
     return;
   }
   document.body.style.overflow = 'hidden';
-  console.log('showBottomSheetWithContent called with:', { 
-    content, 
-    item: item ? { clientId: item.clientId, clientName: item.clientName } : null, 
-    secondaryItem 
-  });
+  // console.log('showBottomSheetWithContent called with:', { content, item: item ? { clientId: item.clientId, clientName: item.clientName } : null, secondaryItem });
   
   // Validate inputs
   if (!content) {
@@ -3697,16 +3690,12 @@ const showBottomSheetWithContent = (content, item, secondaryItem = null) => {
   // Show the modal
   setShowBottomSheet(true);
   
-  console.log('Bottom sheet state updated:', { 
-    content, 
-    showBottomSheet: true,
-    selectedItemName: item?.clientName 
-  });
+  // console.log('Bottom sheet state updated:', { content, showBottomSheet: true, selectedItemName: item?.clientName });
 };
 
 // 2. FIXED: Close function (around line 790)
 const closeBottomSheet = () => {
-  console.log('Closing bottom sheet');
+  // console.log('Closing bottom sheet'); // Removed for production
   setShowBottomSheet(false);
   document.body.style.overflow = '';
   setTimeout(() => {
@@ -3723,15 +3712,15 @@ const closeBottomSheet = () => {
       createdAt: new Date(),
       modifiedAt: new Date()
     });
-    console.log('Bottom sheet state cleared');
+  // console.log('Bottom sheet state cleared'); // Removed for production
   }, 300);
 };
 
 // 3. FIXED: Click handlers (around line 800)
 const viewClientDetails = (clientId) => {
-  console.log('viewClientDetails called with clientId:', clientId);
+  // console.log('viewClientDetails called with clientId:', clientId); // Removed for production
   const client = clientGroups[clientId];
-  console.log('Found client:', client);
+  // console.log('Found client:', client); // Removed for production
   if (client) {
     showBottomSheetWithContent('client-details', client);
   } else {
@@ -3740,7 +3729,7 @@ const viewClientDetails = (clientId) => {
 };
 
 const openPaymentModal = (client, service = null) => {
-  console.log('openPaymentModal called with client:', client, 'service:', service);
+  // console.log('openPaymentModal called with client:', client, 'service:', service); // Removed for production
   if (client) {
     setPaymentTargetService(service);
     // Pre-fill amount with service total if provided, otherwise client's due amount
@@ -3761,7 +3750,7 @@ const openPaymentModal = (client, service = null) => {
 };
 
 const openEditPaymentModal = (client, payment) => {
-  console.log('openEditPaymentModal called with:', { client, payment });
+  // console.log('openEditPaymentModal called with:', { client, payment }); // Removed for production
   if (client && payment) {
     showBottomSheetWithContent('edit-payment', client, payment);
   } else {
@@ -3770,7 +3759,7 @@ const openEditPaymentModal = (client, payment) => {
 };
 
 const openAddServiceModal = (client) => {
-  console.log('openAddServiceModal called with client:', client);
+  // console.log('openAddServiceModal called with client:', client); // Removed for production
   if (client) {
     showBottomSheetWithContent('add-service', client);
   } else {
@@ -3779,7 +3768,7 @@ const openAddServiceModal = (client) => {
 };
 
 const openEditServiceModal = (client, service) => {
-  console.log('openEditServiceModal called with:', { client, service });
+  // console.log('openEditServiceModal called with:', { client, service }); // Removed for production
   if (client && service) {
     showBottomSheetWithContent('edit-service', client, service);
   } else {
@@ -3788,7 +3777,7 @@ const openEditServiceModal = (client, service) => {
 };
 
 const openEditBookingModal = (client, booking) => {
-  console.log('openEditBookingModal called with:', { client, booking });
+  // console.log('openEditBookingModal called with:', { client, booking }); // Removed for production
   if (client && booking) {
     showBottomSheetWithContent('edit-booking', client, booking);
   } else {
@@ -3856,7 +3845,7 @@ const handleUpdateBookingDates = async () => {
 };
 
 const openAddShoppingModal = (client) => {
-  console.log('openAddShoppingModal called with client:', client);
+  // console.log('openAddShoppingModal called with client:', client); // Removed for production
   if (client) {
     showBottomSheetWithContent('add-shopping', client);
   } else {
@@ -3896,19 +3885,19 @@ const renderMainContent = (filteredClients) => {
           key={client.clientId} 
           client={client} 
           onViewDetails={(clientId) => {
-            console.log('ClientCard onViewDetails called with:', clientId);
+  // console.log('ClientCard onViewDetails called with:', clientId); // Removed for production
             viewClientDetails(clientId);
           }}
           onOpenPayment={(client) => {
-            console.log('ClientCard onOpenPayment called with:', client);
+  // console.log('ClientCard onOpenPayment called with:', client); // Removed for production
             openPaymentModal(client);
           }}
           onOpenService={(client) => {
-            console.log('ClientCard onOpenService called with:', client);
+  // console.log('ClientCard onOpenService called with:', client); // Removed for production
             openAddServiceModal(client);
           }}
           onOpenShopping={(client) => {
-            console.log('ClientCard onOpenShopping called with:', client);
+  // console.log('ClientCard onOpenShopping called with:', client); // Removed for production
             openAddShoppingModal(client);
           }}
         />
@@ -4168,7 +4157,7 @@ const renderMainContent = (filteredClients) => {
     }
     
     try {
-      console.log("Deleting booking:", booking.id, "for company:", userCompanyId);
+  // console.log("Deleting booking:", booking.id, "for company:", userCompanyId); // Removed for production
       
       // Verify this booking belongs to the user's company
       const bookingRef = doc(db, 'reservations', booking.id);
@@ -4194,7 +4183,7 @@ const renderMainContent = (filteredClients) => {
       const financeDocs = await getDocs(financeQuery);
       
       if (!financeDocs.empty) {
-        console.log(`Deleting ${financeDocs.size} finance records for booking ${booking.id}`);
+  // console.log(`Deleting ${financeDocs.size} finance records for booking ${booking.id}`); // Removed for production
         const deletePromises = financeDocs.docs
           .filter(fDoc => fDoc.data()?.companyId === userCompanyId)
           .map(fDoc => deleteDoc(fDoc.ref));
@@ -4282,7 +4271,7 @@ const renderMainContent = (filteredClients) => {
     }
     
     try {
-      console.log("Deleting service from booking:", service.bookingId);
+  // console.log("Deleting service from booking:", service.bookingId); // Removed for production
       
       // Verify this booking belongs to the user's company
       const bookingRef = doc(db, 'reservations', service.bookingId);
@@ -4388,7 +4377,7 @@ const renderMainContent = (filteredClients) => {
         updatedAt: serverTimestamp()
       });
       
-      console.log("Service and associated payments deleted, updating local state");
+  // console.log("Service and associated payments deleted, updating local state"); // Removed for production
       
       // Update local state: bookings
       setBookings(prev => {
@@ -4532,7 +4521,7 @@ const renderMainContent = (filteredClients) => {
     }
     
     try {
-      console.log("Adding shopping expense to booking:", targetBooking.id);
+  // console.log("Adding shopping expense to booking:", targetBooking.id); // Removed for production
       
       const bookingRef = doc(db, 'reservations', targetBooking.id);
       const bookingDoc = await getDoc(bookingRef);
@@ -4720,7 +4709,7 @@ const renderMainContent = (filteredClients) => {
         };
       });
       
-      console.log('Successfully added shopping expense to booking:', targetBooking.id);
+  // console.log('Successfully added shopping expense to booking:', targetBooking.id); // Removed for production
       showNotificationMessage(t.shoppingExpenseSuccess || "Shopping expense added successfully");
       return true;
     } catch (err) {
@@ -4756,7 +4745,7 @@ const renderMainContent = (filteredClients) => {
       if (serviceData.targetBookingId) {
         targetBooking = client.bookings.find(b => b.id === serviceData.targetBookingId);
         if (!targetBooking) {
-          console.warn("Specified booking not found, falling back to most recent");
+  // console.warn("Specified booking not found, falling back to most recent"); // Removed for production
         }
       }
       // Fall back to most recent booking if no specific booking was selected or found
@@ -4771,7 +4760,7 @@ const renderMainContent = (filteredClients) => {
     }
     
     try {
-      console.log("Adding service to booking:", targetBooking.id);
+  // console.log("Adding service to booking:", targetBooking.id); // Removed for production
       
       const bookingRef = doc(db, 'reservations', targetBooking.id);
       const bookingDoc = await getDoc(bookingRef);
@@ -4960,7 +4949,7 @@ const renderMainContent = (filteredClients) => {
         };
       });
       
-      console.log('Successfully added service to booking:', targetBooking.id);
+  // console.log('Successfully added service to booking:', targetBooking.id); // Removed for production
       showNotificationMessage(t.serviceAddedSuccess || "Service added successfully");
       return true;
     } catch (err) {
@@ -5022,14 +5011,14 @@ async function handleShoppingFormSubmit(shoppingExpense) {
     
     // CRITICAL: Prevent double-click/double-submission
     if (isProcessingPayment) {
-      console.warn('⚠️ Payment already in progress, ignoring duplicate request');
+  // console.warn('⚠️ Payment already in progress, ignoring duplicate request'); // Removed for production
       return;
     }
     
     // CRITICAL: Check if booking is already fully paid or overpaid
     const clientTotalDue = Math.max(0, (client.totalValue || 0) - (client.paidAmount || 0));
     if (clientTotalDue <= 0) {
-      console.warn('⚠️ Client already fully paid, no payment needed');
+  // console.warn('⚠️ Client already fully paid, no payment needed'); // Removed for production
       showNotificationMessage(t.alreadyFullyPaid || 'This booking is already fully paid', 'warning');
       closeBottomSheet();
       return;
@@ -5037,7 +5026,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
     
     // Cap payment at what's actually due to prevent overpayment
     if (amount > clientTotalDue) {
-      console.log(`📝 Capping payment from ${amount}€ to ${clientTotalDue}€ (client's actual due)`);
+  // console.log(`📝 Capping payment from ${amount}€ to ${clientTotalDue}€ (client's actual due)`); // Removed for production
       amount = clientTotalDue;
     }
     
@@ -5053,7 +5042,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
       const serviceDue = Math.max(0, serviceTotal - servicePaid);
       
       if (serviceDue <= 0 && serviceTotal > 0) {
-        console.warn('⚠️ Attempted to pay for already-paid service:', targetService.name);
+  // console.warn('⚠️ Attempted to pay for already-paid service:', targetService.name); // Removed for production
         showNotificationMessage(t.serviceAlreadyPaid || 'This service is already fully paid', 'warning');
         setIsProcessingPayment(false); // Reset flag before returning
         return;
@@ -5061,7 +5050,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
       
       // Cap the payment at what's actually due
       if (amount > serviceDue && serviceDue > 0) {
-        console.log(`📝 Capping payment from ${amount} to ${serviceDue} (what's actually due)`);
+  // console.log(`📝 Capping payment from ${amount} to ${serviceDue} (what's actually due)`); // Removed for production
         amount = serviceDue;
       }
     }
