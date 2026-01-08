@@ -29,13 +29,13 @@ export const CompanyProvider = ({ children }) => {
       setCurrentCompany(null);
 
       if (!user) {
-        console.log('No authenticated user');
+  // console.log('No authenticated user'); // Removed for production
         setUserRole(null);
         setLoading(false);
         return;
       }
 
-      console.log(`Authenticated user: ${user.email}`);
+  // console.log(`Authenticated user: ${user.email}`); // Removed for production
 
       try {
         // Step 1: Get primary user mapping from users/{uid} (allowed by rules for the signed-in user)
@@ -49,7 +49,7 @@ export const CompanyProvider = ({ children }) => {
           resolvedRole = userData.role || null;
           resolvedCompanyId = userData.companyId || null;
           resolvedCompanyName = userData.companyName || null;
-          console.log('User data from users collection:', userData);
+  // console.log('User data from users collection:', userData); // Removed for production
         }
 
         // Step 2: Fallback to authorized_users only if we still do not have role/company
@@ -64,7 +64,7 @@ export const CompanyProvider = ({ children }) => {
             resolvedRole = resolvedRole || authData.role || null;
             resolvedCompanyId = resolvedCompanyId || authData.companyId || null;
             resolvedCompanyName = resolvedCompanyName || authData.companyName || null;
-            console.log('Found in authorized_users:', authData);
+  // console.log('Found in authorized_users:', authData); // Removed for production
 
             // If user doc missing, create it so rules can allow future reads
             if (!userDoc.exists() && resolvedCompanyId) {
@@ -75,13 +75,13 @@ export const CompanyProvider = ({ children }) => {
                   companyName: resolvedCompanyName || resolvedCompanyId,
                   role: resolvedRole || 'agent'
                 }, { merge: true });
-                console.log('Created users doc from authorized_users fallback');
+  // console.log('Created users doc from authorized_users fallback'); // Removed for production
               } catch (writeErr) {
-                console.warn('Failed to create users doc from authorized_users:', writeErr);
+  // console.warn('Failed to create users doc from authorized_users:', writeErr); // Removed for production
               }
             }
           } else {
-            console.log('No authorized_users entry for user email');
+  // console.log('No authorized_users entry for user email'); // Removed for production
           }
         }
 
@@ -96,14 +96,14 @@ export const CompanyProvider = ({ children }) => {
               setCompanies([companyData]);
               setCurrentCompany(companyData);
               setAuthorized(true);
-              console.log('Setting current company:', companyData);
+  // console.log('Setting current company:', companyData); // Removed for production
             } else {
-              console.log('User company not found in Firestore');
+  // console.log('User company not found in Firestore'); // Removed for production
               setAuthorized(false);
             }
           } catch (companyError) {
             if (companyError?.code === 'permission-denied') {
-              console.warn('Permission denied reading company doc, falling back to authorized_users data');
+  // console.warn('Permission denied reading company doc, falling back to authorized_users data'); // Removed for production
               if (resolvedCompanyName || resolvedCompanyId) {
                 const fallbackCompany = {
                   id: preferredCompanyId,
@@ -120,13 +120,13 @@ export const CompanyProvider = ({ children }) => {
             }
           }
         } else {
-          console.log('No companyId resolved for user');
+  // console.log('No companyId resolved for user'); // Removed for production
           setAuthorized(false);
         }
 
         if (resolvedRole) {
           setUserRole(resolvedRole);
-          console.log(`User role set to: ${resolvedRole}`);
+  // console.log(`User role set to: ${resolvedRole}`); // Removed for production
         }
       } catch (error) {
         if (error?.code === 'permission-denied') {
@@ -138,7 +138,7 @@ export const CompanyProvider = ({ children }) => {
             setCurrentCompany(fallbackCompany);
             setAuthorized(true);
             setUserRole(debugForceRole);
-            console.warn('DEBUG: Forced company/role applied from env vars.');
+  // console.warn('DEBUG: Forced company/role applied from env vars.'); // Removed for production
           }
         } else {
           console.error('Error fetching companies:', error);
@@ -154,7 +154,7 @@ export const CompanyProvider = ({ children }) => {
   const switchCompany = (companyId) => {
     const company = companies.find(c => c.id === companyId);
     if (company) {
-      console.log(`Switching to company: ${company.name}`);
+  // console.log(`Switching to company: ${company.name}`); // Removed for production
       setCurrentCompany(company);
       localStorage.setItem('lastCompanyId', companyId);
     }
@@ -162,7 +162,7 @@ export const CompanyProvider = ({ children }) => {
 
   // Manually update user role - can be called after fixes
   const updateUserRole = (role) => {
-    console.log(`Manually updating user role to: ${role}`);
+  // console.log(`Manually updating user role to: ${role}`); // Removed for production
     setUserRole(role);
   };
 

@@ -36,7 +36,7 @@ export function AuthProvider({ children }) {
   // Function to check and update existing users' roles
   async function updateExistingUserRoles() {
     try {
-      console.log("FORCE UPDATING unujulian@gmail.com to ADMIN role");
+  // console.log("FORCE UPDATING unujulian@gmail.com to ADMIN role"); // Removed for production
       
       // 1. First, get all auth users with unujulian@gmail.com and update them
       const authUsersRef = collection(db, 'authorized_users');
@@ -46,7 +46,7 @@ export function AuthProvider({ children }) {
       // Force update all matching documents in authorized_users
       if (!authSnapshot.empty) {
         for (const docRef of authSnapshot.docs) {
-          console.log(`Updating authorized_users document: ${docRef.id}`);
+  // console.log(`Updating authorized_users document: ${docRef.id}`); // Removed for production
           // Use setDoc to completely replace the document
           await setDoc(doc(db, 'authorized_users', docRef.id), {
             email: "unujulian@gmail.com",
@@ -56,7 +56,7 @@ export function AuthProvider({ children }) {
           });
         }
       } else {
-        console.log("No authorized_users document found for unujulian@gmail.com");
+  // console.log("No authorized_users document found for unujulian@gmail.com"); // Removed for production
         
         // Create a new authorized_user document if none exists
         await setDoc(doc(authUsersRef, 'unu_admin_fix'), {
@@ -74,7 +74,7 @@ export function AuthProvider({ children }) {
       
       if (!userSnapshot.empty) {
         for (const docRef of userSnapshot.docs) {
-          console.log(`Updating users document: ${docRef.id}`);
+  // console.log(`Updating users document: ${docRef.id}`); // Removed for production
           // Update only the role field, preserving other user data
           await setDoc(doc(db, 'users', docRef.id), {
             ...docRef.data(),
@@ -84,7 +84,7 @@ export function AuthProvider({ children }) {
         }
       }
       
-      console.log("FORCE UPDATE COMPLETED");
+  // console.log("FORCE UPDATE COMPLETED"); // Removed for production
     } catch (error) {
       console.error("Error in force update:", error);
       setError("Failed to update user roles: " + error.message);
@@ -94,12 +94,12 @@ export function AuthProvider({ children }) {
   // Initialize authorized users collection
   async function initializeAuthorizedUsers() {
     try {
-      console.log("Checking if authorized users need to be initialized...");
+  // console.log("Checking if authorized users need to be initialized..."); // Removed for production
       const authorizedUsersRef = collection(db, 'authorized_users');
       const snapshot = await getDocs(authorizedUsersRef);
       
       if (snapshot.empty) {
-        console.log("Creating initial authorized users...");
+  // console.log("Creating initial authorized users..."); // Removed for production
         
         // Company 1 admin
         await setDoc(doc(authorizedUsersRef, 'auth1'), {
@@ -133,9 +133,9 @@ export function AuthProvider({ children }) {
           createdAt: serverTimestamp()
         });
         
-        console.log("Authorized users created successfully");
+  // console.log("Authorized users created successfully"); // Removed for production
       } else {
-        console.log("Authorized users already exist in database");
+  // console.log("Authorized users already exist in database"); // Removed for production
       }
     } catch (error) {
       console.error("Error initializing authorized users:", error);
@@ -146,12 +146,12 @@ export function AuthProvider({ children }) {
   // Initialize companies in Firestore
   async function initializeCompanies() {
     try {
-      console.log("Checking if companies need to be initialized...");
+  // console.log("Checking if companies need to be initialized..."); // Removed for production
       const companiesRef = collection(db, 'companies');
       const snapshot = await getDocs(companiesRef);
       
       if (snapshot.empty) {
-        console.log("Creating initial companies...");
+  // console.log("Creating initial companies..."); // Removed for production
         // Create Company 1
         await setDoc(doc(companiesRef, 'company1'), {
           name: 'Luxury Concierge',
@@ -166,9 +166,9 @@ export function AuthProvider({ children }) {
           createdAt: serverTimestamp()
         });
         
-        console.log("Companies created successfully");
+  // console.log("Companies created successfully"); // Removed for production
       } else {
-        console.log("Companies already exist in database");
+  // console.log("Companies already exist in database"); // Removed for production
       }
     } catch (error) {
       console.error("Error initializing companies:", error);
@@ -180,7 +180,7 @@ export function AuthProvider({ children }) {
   async function isAuthorizedUser(email, uid = null) {
     try {
       const normalizedEmail = email?.toLowerCase();
-      console.log(`Checking if ${normalizedEmail} is authorized...`);
+  // console.log(`Checking if ${normalizedEmail} is authorized...`); // Removed for production
 
       // First check authorized_users collection
       const authorizedUsersRef = collection(db, 'authorized_users');
@@ -189,7 +189,7 @@ export function AuthProvider({ children }) {
 
       if (!snapshot.empty) {
         const userData = snapshot.docs[0].data();
-        console.log(`User ${email} found in authorized_users for company ${userData.companyId} with role ${userData.role}`);
+  // console.log(`User ${email} found in authorized_users for company ${userData.companyId} with role ${userData.role}`); // Removed for production
         return {
           authorized: true,
           companyId: userData.companyId,
@@ -199,14 +199,14 @@ export function AuthProvider({ children }) {
 
       // If not in authorized_users, check users collection if uid is provided
       if (uid) {
-        console.log(`User not in authorized_users, checking users collection with uid: ${uid}`);
+  // console.log(`User not in authorized_users, checking users collection with uid: ${uid}`); // Removed for production
         const userDocRef = doc(db, 'users', uid);
         const userDocSnap = await getDoc(userDocRef);
 
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data();
           if (userData.email?.toLowerCase() === normalizedEmail) {
-            console.log(`User ${email} found in users collection for company ${userData.companyId} with role ${userData.role}`);
+  // console.log(`User ${email} found in users collection for company ${userData.companyId} with role ${userData.role}`); // Removed for production
             return {
               authorized: true,
               companyId: userData.companyId,
@@ -216,7 +216,7 @@ export function AuthProvider({ children }) {
         }
       }
 
-      console.log(`User ${normalizedEmail} is not authorized`);
+  // console.log(`User ${normalizedEmail} is not authorized`); // Removed for production
       return { authorized: false };
     } catch (error) {
       console.error("Error checking user authorization:", error);
@@ -230,10 +230,15 @@ export function AuthProvider({ children }) {
       setError(null);
       
       const provider = new GoogleAuthProvider();
+      // Force account selection and prevent auto-select
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+      
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
       
-      console.log("Google authentication successful for:", user.email);
+  // console.log("Google authentication successful for:", user.email); // Removed for production
 
       // Check if this email is authorized (check both authorized_users and users collections)
       const { authorized, companyId, role } = await isAuthorizedUser(user.email, user.uid);
@@ -249,7 +254,7 @@ export function AuthProvider({ children }) {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       
       if (!userDoc.exists()) {
-        console.log("New user - company assignment");
+  // console.log("New user - company assignment"); // Removed for production
         
         // Automatically assign the user to their authorized company
         await setDoc(doc(db, 'users', user.uid), {
@@ -264,7 +269,7 @@ export function AuthProvider({ children }) {
         // Update local state with role
         setUserCompany(companyId);
         setUserRole(role);
-        console.log(`Set userRole state to: ${role}`);
+  // console.log(`Set userRole state to: ${role}`); // Removed for production
         
         // No need for company selection, already assigned
         return { newUser: false, user };
@@ -282,7 +287,7 @@ export function AuthProvider({ children }) {
         setUserCompany(resolvedCompanyId);
       }
       
-      console.log("Existing user found");
+  // console.log("Existing user found"); // Removed for production
       return { newUser: false, user };
     } catch (error) {
       console.error("Login error:", error);
@@ -295,7 +300,7 @@ export function AuthProvider({ children }) {
   // Get available companies for selection
   async function getAvailableCompanies() {
     try {
-      console.log("Fetching available companies");
+  // console.log("Fetching available companies"); // Removed for production
       const companiesRef = collection(db, 'companies');
       const snapshot = await getDocs(companiesRef);
       
@@ -304,7 +309,7 @@ export function AuthProvider({ children }) {
         ...doc.data()
       }));
       
-      console.log("Companies retrieved:", companies);
+  // console.log("Companies retrieved:", companies); // Removed for production
       return companies;
     } catch (error) {
       console.error("Error fetching companies:", error);
@@ -318,7 +323,7 @@ export function AuthProvider({ children }) {
     try {
       if (!currentUser) throw new Error("No user logged in");
       
-      console.log(`Assigning user ${currentUser.uid} to company ${companyId}`);
+  // console.log(`Assigning user ${currentUser.uid} to company ${companyId}`); // Removed for production
       
       await setDoc(doc(db, 'users', currentUser.uid), {
         email: currentUser.email,
@@ -332,9 +337,9 @@ export function AuthProvider({ children }) {
       // Update local state with role - important!
       setUserCompany(companyId);
       setUserRole(role);
-      console.log(`Set userRole state to: ${role}`);
+  // console.log(`Set userRole state to: ${role}`); // Removed for production
       
-      console.log("User successfully assigned to company");
+  // console.log("User successfully assigned to company"); // Removed for production
       return true;
     } catch (error) {
       console.error("Error assigning user to company:", error);
@@ -348,7 +353,7 @@ export function AuthProvider({ children }) {
     try {
       setError(null);
       await signOut(auth);
-      console.log("User signed out");
+  // console.log("User signed out"); // Removed for production
     } catch (error) {
       console.error("Logout error:", error);
       setError(error.message);
@@ -359,24 +364,24 @@ export function AuthProvider({ children }) {
   // Fetch user's company data
   async function fetchUserCompanyData(userId) {
     try {
-      console.log(`Fetching company data for user ${userId}`);
+  // console.log(`Fetching company data for user ${userId}`); // Removed for production
       const userDoc = await getDoc(doc(db, 'users', userId));
       
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        console.log("User data:", userData);
+  // console.log("User data:", userData); // Removed for production
         
         // Important: Check if role exists and update state
         if (userData.role) {
           setUserRole(userData.role);
-          console.log(`Set userRole state to: ${userData.role}`);
+  // console.log(`Set userRole state to: ${userData.role}`); // Removed for production
         } else {
           // If no role, check authorized_users collection
           if (userData.email) {
             const authData = await isAuthorizedUser(userData.email, userId);
             if (authData.authorized && authData.role) {
               setUserRole(authData.role);
-              console.log(`Set userRole from authorized_users to: ${authData.role}`);
+  // console.log(`Set userRole from authorized_users to: ${authData.role}`); // Removed for production
             }
           }
         }
@@ -385,7 +390,7 @@ export function AuthProvider({ children }) {
         return userData;
       }
       
-      console.log("No user document found");
+  // console.log("No user document found"); // Removed for production
       return null;
     } catch (error) {
       console.error("Error fetching user company data:", error);
@@ -396,10 +401,10 @@ export function AuthProvider({ children }) {
 
   // Listen for auth state changes
   useEffect(() => {
-    console.log("Setting up auth state listener");
+  // console.log("Setting up auth state listener"); // Removed for production
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        console.log("User authenticated:", user.email);
+  // console.log("User authenticated:", user.email); // Removed for production
         let safePhotoURL = user.photoURL || '';
         if (safePhotoURL.includes('googleusercontent.com')) {
           safePhotoURL = safePhotoURL.replace(/=s\d+-c/, '=s96-c');
@@ -412,14 +417,14 @@ export function AuthProvider({ children }) {
         
         // If user exists in Firestore but no company assigned, they still need to select one
         if (!userData || !userData.companyId) {
-          console.log("User has no company assigned");
+  // console.log("User has no company assigned"); // Removed for production
           setUserCompany(null);
         }
         
         // Log the current role for debugging
-        console.log("Current user role in Navbar:", userRole);
+  // console.log("Current user role in Navbar:", userRole); // Removed for production
       } else {
-        console.log("No user authenticated");
+  // console.log("No user authenticated"); // Removed for production
         setCurrentUser(null);
         setUserCompany(null);
         setUserRole(null);

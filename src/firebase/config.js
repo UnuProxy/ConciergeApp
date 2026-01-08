@@ -13,6 +13,22 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
+// Log configuration status (without exposing sensitive data)
+// console.log('Firebase Config Status:', {
+//   apiKey: firebaseConfig.apiKey ? '✓ Set' : '✗ Missing',
+//   authDomain: firebaseConfig.authDomain ? '✓ Set' : '✗ Missing',
+//   projectId: firebaseConfig.projectId ? '✓ Set' : '✗ Missing',
+//   storageBucket: firebaseConfig.storageBucket ? '✓ Set' : '✗ Missing',
+//   messagingSenderId: firebaseConfig.messagingSenderId ? '✓ Set' : '✗ Missing',
+//   appId: firebaseConfig.appId ? '✓ Set' : '✗ Missing'
+// });
+
+// Check if all required config values are present
+const missingConfig = Object.entries(firebaseConfig).filter(([key, value]) => !value);
+if (missingConfig.length > 0) {
+  console.error('Missing Firebase configuration:', missingConfig.map(([key]) => key));
+  console.error('Please ensure all VITE_FIREBASE_* environment variables are set');
+}
 
 const app = initializeApp(firebaseConfig);
 

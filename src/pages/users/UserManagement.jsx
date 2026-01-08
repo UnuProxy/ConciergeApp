@@ -121,7 +121,7 @@ function UserManagement() {
     try {
       localStorage.setItem('appLanguage', language);
     } catch (err) {
-      console.warn('Unable to persist language preference', err);
+  // console.warn('Unable to persist language preference', err); // Removed for production
     }
   }, [language]);
   
@@ -192,9 +192,9 @@ function UserManagement() {
       } catch (err) {
         const permDenied = err?.code === 'permission-denied' || err?.code === 'PERMISSION_DENIED';
         if (permDenied) {
-          console.warn("authorized_users read denied; falling back to users collection");
+  // console.warn("authorized_users read denied; falling back to users collection"); // Removed for production
         } else {
-          console.warn("authorized_users read failed; trying users collection", err);
+  // console.warn("authorized_users read failed; trying users collection", err); // Removed for production
         }
         usersData = await fetchUsersFromCollection("users");
       }
@@ -366,7 +366,7 @@ function UserManagement() {
       } catch (err) {
         const permDenied = err?.code === 'permission-denied' || err?.code === 'PERMISSION_DENIED';
         if (permDenied) {
-          console.warn("authorized_users write denied; falling back to users collection");
+  // console.warn("authorized_users write denied; falling back to users collection"); // Removed for production
           await addDoc(collection(db, "users"), userData);
         } else {
           throw err;

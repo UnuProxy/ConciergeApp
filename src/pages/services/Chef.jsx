@@ -126,7 +126,7 @@ function Chef() {
             return { ...chef, bookingCount: bookings.length, totalRevenue };
           } catch (err) {
             // If permission error, return chef without stats
-            console.warn('Could not load stats for chef:', chef.id, err.message);
+  // console.warn('Could not load stats for chef:', chef.id, err.message); // Removed for production
             return { ...chef, bookingCount: 0, totalRevenue: 0 };
           }
         })

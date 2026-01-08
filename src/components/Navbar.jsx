@@ -81,8 +81,8 @@ function Navbar({ sidebarOpen, setSidebarOpen }) {
   }, [currentUser, authUserRole]);
   
   useEffect(() => {
-    console.log('FIXED Navbar - Email:', currentUser?.email);
-    console.log('FIXED Navbar - Override userRole:', userRole);
+  // console.log('FIXED Navbar - Email:', currentUser?.email); // Removed for production
+  // console.log('FIXED Navbar - Override userRole:', userRole); // Removed for production
   }, [userRole, currentUser?.email]);
   
   const getUserInitials = () => {

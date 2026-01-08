@@ -25,7 +25,7 @@ function AddProperty() {
     try {
       if (!auth.currentUser) {
         await signInAnonymously(auth);
-        console.log('Signed in anonymously for property uploads (on-demand)');
+  // console.log('Signed in anonymously for property uploads (on-demand)'); // Removed for production
       }
     } catch (err) {
       console.error('Auth error (on-demand storage auth):', err);
@@ -58,7 +58,7 @@ function AddProperty() {
       try {
         if (!auth.currentUser) {
           await signInAnonymously(auth);
-          console.log('Signed in anonymously for property uploads');
+  // console.log('Signed in anonymously for property uploads'); // Removed for production
         }
       } catch (err) {
         console.error('Auth error (property uploads):', err);
@@ -453,18 +453,18 @@ function AddProperty() {
           // Use shared path to avoid company-restricted storage rules
           const path = `${sharedBasePath}/${fileName}`;
           
-          console.log("Attempting to upload to path:", path);
+  // console.log("Attempting to upload to path:", path); // Removed for production
           
           // Create storage reference using the Firebase v9 SDK directly
           const storageRef = ref(storageInstance, path);
           
           // Upload file
           const uploadResult = await uploadBytes(storageRef, file);
-          console.log("Upload successful:", uploadResult);
+  // console.log("Upload successful:", uploadResult); // Removed for production
           
           // Get download URL
           const url = await getDownloadURL(uploadResult.ref);
-          console.log("Download URL received:", url);
+  // console.log("Download URL received:", url); // Removed for production
           
           return url;
         } catch (error) {
@@ -476,7 +476,7 @@ function AddProperty() {
       });
       
       const uploadedUrls = await Promise.all(uploadPromises);
-      console.log("All uploads completed, URLs:", uploadedUrls);
+  // console.log("All uploads completed, URLs:", uploadedUrls); // Removed for production
       
       // Update form data with new images
       setFormData(prev => ({
@@ -526,14 +526,14 @@ function AddProperty() {
           // Use shared path to avoid company-restricted storage rules
           const path = `${sharedBasePath}/${fileName}`;
           
-          console.log("Attempting to upload document to path:", path);
+  // console.log("Attempting to upload document to path:", path); // Removed for production
           
           // Create storage reference using the Firebase v9 SDK directly
           const storageRef = ref(storageInstance, path);
           
           // Upload file
           const uploadResult = await uploadBytes(storageRef, file);
-          console.log("Document upload successful");
+  // console.log("Document upload successful"); // Removed for production
           
           // Get download URL
           const url = await getDownloadURL(uploadResult.ref);
@@ -552,7 +552,7 @@ function AddProperty() {
       });
       
       const uploadedDocs = await Promise.all(uploadPromises);
-      console.log("All document uploads completed");
+  // console.log("All document uploads completed"); // Removed for production
       
       // Update form data with new documents
       setFormData(prev => ({
@@ -679,7 +679,7 @@ function AddProperty() {
         propertyData.createdBy = db.currentUser?.uid;
       }
       
-      console.log("Saving property data:", propertyData);
+  // console.log("Saving property data:", propertyData); // Removed for production
       
       if (isEditing) {
         // Update existing property
@@ -691,7 +691,7 @@ function AddProperty() {
         await addDoc(propertiesCollection, propertyData);
       }
       
-      console.log("Property saved successfully");
+  // console.log("Property saved successfully"); // Removed for production
       
       // Navigate back to property list or detail page
       if (isEditing) {

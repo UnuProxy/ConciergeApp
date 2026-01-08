@@ -815,13 +815,13 @@ function Cars() {
         // Only sign in anonymously if no user is signed in
         signInAnonymously(auth)
           .then(() => {
-            console.log("Signed in anonymously for storage access");
+  // console.log("Signed in anonymously for storage access"); // Removed for production
           })
           .catch((error) => {
             console.error("Anonymous auth error:", error);
           });
       } else {
-        console.log("User is already authenticated", user.uid);
+  // console.log("User is already authenticated", user.uid); // Removed for production
       }
     });
     
@@ -1088,7 +1088,7 @@ function Cars() {
       if (!auth.currentUser) {
         try {
           await signInAnonymously(auth);
-          console.log("Signed in anonymously for upload");
+  // console.log("Signed in anonymously for upload"); // Removed for production
           
           // Allow time for auth to propagate
           await new Promise(resolve => setTimeout(resolve, 1000));
@@ -1114,7 +1114,7 @@ function Cars() {
         const fileName = `cars/${timestamp}_${randomStr}_${safeFileName}`;
         
         try {
-          console.log(`Uploading to: ${fileName}`);
+  // console.log(`Uploading to: ${fileName}`); // Removed for production
           const storageRef = ref(storage, fileName);
           
           const uploadTask = uploadBytesResumable(storageRef, file);

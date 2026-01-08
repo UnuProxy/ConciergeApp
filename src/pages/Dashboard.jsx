@@ -325,7 +325,7 @@ function Dashboard() {
         );
         
         if (orphanedOffers.length > 0) {
-          console.log(`Found ${orphanedOffers.length} orphaned offers from deleted clients`);
+  // console.log(`Found ${orphanedOffers.length} orphaned offers from deleted clients`); // Removed for production
         }
         
         setDashboardData(prev => ({
