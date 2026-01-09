@@ -13,6 +13,7 @@ import {
 import { db } from '../../firebase/config';
 import { useDatabase } from '../../context/DatabaseContext';
 import { getCurrentLanguage } from "../../utils/languageHelper"; // Import the language helper
+import BookingCommissionEditor from '../../components/BookingCommissionEditor';
 
 // Translation strings
 const translations = {
@@ -59,7 +60,16 @@ const translations = {
     save: 'Save',
     cancelSmall: 'Cancel',
     paid: 'Paid',
-    planned: 'Scheduled'
+    planned: 'Scheduled',
+    calculatedCommission: 'Calculated Commission',
+    useOutstanding: 'Use Outstanding',
+    useCalculated: 'Use Calculated',
+    adjustablePayment: 'You can adjust the amount to pay less or more',
+    bookingsWithCommission: 'Bookings & Commission Rates',
+    adjustRate: 'Adjust Rate',
+    customRate: 'Custom',
+    defaultRate: 'Default',
+    noBookings: 'No bookings found for this collaborator'
   },
   ro: {
     collaborators: 'Colaboratori',
@@ -104,7 +114,16 @@ const translations = {
     save: 'Salvează',
     cancelSmall: 'Renunță',
     paid: 'Plătită',
-    planned: 'Programată'
+    planned: 'Programată',
+    calculatedCommission: 'Comision Calculat',
+    useOutstanding: 'Folosește Rest de Plată',
+    useCalculated: 'Folosește Calculat',
+    adjustablePayment: 'Poți ajusta suma pentru a plăti mai puțin sau mai mult',
+    bookingsWithCommission: 'Rezervări & Rate Comision',
+    adjustRate: 'Ajustează Rata',
+    customRate: 'Personalizat',
+    defaultRate: 'Implicit',
+    noBookings: 'Nu există rezervări pentru acest colaborator'
   }
 };
 
@@ -136,6 +155,9 @@ function Collaborators() {
   const [editingId, setEditingId] = useState(null);
   const [selectedCollab, setSelectedCollab] = useState(null);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [showCommissionEditor, setShowCommissionEditor] = useState(false);
+  const [editingBooking, setEditingBooking] = useState(null);
+  const [collaboratorBookings, setCollaboratorBookings] = useState([]);
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
     date: new Date().toISOString().slice(0, 10),
@@ -209,8 +231,12 @@ function Collaborators() {
             )
           );
           const bookings = bookingSnap.docs.map(d => d.data());
+          // Calculate commission using custom rate if available, otherwise use collaborator's default rate
           const totalCommission = bookings.reduce(
-            (sum, b) => sum + b.totalAmount * c.commissionRate,
+            (sum, b) => {
+              const rate = b.customCommissionRate !== undefined ? b.customCommissionRate : c.commissionRate;
+              return sum + (b.totalAmount * rate);
+            },
             0
           );
           return { ...c, bookingCount: bookings.length, totalCommission };
@@ -294,20 +320,45 @@ function Collaborators() {
     setEditingId(null);
   };
 
-  const openLedger = collab => {
+  const openLedger = async collab => {
     setSelectedCollab(collab);
     setShowPaymentForm(false);
+    
+    // Pre-fill with outstanding amount as a suggestion
+    const meta = getPaymentMeta(collab);
     setPaymentForm({
-      amount: '',
+      amount: meta.outstanding > 0 ? meta.outstanding.toFixed(2) : '',
       date: new Date().toISOString().slice(0, 10),
       status: 'paid',
       method: 'transfer',
       reference: '',
       note: ''
     });
+
+    // Load bookings for this collaborator
+    try {
+      const bookingsRef = collection(db, 'reservations');
+      const bookingsQuery = query(
+        bookingsRef,
+        where('companyId', '==', companyId),
+        where('collaboratorId', '==', collab.id)
+      );
+      const bookingsSnap = await getDocs(bookingsQuery);
+      const bookings = bookingsSnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setCollaboratorBookings(bookings);
+    } catch (err) {
+      console.error('Error loading collaborator bookings:', err);
+      setCollaboratorBookings([]);
+    }
   };
 
-  const closeLedger = () => setSelectedCollab(null);
+  const closeLedger = () => {
+    setSelectedCollab(null);
+    setCollaboratorBookings([]);
+  };
 
   const selectedMeta = selectedCollab ? getPaymentMeta(selectedCollab) : null;
   const selectedLedgerItems = selectedCollab ? getLedgerItems(selectedCollab) : [];
@@ -351,7 +402,7 @@ function Collaborators() {
         scheduledTotal
       });
 
-      // Mirror collaborator payout into Finance as a provider cost
+      // Record collaborator payout in Finance as an expense (not a service cost)
       await addDoc(collection(db, 'financeRecords'), {
         companyId,
         collaboratorId: selectedCollab.id,
@@ -366,15 +417,8 @@ function Collaborators() {
         createdAt: Timestamp.now()
       });
 
-      // Also log in legacy payments for Finance summaries
-      await addDoc(collection(db, 'categoryPayments'), {
-        companyId,
-        category: { en: 'Collaborator payout', ro: 'Plată colaborator' },
-        amount: cleanAmount,
-        date: Timestamp.fromDate(new Date(paymentForm.date)),
-        description: paymentForm.note || paymentForm.reference || `Payout to ${selectedCollab.name}`,
-        createdAt: Timestamp.now()
-      });
+      // Note: We no longer create categoryPayments for collaborators to avoid double-counting
+      // Collaborator payouts are tracked in financeRecords and counted as expenses in Finance.jsx
 
       await loadCollaborators();
       // Refresh selected collaborator locally to keep panel in sync
@@ -692,19 +736,41 @@ function Collaborators() {
 
               {showPaymentForm && (
                 <form onSubmit={handlePaymentSubmit} className="mb-4 space-y-3 bg-slate-50 border border-slate-200 rounded-lg p-4">
+                  {/* Show calculated commission info */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-gray-700">{t.calculatedCommission}:</span>
+                      <span className="font-semibold text-blue-900">{formatCurrency(selectedMeta?.outstanding || 0)}</span>
+                    </div>
+                    <p className="text-xs text-gray-600 italic">{t.adjustablePayment}</p>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <label className="text-sm text-gray-700 flex flex-col gap-1">
-                      {t.amount}
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        required
-                        value={paymentForm.amount}
-                        onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                        className="border rounded-md p-2 focus:ring focus:ring-indigo-200"
-                      />
-                    </label>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-sm text-gray-700">
+                        {t.amount}
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          required
+                          value={paymentForm.amount}
+                          onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                          className="flex-1 border rounded-md p-2 focus:ring focus:ring-indigo-200"
+                          placeholder="0.00"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPaymentForm({ ...paymentForm, amount: selectedMeta?.outstanding || 0 })}
+                          className="px-3 py-2 text-xs bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200 transition whitespace-nowrap"
+                          title={t.useOutstanding}
+                        >
+                          {t.useOutstanding}
+                        </button>
+                      </div>
+                    </div>
                     <label className="text-sm text-gray-700 flex flex-col gap-1">
                       {t.date}
                       <input
@@ -771,6 +837,57 @@ function Collaborators() {
                 </form>
               )}
 
+              {/* Bookings & Commission Rates */}
+              {collaboratorBookings.length > 0 && (
+                <div className="mb-6">
+                  <p className="text-sm font-semibold text-gray-800 mb-3">{t.bookingsWithCommission}</p>
+                  <div className="space-y-2">
+                    {collaboratorBookings.map(booking => {
+                      const isCustomRate = booking.customCommissionRate !== undefined;
+                      const rate = isCustomRate ? booking.customCommissionRate : selectedCollab.commissionRate;
+                      const commission = (booking.totalAmount || 0) * rate;
+                      
+                      return (
+                        <div key={booking.id} className="border border-slate-200 rounded-lg p-3 bg-white hover:bg-slate-50 transition">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {booking.clientName || booking.accommodationType || 'Booking'}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                <span className="text-xs text-gray-500">
+                                  {booking.checkIn ? new Date(booking.checkIn).toLocaleDateString() : 'N/A'}
+                                </span>
+                                <span className="text-xs text-gray-400">•</span>
+                                <span className="text-xs font-medium text-gray-700">
+                                  €{(booking.totalAmount || 0).toFixed(2)}
+                                </span>
+                                <span className="text-xs text-gray-400">•</span>
+                                <span className={`text-xs px-2 py-0.5 rounded ${isCustomRate ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>
+                                  {(rate * 100).toFixed(1)}% {isCustomRate && `(${t.customRate})`}
+                                </span>
+                              </div>
+                              <p className="text-xs text-green-600 font-medium mt-1">
+                                {t.calculatedCommission}: €{commission.toFixed(2)}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setEditingBooking(booking);
+                                setShowCommissionEditor(true);
+                              }}
+                              className="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition whitespace-nowrap"
+                            >
+                              {t.adjustRate}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-3">
                 {selectedLedgerItems.length === 0 ? (
                   <div className="border border-dashed border-slate-200 rounded-lg p-4 text-sm text-gray-600">
@@ -798,6 +915,26 @@ function Collaborators() {
               </div>
             </aside>
           </div>
+        )}
+
+        {/* Commission Rate Editor Modal */}
+        {showCommissionEditor && editingBooking && selectedCollab && (
+          <BookingCommissionEditor
+            booking={editingBooking}
+            collaborator={selectedCollab}
+            onUpdate={async () => {
+              // Reload collaborators to reflect updated commission
+              await loadCollaborators();
+              // Reload bookings for the selected collaborator
+              if (selectedCollab) {
+                await openLedger(selectedCollab);
+              }
+            }}
+            onClose={() => {
+              setShowCommissionEditor(false);
+              setEditingBooking(null);
+            }}
+          />
         )}
       </div>
     </div>

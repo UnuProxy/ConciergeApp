@@ -4190,7 +4190,67 @@ const renderMainContent = (filteredClients) => {
         await Promise.all(deletePromises);
       }
 
-      // 2. Delete the booking document from Firestore
+      // 2. Delete associated category payments
+      const categoryPaymentsQuery = query(
+        collection(db, 'categoryPayments'),
+        where('companyId', '==', userCompanyId),
+        where('bookingId', '==', booking.id)
+      );
+      const categoryPaymentsDocs = await getDocs(categoryPaymentsQuery);
+      
+      if (!categoryPaymentsDocs.empty) {
+        const deleteCategoryPaymentsPromises = categoryPaymentsDocs.docs
+          .filter(cpDoc => cpDoc.data()?.companyId === userCompanyId)
+          .map(cpDoc => deleteDoc(cpDoc.ref));
+        await Promise.all(deleteCategoryPaymentsPromises);
+      }
+
+      // 3. Delete associated expenses
+      const expensesQuery = query(
+        collection(db, 'expenses'),
+        where('companyId', '==', userCompanyId),
+        where('bookingId', '==', booking.id)
+      );
+      const expensesDocs = await getDocs(expensesQuery);
+      
+      if (!expensesDocs.empty) {
+        const deleteExpensesPromises = expensesDocs.docs
+          .filter(eDoc => eDoc.data()?.companyId === userCompanyId)
+          .map(eDoc => deleteDoc(eDoc.ref));
+        await Promise.all(deleteExpensesPromises);
+      }
+
+      // 3b. If booking has a collaborator, clean up collaborator payout records
+      if (bookingData.collaboratorId) {
+        // Delete financeRecords for this collaborator's payouts
+        const collaboratorPayoutsQuery = query(
+          collection(db, 'financeRecords'),
+          where('companyId', '==', userCompanyId),
+          where('collaboratorId', '==', bookingData.collaboratorId),
+          where('serviceKey', '==', 'collaborator_payout')
+        );
+        const collaboratorPayoutsDocs = await getDocs(collaboratorPayoutsQuery);
+        
+        if (!collaboratorPayoutsDocs.empty) {
+          const deleteCollaboratorPayoutsPromises = collaboratorPayoutsDocs.docs
+            .filter(cpDoc => cpDoc.data()?.companyId === userCompanyId)
+            .map(cpDoc => deleteDoc(cpDoc.ref));
+          await Promise.all(deleteCollaboratorPayoutsPromises);
+        }
+        
+        // Also reset the collaborator's payment data
+        const collaboratorRef = doc(db, 'collaborators', bookingData.collaboratorId);
+        const collaboratorDoc = await getDoc(collaboratorRef);
+        if (collaboratorDoc.exists()) {
+          await updateDoc(collaboratorRef, {
+            payments: [],
+            paidTotal: 0,
+            scheduledTotal: 0
+          });
+        }
+      }
+
+      // 4. Delete the booking document from Firestore
       await deleteDoc(bookingRef);
       
       // Update local state: remove the booking from bookings array
