@@ -804,18 +804,21 @@ const Finance = () => {
     return startOk && endOk;
   });
 
-  const serviceBreakdown = Object.values(filteredFinanceRecords.reduce((acc, r) => {
-    const key = r.service || 'Unknown';
-    if (!acc[key]) {
-      acc[key] = { service: key, revenue: 0, cost: 0, count: 0 };
-    }
-    acc[key].revenue += (r.clientAmount || 0);
-    acc[key].cost += (r.providerCost || 0);
-    acc[key].count += 1;
-    acc[key].profit = acc[key].revenue - acc[key].cost;
-    acc[key].margin = acc[key].revenue > 0 ? (acc[key].profit / acc[key].revenue * 100) : 0;
-    return acc;
-  }, {}));
+  // Exclude collaborator payouts from service breakdown (they're expenses, not services)
+  const serviceBreakdown = Object.values(filteredFinanceRecords
+    .filter(r => r.serviceKey !== 'collaborator_payout')
+    .reduce((acc, r) => {
+      const key = r.service || 'Unknown';
+      if (!acc[key]) {
+        acc[key] = { service: key, revenue: 0, cost: 0, count: 0 };
+      }
+      acc[key].revenue += (r.clientAmount || 0);
+      acc[key].cost += (r.providerCost || 0);
+      acc[key].count += 1;
+      acc[key].profit = acc[key].revenue - acc[key].cost;
+      acc[key].margin = acc[key].revenue > 0 ? (acc[key].profit / acc[key].revenue * 100) : 0;
+      return acc;
+    }, {}));
   
   // Reset transactions pagination when filters change
   useEffect(() => {
@@ -834,9 +837,39 @@ const Finance = () => {
 
   const pendingFinance = filteredFinanceRecords.filter(r => (r.status === 'pending') || r.providerCost === null);
   const totalClientRevenue = filteredFinanceRecords.reduce((sum, r) => sum + (r.clientAmount || 0), 0);
-  const totalLegacyProviderPayments = categoryPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
-  const totalProviderCosts = filteredFinanceRecords.reduce((sum, r) => sum + (r.providerCost || 0), 0) + totalLegacyProviderPayments;
-  const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+  
+  // Helper function to check if a payment is a collaborator payout
+  const isCollaboratorPayout = (payment) => {
+    if (!payment.category) return false;
+    const categoryText = typeof payment.category === 'object' 
+      ? (payment.category.en || payment.category.ro || '')
+      : String(payment.category);
+    return categoryText.toLowerCase().includes('collaborator') || 
+           categoryText.toLowerCase().includes('colaborator');
+  };
+  
+  // FIXED: Exclude collaborator payouts from legacy provider payments
+  const totalLegacyProviderPayments = categoryPayments
+    .filter(p => !isCollaboratorPayout(p))
+    .reduce((sum, p) => sum + (p.amount || 0), 0);
+  
+  // FIXED: Exclude collaborator payouts from provider costs (they're commissions, not service costs)
+  const totalProviderCosts = filteredFinanceRecords
+    .filter(r => r.serviceKey !== 'collaborator_payout')
+    .reduce((sum, r) => sum + (r.providerCost || 0), 0) + totalLegacyProviderPayments;
+  
+  // Collaborator payouts are expenses, not provider costs
+  const totalCollaboratorPayoutsFromFinance = filteredFinanceRecords
+    .filter(r => r.serviceKey === 'collaborator_payout')
+    .reduce((sum, r) => sum + (r.providerCost || 0), 0);
+  
+  const totalCollaboratorPayoutsFromLegacy = categoryPayments
+    .filter(p => isCollaboratorPayout(p))
+    .reduce((sum, p) => sum + (p.amount || 0), 0);
+  
+  const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0) + 
+                        totalCollaboratorPayoutsFromFinance + 
+                        totalCollaboratorPayoutsFromLegacy;
   const grossProfit = totalClientRevenue - totalProviderCosts;
   const totalRevenue = grossProfit;
   const netProfit = totalRevenue - totalExpenses;

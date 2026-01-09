@@ -2541,6 +2541,56 @@ const handleSelectClient = async (client) => {
             .map(fDoc => deleteDoc(fDoc.ref));
           await Promise.all(deleteFinancePromises);
           
+          // Delete category payments for this booking
+          const categoryPaymentsQuery = query(
+            collection(db, "categoryPayments"),
+            where("companyId", "==", companyInfo.id),
+            where("bookingId", "==", bookingDoc.id)
+          );
+          const categoryPaymentsSnapshot = await getDocs(categoryPaymentsQuery);
+          const deleteCategoryPaymentsPromises = categoryPaymentsSnapshot.docs
+            .filter(cpDoc => cpDoc.data()?.companyId === companyInfo.id)
+            .map(cpDoc => deleteDoc(cpDoc.ref));
+          await Promise.all(deleteCategoryPaymentsPromises);
+          
+          // Delete expenses for this booking
+          const expensesQuery = query(
+            collection(db, "expenses"),
+            where("companyId", "==", companyInfo.id),
+            where("bookingId", "==", bookingDoc.id)
+          );
+          const expensesSnapshot = await getDocs(expensesQuery);
+          const deleteExpensesPromises = expensesSnapshot.docs
+            .filter(eDoc => eDoc.data()?.companyId === companyInfo.id)
+            .map(eDoc => deleteDoc(eDoc.ref));
+          await Promise.all(deleteExpensesPromises);
+          
+          // If booking has a collaborator, clean up their payout records
+          if (bookingData.collaboratorId) {
+            const collaboratorPayoutsQuery = query(
+              collection(db, "financeRecords"),
+              where("companyId", "==", companyInfo.id),
+              where("collaboratorId", "==", bookingData.collaboratorId),
+              where("serviceKey", "==", "collaborator_payout")
+            );
+            const collaboratorPayoutsSnapshot = await getDocs(collaboratorPayoutsQuery);
+            const deleteCollaboratorPayoutsPromises = collaboratorPayoutsSnapshot.docs
+              .filter(cpDoc => cpDoc.data()?.companyId === companyInfo.id)
+              .map(cpDoc => deleteDoc(cpDoc.ref));
+            await Promise.all(deleteCollaboratorPayoutsPromises);
+            
+            // Reset collaborator payment data
+            const collaboratorRef = doc(db, "collaborators", bookingData.collaboratorId);
+            const collaboratorDoc = await getDoc(collaboratorRef);
+            if (collaboratorDoc.exists()) {
+              await updateDoc(collaboratorRef, {
+                payments: [],
+                paidTotal: 0,
+                scheduledTotal: 0
+              });
+            }
+          }
+          
           // Delete the booking
           return deleteDoc(bookingDoc.ref);
         });
@@ -2558,6 +2608,30 @@ const handleSelectClient = async (client) => {
           .filter(fDoc => fDoc.data()?.companyId === companyInfo.id)
           .map(fDoc => deleteDoc(fDoc.ref));
         await Promise.all(deleteClientFinancePromises);
+        
+        // 2b. Delete any category payments directly tied to this client
+        const clientCategoryPaymentsQuery = query(
+          collection(db, "categoryPayments"),
+          where("companyId", "==", companyInfo.id),
+          where("clientId", "==", selectedClient.id)
+        );
+        const clientCategoryPaymentsSnapshot = await getDocs(clientCategoryPaymentsQuery);
+        const deleteClientCategoryPaymentsPromises = clientCategoryPaymentsSnapshot.docs
+          .filter(cpDoc => cpDoc.data()?.companyId === companyInfo.id)
+          .map(cpDoc => deleteDoc(cpDoc.ref));
+        await Promise.all(deleteClientCategoryPaymentsPromises);
+        
+        // 2c. Delete any expenses directly tied to this client
+        const clientExpensesQuery = query(
+          collection(db, "expenses"),
+          where("companyId", "==", companyInfo.id),
+          where("clientId", "==", selectedClient.id)
+        );
+        const clientExpensesSnapshot = await getDocs(clientExpensesQuery);
+        const deleteClientExpensesPromises = clientExpensesSnapshot.docs
+          .filter(eDoc => eDoc.data()?.companyId === companyInfo.id)
+          .map(eDoc => deleteDoc(eDoc.ref));
+        await Promise.all(deleteClientExpensesPromises);
         
         // 3. Delete all offers for this client
         const offersQuery = query(
