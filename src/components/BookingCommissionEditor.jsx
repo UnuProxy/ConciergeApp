@@ -3,42 +3,46 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
 /**
- * Component to edit custom commission rate for a booking
+ * Component to edit custom commission amount for a booking
  */
 function BookingCommissionEditor({ booking, collaborator, onUpdate, onClose }) {
-  const [customRate, setCustomRate] = useState(
-    booking.customCommissionRate !== undefined 
-      ? (booking.customCommissionRate * 100).toFixed(1)
-      : (collaborator.commissionRate * 100).toFixed(1)
+  // Calculate default commission based on collaborator's rate
+  const defaultCommission = (booking.totalAmount || 0) * collaborator.commissionRate;
+  
+  // Initialize with custom amount if exists, otherwise use default
+  const [customAmount, setCustomAmount] = useState(
+    booking.customCommissionAmount !== undefined 
+      ? booking.customCommissionAmount.toFixed(2)
+      : defaultCommission.toFixed(2)
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const isCustom = booking.customCommissionAmount !== undefined;
   const defaultRate = (collaborator.commissionRate * 100).toFixed(1);
-  const isCustom = booking.customCommissionRate !== undefined;
 
   const handleSave = async () => {
     try {
       setSaving(true);
       setError('');
 
-      const rateValue = parseFloat(customRate) / 100;
+      const amountValue = parseFloat(customAmount);
 
-      if (isNaN(rateValue) || rateValue < 0 || rateValue > 100) {
-        setError('Invalid rate. Must be between 0% and 100%.');
+      if (isNaN(amountValue) || amountValue < 0) {
+        setError('Invalid amount. Must be 0 or greater.');
         return;
       }
 
       const bookingRef = doc(db, 'reservations', booking.id);
       await updateDoc(bookingRef, {
-        customCommissionRate: rateValue
+        customCommissionAmount: amountValue
       });
 
       if (onUpdate) onUpdate();
       if (onClose) onClose();
     } catch (err) {
-      console.error('Error updating commission rate:', err);
-      setError('Failed to update commission rate.');
+      console.error('Error updating commission amount:', err);
+      setError('Failed to update commission amount.');
     } finally {
       setSaving(false);
     }
@@ -51,26 +55,28 @@ function BookingCommissionEditor({ booking, collaborator, onUpdate, onClose }) {
 
       const bookingRef = doc(db, 'reservations', booking.id);
       await updateDoc(bookingRef, {
-        customCommissionRate: null
+        customCommissionAmount: null
       });
 
       if (onUpdate) onUpdate();
       if (onClose) onClose();
     } catch (err) {
-      console.error('Error resetting commission rate:', err);
-      setError('Failed to reset commission rate.');
+      console.error('Error resetting commission amount:', err);
+      setError('Failed to reset commission amount.');
     } finally {
       setSaving(false);
     }
   };
 
-  const calculatedCommission = (booking.totalAmount || 0) * (parseFloat(customRate) / 100);
+  const currentAmount = parseFloat(customAmount) || 0;
+  const difference = currentAmount - defaultCommission;
+  const effectiveRate = booking.totalAmount > 0 ? (currentAmount / booking.totalAmount) * 100 : 0;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Adjust Commission Rate</h3>
+          <h3 className="text-lg font-semibold text-gray-900">Adjust Commission Amount</h3>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
@@ -87,7 +93,7 @@ function BookingCommissionEditor({ booking, collaborator, onUpdate, onClose }) {
             <p className="text-sm text-gray-600">Collaborator</p>
             <p className="font-medium text-gray-900">{collaborator.name}</p>
             <p className="text-xs text-gray-500 mt-1">
-              Default rate: {defaultRate}%
+              Default rate: {defaultRate}% → €{defaultCommission.toFixed(2)}
             </p>
           </div>
 
@@ -99,34 +105,55 @@ function BookingCommissionEditor({ booking, collaborator, onUpdate, onClose }) {
             </p>
           </div>
 
-          {/* Custom Rate Input */}
+          {/* Custom Amount Input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Commission Rate (%)
+              Commission Amount (€)
             </label>
             <input
               type="number"
-              step="0.1"
+              step="0.01"
               min="0"
-              max="100"
-              value={customRate}
-              onChange={(e) => setCustomRate(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="5.0"
+              value={customAmount}
+              onChange={(e) => setCustomAmount(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg p-2.5 text-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="0.00"
             />
-            <p className="text-xs text-gray-500 mt-1">
-              {isCustom ? '✏️ Custom rate for this booking' : '📋 Using default rate'}
-            </p>
+            <div className="flex items-center justify-between mt-2">
+              <p className="text-xs text-gray-500">
+                {isCustom ? '✏️ Custom amount' : '📋 Using default'}
+              </p>
+              <button
+                onClick={() => setCustomAmount(defaultCommission.toFixed(2))}
+                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+              >
+                Use Default (€{defaultCommission.toFixed(2)})
+              </button>
+            </div>
           </div>
 
-          {/* Calculated Commission */}
-          <div className="bg-green-50 rounded-lg p-3">
-            <p className="text-sm text-gray-600">Calculated Commission</p>
-            <p className="text-lg font-semibold text-green-700">
-              €{calculatedCommission.toFixed(2)}
-            </p>
+          {/* Comparison Display */}
+          <div className={`rounded-lg p-3 ${difference === 0 ? 'bg-gray-50' : difference > 0 ? 'bg-amber-50 border border-amber-200' : 'bg-green-50 border border-green-200'}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Effective Rate</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {effectiveRate.toFixed(1)}%
+                </p>
+              </div>
+              {difference !== 0 && (
+                <div className="text-right">
+                  <p className="text-xs text-gray-600">
+                    {difference > 0 ? 'Paying more' : 'Paying less'}
+                  </p>
+                  <p className={`text-sm font-semibold ${difference > 0 ? 'text-amber-700' : 'text-green-700'}`}>
+                    {difference > 0 ? '+' : ''}€{difference.toFixed(2)}
+                  </p>
+                </div>
+              )}
+            </div>
             <p className="text-xs text-gray-500 mt-1">
-              {parseFloat(customRate).toFixed(1)}% of €{(booking.totalAmount || 0).toFixed(2)}
+              €{currentAmount.toFixed(2)} {difference === 0 ? '(default)' : `vs €${defaultCommission.toFixed(2)} default`}
             </p>
           </div>
 
@@ -168,4 +195,5 @@ function BookingCommissionEditor({ booking, collaborator, onUpdate, onClose }) {
 }
 
 export default BookingCommissionEditor;
+
 

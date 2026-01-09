@@ -65,8 +65,8 @@ const translations = {
     useOutstanding: 'Use Outstanding',
     useCalculated: 'Use Calculated',
     adjustablePayment: 'You can adjust the amount to pay less or more',
-    bookingsWithCommission: 'Bookings & Commission Rates',
-    adjustRate: 'Adjust Rate',
+    bookingsWithCommission: 'Bookings & Commission Amounts',
+    adjustRate: 'Adjust Amount',
     customRate: 'Custom',
     defaultRate: 'Default',
     noBookings: 'No bookings found for this collaborator'
@@ -119,8 +119,8 @@ const translations = {
     useOutstanding: 'Folosește Rest de Plată',
     useCalculated: 'Folosește Calculat',
     adjustablePayment: 'Poți ajusta suma pentru a plăti mai puțin sau mai mult',
-    bookingsWithCommission: 'Rezervări & Rate Comision',
-    adjustRate: 'Ajustează Rata',
+    bookingsWithCommission: 'Rezervări & Sume Comision',
+    adjustRate: 'Ajustează Suma',
     customRate: 'Personalizat',
     defaultRate: 'Implicit',
     noBookings: 'Nu există rezervări pentru acest colaborator'
@@ -175,7 +175,9 @@ function Collaborators() {
     );
   };
 
-  const getPaymentMeta = collab => {
+  const getPaymentMeta = (collab, bookings = null) => {
+    if (!collab) return { paidTotal: 0, scheduledTotal: 0, outstanding: 0, badgeClass: 'bg-gray-400', statusLabel: '' };
+    
     const payments = Array.isArray(collab?.payments) ? collab.payments : [];
     const paidTotalFromPayments = payments
       .filter(p => p.status === 'paid')
@@ -189,8 +191,19 @@ function Collaborators() {
       ? Number(collab.scheduledTotal)
       : scheduledTotalFromPayments;
 
-    const outstanding = Math.max(Number(collab?.totalCommission || 0) - paidTotal, 0);
-    const pressureThreshold = Math.max(Number(collab?.totalCommission || 0) * 0.25, 50);
+    // Recalculate total commission from bookings if available (to account for custom amounts)
+    let totalCommission = Number(collab?.totalCommission || 0);
+    if (bookings && bookings.length > 0) {
+      totalCommission = bookings.reduce((sum, b) => {
+        if (b.customCommissionAmount !== undefined) {
+          return sum + b.customCommissionAmount;
+        }
+        return sum + (b.totalAmount * collab.commissionRate);
+      }, 0);
+    }
+
+    const outstanding = Math.max(totalCommission - paidTotal, 0);
+    const pressureThreshold = Math.max(totalCommission * 0.25, 50);
     const badgeClass =
       outstanding === 0 ? 'bg-emerald-500' : outstanding >= pressureThreshold ? 'bg-rose-500' : 'bg-amber-500';
     const statusLabel = outstanding === 0 ? t.upToDate : t.outstanding;
@@ -231,11 +244,13 @@ function Collaborators() {
             )
           );
           const bookings = bookingSnap.docs.map(d => d.data());
-          // Calculate commission using custom rate if available, otherwise use collaborator's default rate
+          // Calculate commission using custom amount if available, otherwise use collaborator's default rate
           const totalCommission = bookings.reduce(
             (sum, b) => {
-              const rate = b.customCommissionRate !== undefined ? b.customCommissionRate : c.commissionRate;
-              return sum + (b.totalAmount * rate);
+              if (b.customCommissionAmount !== undefined) {
+                return sum + b.customCommissionAmount;
+              }
+              return sum + (b.totalAmount * c.commissionRate);
             },
             0
           );
@@ -323,19 +338,8 @@ function Collaborators() {
   const openLedger = async collab => {
     setSelectedCollab(collab);
     setShowPaymentForm(false);
-    
-    // Pre-fill with outstanding amount as a suggestion
-    const meta = getPaymentMeta(collab);
-    setPaymentForm({
-      amount: meta.outstanding > 0 ? meta.outstanding.toFixed(2) : '',
-      date: new Date().toISOString().slice(0, 10),
-      status: 'paid',
-      method: 'transfer',
-      reference: '',
-      note: ''
-    });
 
-    // Load bookings for this collaborator
+    // Load bookings for this collaborator first
     try {
       const bookingsRef = collection(db, 'reservations');
       const bookingsQuery = query(
@@ -349,9 +353,31 @@ function Collaborators() {
         ...doc.data()
       }));
       setCollaboratorBookings(bookings);
+      
+      // Pre-fill with outstanding amount using fresh bookings data
+      const meta = getPaymentMeta(collab, bookings);
+      setPaymentForm({
+        amount: meta.outstanding > 0 ? meta.outstanding.toFixed(2) : '',
+        date: new Date().toISOString().slice(0, 10),
+        status: 'paid',
+        method: 'transfer',
+        reference: '',
+        note: ''
+      });
     } catch (err) {
       console.error('Error loading collaborator bookings:', err);
       setCollaboratorBookings([]);
+      
+      // Fallback to cached commission if bookings fail to load
+      const meta = getPaymentMeta(collab);
+      setPaymentForm({
+        amount: meta.outstanding > 0 ? meta.outstanding.toFixed(2) : '',
+        date: new Date().toISOString().slice(0, 10),
+        status: 'paid',
+        method: 'transfer',
+        reference: '',
+        note: ''
+      });
     }
   };
 
@@ -360,7 +386,7 @@ function Collaborators() {
     setCollaboratorBookings([]);
   };
 
-  const selectedMeta = selectedCollab ? getPaymentMeta(selectedCollab) : null;
+  const selectedMeta = selectedCollab ? getPaymentMeta(selectedCollab, collaboratorBookings) : null;
   const selectedLedgerItems = selectedCollab ? getLedgerItems(selectedCollab) : [];
 
   const handlePaymentSubmit = async e => {
@@ -420,13 +446,43 @@ function Collaborators() {
       // Note: We no longer create categoryPayments for collaborators to avoid double-counting
       // Collaborator payouts are tracked in financeRecords and counted as expenses in Finance.jsx
 
+      // Reload all collaborators first
       await loadCollaborators();
-      // Refresh selected collaborator locally to keep panel in sync
-      setSelectedCollab(prev =>
-        prev && prev.id === selectedCollab.id
-          ? { ...prev, payments: updatedPayments, paidTotal, scheduledTotal }
-          : prev
-      );
+      
+      // Reload bookings for this specific collaborator to recalculate commission with custom amounts
+      try {
+        const bookingsRef = collection(db, 'reservations');
+        const bookingsQuery = query(
+          bookingsRef,
+          where('companyId', '==', companyId),
+          where('collaboratorId', '==', selectedCollab.id)
+        );
+        const bookingsSnap = await getDocs(bookingsQuery);
+        const bookings = bookingsSnap.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setCollaboratorBookings(bookings);
+        
+        // Update selectedCollab with fresh payment data and recalculated commission
+        const bookingsCommission = bookings.reduce((sum, b) => {
+          if (b.customCommissionAmount !== undefined) {
+            return sum + b.customCommissionAmount;
+          }
+          return sum + (b.totalAmount * selectedCollab.commissionRate);
+        }, 0);
+        
+        setSelectedCollab({
+          ...selectedCollab,
+          payments: updatedPayments,
+          paidTotal,
+          scheduledTotal,
+          totalCommission: bookingsCommission
+        });
+      } catch (err) {
+        console.error('Error reloading collaborator bookings:', err);
+      }
+      
       setShowPaymentForm(false);
     } catch (err) {
       console.error(err);
@@ -837,15 +893,16 @@ function Collaborators() {
                 </form>
               )}
 
-              {/* Bookings & Commission Rates */}
+              {/* Bookings & Commission Amounts */}
               {collaboratorBookings.length > 0 && (
                 <div className="mb-6">
                   <p className="text-sm font-semibold text-gray-800 mb-3">{t.bookingsWithCommission}</p>
                   <div className="space-y-2">
                     {collaboratorBookings.map(booking => {
-                      const isCustomRate = booking.customCommissionRate !== undefined;
-                      const rate = isCustomRate ? booking.customCommissionRate : selectedCollab.commissionRate;
-                      const commission = (booking.totalAmount || 0) * rate;
+                      const isCustomAmount = booking.customCommissionAmount !== undefined;
+                      const defaultCommission = (booking.totalAmount || 0) * selectedCollab.commissionRate;
+                      const commission = isCustomAmount ? booking.customCommissionAmount : defaultCommission;
+                      const effectiveRate = booking.totalAmount > 0 ? (commission / booking.totalAmount) * 100 : 0;
                       
                       return (
                         <div key={booking.id} className="border border-slate-200 rounded-lg p-3 bg-white hover:bg-slate-50 transition">
@@ -863,12 +920,17 @@ function Collaborators() {
                                   €{(booking.totalAmount || 0).toFixed(2)}
                                 </span>
                                 <span className="text-xs text-gray-400">•</span>
-                                <span className={`text-xs px-2 py-0.5 rounded ${isCustomRate ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>
-                                  {(rate * 100).toFixed(1)}% {isCustomRate && `(${t.customRate})`}
+                                <span className={`text-xs px-2 py-0.5 rounded ${isCustomAmount ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>
+                                  {effectiveRate.toFixed(1)}% {isCustomAmount && `(${t.customRate})`}
                                 </span>
                               </div>
                               <p className="text-xs text-green-600 font-medium mt-1">
                                 {t.calculatedCommission}: €{commission.toFixed(2)}
+                                {isCustomAmount && commission !== defaultCommission && (
+                                  <span className="text-gray-500 ml-1">
+                                    (was €{defaultCommission.toFixed(2)})
+                                  </span>
+                                )}
                               </p>
                             </div>
                             <button
