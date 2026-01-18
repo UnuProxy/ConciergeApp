@@ -30,7 +30,7 @@ const OffersOverview = ({ offers = [], loading, language, onRefresh }) => {
         pendingOffers: 'Pending Action',
         bookedOffers: 'Booked',
         daysAgo: 'd ago',
-        viewClient: 'View Client',
+        viewOffer: 'View Offer',
         refresh: 'Refresh'
       },
       actionNeeded: {
@@ -65,7 +65,7 @@ const OffersOverview = ({ offers = [], loading, language, onRefresh }) => {
         pendingOffers: 'În Așteptare',
         bookedOffers: 'Rezervate',
         daysAgo: 'z',
-        viewClient: 'Vezi Client',
+        viewOffer: 'Vezi Oferta',
         refresh: 'Actualizează'
       },
       actionNeeded: {
@@ -167,9 +167,14 @@ const OffersOverview = ({ offers = [], loading, language, onRefresh }) => {
     return dateB - dateA;
   });
 
-  const handleViewClient = (offer) => {
-    // Navigate to clients page with the client selected
-    navigate('/clients/existing', { state: { clientId: offer.clientId } });
+  const handleViewOffer = (offer) => {
+    if (!offer?.clientId) return;
+    if (!offer?.id) {
+      navigate('/clients/existing', { state: { clientId: offer.clientId } });
+      return;
+    }
+    // Navigate to clients page with the client selected and the offer focused
+    navigate('/clients/existing', { state: { clientId: offer.clientId, offerId: offer.id } });
   };
 
   if (loading) {
@@ -329,10 +334,10 @@ const OffersOverview = ({ offers = [], loading, language, onRefresh }) => {
                   {/* Action Button */}
                   <div className="flex-shrink-0">
                     <button
-                      onClick={() => handleViewClient(offer)}
+                      onClick={() => handleViewOffer(offer)}
                       className="w-full lg:w-auto px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-xl hover:from-amber-600 hover:to-amber-700 transition-all duration-300 shadow-sm hover:shadow-md font-medium text-sm"
                     >
-                      {t.labels.viewClient}
+                      {t.labels.viewOffer}
                     </button>
                   </div>
                 </div>
@@ -356,4 +361,3 @@ const OffersOverview = ({ offers = [], loading, language, onRefresh }) => {
 };
 
 export default OffersOverview;
-
