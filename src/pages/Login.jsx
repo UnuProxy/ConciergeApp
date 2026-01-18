@@ -199,7 +199,7 @@ const styles = {
       radial-gradient(circle at 40% 40%, rgba(59, 130, 246, 0.05) 0%, transparent 50%),
       linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 75%, #475569 100%)
     `,
-    fontFamily: "'Inter', sans-serif",
+    fontFamily: "'Manrope', sans-serif",
     overflow: 'hidden'
   },
 
@@ -292,7 +292,7 @@ const styles = {
   },
 
   brandName: {
-    fontFamily: "'Playfair Display', serif",
+    fontFamily: "'Fraunces', serif",
     fontSize: '1.75rem',
     fontWeight: 600,
     color: '#ffffff',
@@ -411,7 +411,7 @@ const styles = {
     width: '20px',
     height: '20px',
     border: '2px solid #e5e7eb',
-    borderTop: '2px solid #3b82f6',
+    borderTop: '2px solid #2c5d6c',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite'
   },
@@ -458,8 +458,6 @@ const styles = {
 // Add CSS animations
 const styleSheet = document.createElement('style');
 styleSheet.textContent = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
-
   @keyframes patternFloat {
     0%, 100% { transform: translateY(0px) rotate(0deg); }
     50% { transform: translateY(-5px) rotate(0.5deg); }

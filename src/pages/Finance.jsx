@@ -314,7 +314,23 @@ const Finance = () => {
   // Firebase
   const db = getFirestore();
   const auth = getAuth();
-  const formatCurrency = (value = 0) => `€${Number(value || 0).toLocaleString()}`;
+  const toNumber = (value) => {
+    if (value === null || value === undefined || value === '') return 0;
+    if (typeof value === 'number') return Number.isNaN(value) ? 0 : value;
+    const cleaned = String(value).replace(/[^\d.-]/g, '');
+    const parsed = parseFloat(cleaned);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+
+  const toNumberOrNull = (value) => {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'number') return Number.isNaN(value) ? null : value;
+    const cleaned = String(value).replace(/[^\d.-]/g, '');
+    const parsed = parseFloat(cleaned);
+    return Number.isNaN(parsed) ? null : parsed;
+  };
+
+  const formatCurrency = (value = 0) => `€${toNumber(value).toLocaleString()}`;
   const getServiceLabel = (value, fallback = 'Unknown') => {
     if (!value) return fallback;
     if (typeof value === 'string') return value;
@@ -339,6 +355,42 @@ const Finance = () => {
     }
     const d = new Date(input);
     return Number.isNaN(d.getTime()) ? null : d;
+  };
+  const normalizeKeyPart = (value) => {
+    if (value === null || value === undefined || value === '') return 'Unknown';
+    return String(value);
+  };
+  const getServiceQuantity = (serviceItem) => {
+    if (!serviceItem) return 1;
+    const raw = serviceItem.quantity;
+    if (raw === null || raw === undefined || raw === '') return 1;
+    const qty = toNumber(raw);
+    return Number.isNaN(qty) ? 1 : qty;
+  };
+  const calculateDiscountedTotal = (serviceItem, basePrice, quantity) => {
+    const subtotal = basePrice * quantity;
+    const discountValue = toNumber(serviceItem?.discountValue ?? 0);
+    if (!discountValue) return subtotal;
+    if (serviceItem?.discountType === 'percentage') {
+      return Math.max(subtotal - (subtotal * (discountValue / 100)), 0);
+    }
+    return Math.max(subtotal - discountValue, 0);
+  };
+  const resolveServiceClientAmount = (serviceItem) => {
+    if (!serviceItem) return null;
+    const explicitTotal = toNumberOrNull(
+      serviceItem?.totalValue ??
+      serviceItem?.total ??
+      serviceItem?.clientAmount ??
+      serviceItem?.clientPrice ??
+      serviceItem?.rate ??
+      serviceItem?.amount ??
+      null
+    );
+    if (explicitTotal !== null) return explicitTotal;
+    const quantity = getServiceQuantity(serviceItem);
+    const basePrice = toNumber(serviceItem?.originalPrice ?? serviceItem?.price ?? 0);
+    return calculateDiscountedTotal(serviceItem, basePrice, quantity);
   };
 
   const getMonthBounds = (monthStr) => {
@@ -398,9 +450,9 @@ const Finance = () => {
     return financeList.filter(r => !orphanIds.has(r.id));
   };
 
-  // If there is no client or booking data at all, clear finance and category payments
-  const wipeFinanceIfEmpty = async (reservationsList, clientsList, financeList, paymentsList) => {
-    if (reservationsList.length === 0 && clientsList.length === 0) {
+  // If there are no reservation documents, clear finance, legacy payments, and expenses.
+  const wipeFinanceIfEmpty = async (hasReservations, financeList, paymentsList, expensesList) => {
+    if (!hasReservations) {
       try {
         if (financeList.length > 0) {
           await Promise.all(financeList.map(record => deleteDoc(doc(db, 'financeRecords', record.id))));
@@ -408,13 +460,61 @@ const Finance = () => {
         if (paymentsList.length > 0) {
           await Promise.all(paymentsList.map(payment => deleteDoc(doc(db, 'categoryPayments', payment.id))));
         }
-        return { finance: [], payments: [] };
+        if (expensesList.length > 0) {
+          await Promise.all(expensesList.map(expense => deleteDoc(doc(db, 'expenses', expense.id))));
+        }
+        return { finance: [], payments: [], expenses: [] };
       } catch (error) {
-        console.error('Error wiping finance/category payments:', error);
-        return { finance: financeList, payments: paymentsList };
+        console.error('Error wiping finance/category payments/expenses:', error);
+        return { finance: financeList, payments: paymentsList, expenses: expensesList };
       }
     }
-    return { finance: financeList, payments: paymentsList };
+    return { finance: financeList, payments: paymentsList, expenses: expensesList };
+  };
+  const clearCollaboratorPaymentsIfNoBookings = async (collaboratorIdsWithBookings, financeList = []) => {
+    if (!companyId) return;
+    const linkedIds = collaboratorIdsWithBookings instanceof Set ? collaboratorIdsWithBookings : new Set();
+    const deletedFinanceIds = new Set();
+    try {
+      const collaboratorsQuery = query(
+        collection(db, 'collaborators'),
+        where('companyId', '==', companyId)
+      );
+      const collaboratorsSnapshot = await getDocs(collaboratorsQuery);
+      if (collaboratorsSnapshot.empty) return;
+      const updates = collaboratorsSnapshot.docs
+        .filter(docSnap => {
+          if (linkedIds.has(docSnap.id)) return false;
+          const data = docSnap.data() || {};
+          const payments = Array.isArray(data.payments) ? data.payments : [];
+          const paidTotal = toNumber(data.paidTotal ?? 0);
+          const scheduledTotal = toNumber(data.scheduledTotal ?? 0);
+          return payments.length > 0 || paidTotal !== 0 || scheduledTotal !== 0;
+        })
+        .map(docSnap => updateDoc(docSnap.ref, {
+          payments: [],
+          paidTotal: 0,
+          scheduledTotal: 0
+        }));
+      if (updates.length > 0) {
+        await Promise.all(updates);
+      }
+
+      const payoutDeletes = financeList
+        .filter(record =>
+          record.serviceKey === 'collaborator_payout' &&
+          record.collaboratorId &&
+          !linkedIds.has(record.collaboratorId)
+        )
+        .map(record => record.id);
+      if (payoutDeletes.length > 0) {
+        await Promise.all(payoutDeletes.map(id => deleteDoc(doc(db, 'financeRecords', id))));
+        payoutDeletes.forEach(id => deletedFinanceIds.add(id));
+      }
+    } catch (error) {
+      console.error('Error clearing collaborator payments:', error);
+    }
+    return deletedFinanceIds;
   };
 
   // Ensure each booking has a finance record with a pending provider cost
@@ -423,12 +523,32 @@ const Finance = () => {
     if (!companyId || reservationsList.length === 0) return existingFinanceRecords;
     
     const clientIds = new Set(clientsList.map(c => c.id));
+    const expectedRecordKeys = new Set();
+    const makeRecordKey = (bookingId, serviceKey) => `${bookingId || 'none'}::${normalizeKeyPart(serviceKey)}`;
+    const pickPreferredRecord = (current, candidate) => {
+      const currentHasCost = toNumberOrNull(current.providerCost) !== null;
+      const candidateHasCost = toNumberOrNull(candidate.providerCost) !== null;
+      if (currentHasCost !== candidateHasCost) return candidateHasCost ? candidate : current;
+      const currentSettled = current.status === 'settled';
+      const candidateSettled = candidate.status === 'settled';
+      if (currentSettled !== candidateSettled) return candidateSettled ? candidate : current;
+      return current;
+    };
     
     // Map existing records for quick lookup by key
     const existingRecordMap = new Map();
+    const duplicateRecordIds = new Set();
     existingFinanceRecords.forEach(r => {
-      const key = `${r.bookingId || 'none'}::${r.serviceKey || r.service || 'Unknown'}`;
-      existingRecordMap.set(key, r);
+      if (!r.bookingId) return;
+      const key = makeRecordKey(r.bookingId, r.serviceKey || r.bookingServiceKey || r.service || 'Unknown');
+      if (!existingRecordMap.has(key)) {
+        existingRecordMap.set(key, r);
+        return;
+      }
+      const preferred = pickPreferredRecord(existingRecordMap.get(key), r);
+      const discarded = preferred === existingRecordMap.get(key) ? r : existingRecordMap.get(key);
+      existingRecordMap.set(key, preferred);
+      if (discarded?.id) duplicateRecordIds.add(discarded.id);
     });
 
     const toCreate = [];
@@ -443,24 +563,29 @@ const Finance = () => {
         : [null];
 
       servicesArray.forEach((serviceItem, index) => {
-        const serviceKey = serviceItem?.id || serviceItem?.serviceId || serviceItem?.type || serviceItem?.name || serviceItem?.title || `service-${index}`;
-        const recordKey = `${booking.id || 'none'}::${serviceKey}`;
+        const rawServiceKey = serviceItem?.id || serviceItem?.serviceId || serviceItem?.type || serviceItem?.name || serviceItem?.title || `service-${index}`;
+        const serviceKey = normalizeKeyPart(rawServiceKey);
+        const recordKey = makeRecordKey(booking.id, serviceKey);
+        expectedRecordKeys.add(recordKey);
         
         const serviceLabel = getServiceLabel(
           serviceItem?.name || serviceItem?.title || serviceItem?.type || serviceItem?.serviceType || serviceItem?.service || booking.service || booking.accommodationType,
           'Unknown'
         );
-        const rawAmount = [
-          serviceItem?.price,
-          serviceItem?.total,
-          serviceItem?.amount,
-          serviceItem?.clientPrice,
-          serviceItem?.clientAmount,
-          serviceItem?.rate,
-          booking.clientIncome
-        ].find(v => typeof v === 'number' && !Number.isNaN(v));
-
-        const clientAmount = rawAmount ?? 0;
+        const bookingFallbackTotal = toNumber(
+          booking.totalValue ??
+          booking.clientIncome ??
+          booking.totalAmount ??
+          0
+        );
+        const resolvedServiceTotal = serviceItem ? resolveServiceClientAmount(serviceItem) : null;
+        const clientAmount = serviceItem
+          ? (resolvedServiceTotal ?? 0)
+          : bookingFallbackTotal;
+        const rawDate = serviceItem?.startDate || serviceItem?.date || booking.checkIn || booking.date || booking.createdAt;
+        const normalizedDate = typeof rawDate === 'string'
+          ? rawDate
+          : (parseDateSafe(rawDate)?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0]);
         
         // Get client name from booking or lookup from clients list
         const client = booking.clientId ? clientsList.find(c => c.id === booking.clientId) : null;
@@ -477,9 +602,9 @@ const Finance = () => {
           clientAmount,
           // Only take provider cost from booking if we don't already have a settled record
           // (We trust Finance record's settled cost over booking default unless it's new)
-          providerCost: serviceItem?.providerCost ?? null,
-          status: serviceItem?.providerCost ? 'settled' : 'pending',
-          date: booking.date || new Date().toISOString().split('T')[0],
+          providerCost: toNumberOrNull(serviceItem?.providerCost),
+          status: toNumberOrNull(serviceItem?.providerCost) !== null ? 'settled' : 'pending',
+          date: normalizedDate,
           description: serviceItem?.description || booking.description || '',
         };
 
@@ -507,7 +632,16 @@ const Finance = () => {
       });
     });
 
-    if ((toCreate.length === 0 && toUpdate.length === 0) || syncingFinance) return existingFinanceRecords;
+    const recordsToDelete = existingFinanceRecords.filter(record => {
+      if (duplicateRecordIds.has(record.id)) return true;
+      if (!record.bookingId) return false;
+      const key = makeRecordKey(record.bookingId, record.serviceKey || record.bookingServiceKey || record.service || 'Unknown');
+      return !expectedRecordKeys.has(key);
+    });
+    const deleteIds = new Set(recordsToDelete.map(record => record.id));
+
+    const hasChanges = toCreate.length > 0 || toUpdate.length > 0 || deleteIds.size > 0;
+    if (!hasChanges || syncingFinance) return existingFinanceRecords;
     
     setSyncingFinance(true);
     try {
@@ -541,9 +675,14 @@ const Finance = () => {
         });
         updatedIds.add(id);
       }
+      
+      // 3. Delete stale or duplicate records
+      if (deleteIds.size > 0) {
+        await Promise.all(Array.from(deleteIds).map(id => deleteDoc(doc(db, 'financeRecords', id))));
+      }
 
       // Merge results
-      const updatedList = existingFinanceRecords.map(r => {
+      const updatedList = existingFinanceRecords.filter(r => !deleteIds.has(r.id)).map(r => {
         if (updatedIds.has(r.id)) {
           const update = toUpdate.find(u => u.id === r.id);
           return { ...r, clientAmount: update.clientAmount, service: update.service };
@@ -654,6 +793,12 @@ const Finance = () => {
         const reservationsRef = collection(db, 'reservations');
         const reservationsQuery = query(reservationsRef, where("companyId", "==", companyId));
         const reservationsSnapshot = await getDocs(reservationsQuery);
+        const hasAnyReservations = reservationsSnapshot.docs.length > 0;
+        const collaboratorIdsWithBookings = new Set(
+          reservationsSnapshot.docs
+            .map(doc => doc.data()?.collaboratorId)
+            .filter(Boolean)
+        );
         
         const reservationsList = reservationsSnapshot.docs
           .map(doc => {
@@ -698,8 +843,8 @@ const Finance = () => {
           const parsedDate = data.date
             ? (data.date.seconds ? new Date(data.date.seconds * 1000).toISOString().split('T')[0] : data.date)
             : '';
-          const clientAmount = data.clientAmount ?? data.clientIncome ?? data.amount ?? 0;
-          const providerCost = data.providerCost ?? null;
+          const clientAmount = toNumber(data.clientAmount ?? data.clientIncome ?? data.amount ?? 0);
+          const providerCost = toNumberOrNull(data.providerCost);
           const status = data.status || (providerCost !== null ? 'settled' : 'pending');
           return {
             id: doc.id,
@@ -717,7 +862,13 @@ const Finance = () => {
           };
         });
         
+        const deletedCollaboratorPayoutIds = await clearCollaboratorPaymentsIfNoBookings(
+          collaboratorIdsWithBookings,
+          financeList
+        ) || new Set();
+
         const cleanedFinance = await pruneOrphanFinanceRecords(reservationsList, financeList, clientsList);
+        const financeAfterCollaboratorCleanup = cleanedFinance.filter(r => !deletedCollaboratorPayoutIds.has(r.id));
 
         // Fetch category payments (legacy support)
         const paymentsRef = collection(db, 'categoryPayments');
@@ -732,21 +883,11 @@ const Finance = () => {
             createdBy: data.createdBy,
             createdByEmail: data.createdByEmail,
             category: data.category || 'Unknown',
-            amount: data.amount || 0,
+            amount: toNumber(data.amount || 0),
             date: data.date ? new Date(data.date.seconds * 1000).toISOString().split('T')[0] : '',
             description: data.description || ''
           };
         });
-
-        const { finance: finalFinance, payments: finalPayments } = await wipeFinanceIfEmpty(
-          reservationsList,
-          clientsList,
-          cleanedFinance,
-          paymentsList
-        );
-
-        setFinanceRecords(finalFinance);
-        setCategoryPayments(finalPayments);
 
         // Fetch expenses
         const expensesRef = collection(db, 'expenses');
@@ -760,13 +901,22 @@ const Finance = () => {
             ...data,
             createdBy: data.createdBy,
             createdByEmail: data.createdByEmail,
-            amount: data.amount || 0,
+            amount: toNumber(data.amount || 0),
             date: data.date ? new Date(data.date.seconds * 1000).toISOString().split('T')[0] : '',
             description: data.description || ''
           };
         }).filter(isOwnedByCurrentUser);
-        
-        setExpenses(expensesList);
+
+        const { finance: finalFinance, payments: finalPayments, expenses: finalExpenses } = await wipeFinanceIfEmpty(
+          hasAnyReservations,
+          financeAfterCollaboratorCleanup,
+          paymentsList,
+          expensesList
+        );
+
+        setFinanceRecords(finalFinance);
+        setCategoryPayments(finalPayments);
+        setExpenses(finalExpenses);
 
         // Backfill finance records for bookings that do not have one yet
         await syncFinanceRecords(reservationsList, finalFinance, clientsList);
@@ -812,8 +962,8 @@ const Finance = () => {
       if (!acc[key]) {
         acc[key] = { service: key, revenue: 0, cost: 0, count: 0 };
       }
-      acc[key].revenue += (r.clientAmount || 0);
-      acc[key].cost += (r.providerCost || 0);
+      acc[key].revenue += toNumber(r.clientAmount || 0);
+      acc[key].cost += toNumber(r.providerCost || 0);
       acc[key].count += 1;
       acc[key].profit = acc[key].revenue - acc[key].cost;
       acc[key].margin = acc[key].revenue > 0 ? (acc[key].profit / acc[key].revenue * 100) : 0;
@@ -836,7 +986,7 @@ const Finance = () => {
   }, [filteredExpenses.length]);
 
   const pendingFinance = filteredFinanceRecords.filter(r => (r.status === 'pending') || r.providerCost === null);
-  const totalClientRevenue = filteredFinanceRecords.reduce((sum, r) => sum + (r.clientAmount || 0), 0);
+  const totalClientRevenue = filteredFinanceRecords.reduce((sum, r) => sum + toNumber(r.clientAmount || 0), 0);
   
   // Helper function to check if a payment is a collaborator payout
   const isCollaboratorPayout = (payment) => {
@@ -851,23 +1001,23 @@ const Finance = () => {
   // FIXED: Exclude collaborator payouts from legacy provider payments
   const totalLegacyProviderPayments = categoryPayments
     .filter(p => !isCollaboratorPayout(p))
-    .reduce((sum, p) => sum + (p.amount || 0), 0);
+    .reduce((sum, p) => sum + toNumber(p.amount || 0), 0);
   
   // FIXED: Exclude collaborator payouts from provider costs (they're commissions, not service costs)
   const totalProviderCosts = filteredFinanceRecords
     .filter(r => r.serviceKey !== 'collaborator_payout')
-    .reduce((sum, r) => sum + (r.providerCost || 0), 0) + totalLegacyProviderPayments;
+    .reduce((sum, r) => sum + toNumber(r.providerCost || 0), 0) + totalLegacyProviderPayments;
   
   // Collaborator payouts are expenses, not provider costs
   const totalCollaboratorPayoutsFromFinance = filteredFinanceRecords
     .filter(r => r.serviceKey === 'collaborator_payout')
-    .reduce((sum, r) => sum + (r.providerCost || 0), 0);
+    .reduce((sum, r) => sum + toNumber(r.providerCost || 0), 0);
   
   const totalCollaboratorPayoutsFromLegacy = categoryPayments
     .filter(p => isCollaboratorPayout(p))
-    .reduce((sum, p) => sum + (p.amount || 0), 0);
+    .reduce((sum, p) => sum + toNumber(p.amount || 0), 0);
   
-  const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0) + 
+  const totalExpenses = filteredExpenses.reduce((sum, e) => sum + toNumber(e.amount), 0) + 
                         totalCollaboratorPayoutsFromFinance + 
                         totalCollaboratorPayoutsFromLegacy;
   const grossProfit = totalClientRevenue - totalProviderCosts;

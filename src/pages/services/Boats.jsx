@@ -3031,9 +3031,11 @@ function Boats() {
         </div>
       )}
 
-      <div className="header">
-        <h1 className="title">{t.boatList.title}</h1>
-      </div>
+      {!isAddingBoat && !isEditingBoat && (
+        <div className="sr-only" aria-hidden="true">
+          {t.boatList.title}
+        </div>
+      )}
 
       {/* Add/Edit Forms */}
       {(isAddingBoat || isEditingBoat) && (
@@ -3115,436 +3117,146 @@ function Boats() {
       
       {/* Boat List with Search and Filters */}
       {!isAddingBoat && !isEditingBoat && (
-        <div>
-          {/* Header with Add Button */}
-          <div style={{
-            display: 'flex',
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          gap: '0.5rem',
-          marginBottom: '1rem',
-          flexWrap: 'wrap'
-        }}>
+        <div className="page-surface space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-semibold heading-display">{t.boatList.title}</h1>
+              <div className="text-xs text-slate-500 mt-1">
+                {filteredBoats.length} {t.resultsFound}
+              </div>
+            </div>
             <button
               type="button"
               onClick={() => {
                 resetForm();
                 setIsAddingBoat(true);
               }}
-              className="buttonPrimary"
+              className="btn-primary"
             >
               {t.boatList.addNew}
             </button>
           </div>
 
-          {/* Search and Filter Controls */}
-          <div className="controlsRow">
-            {/* Search Bar */}
-            <div className="searchInputWrapper">
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="relative flex-1">
               <input
                 type="text"
                 placeholder={t.search}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="searchInput"
+                className="input-premium input-premium--icon"
               />
-              <div className="searchIcon">
-                🔍
+              <svg
+                className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M21 21l-4.35-4.35m1.6-5.15a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setShowFilters(!showFilters)}
+                className="btn-soft"
+              >
+                {showFilters ? t.hideFilters : t.showFilters}
+              </button>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setLengthFilter({ min: '', max: '' });
+                    setCapacityFilter({ min: '', max: '' });
+                    setPriceFilter({ min: '', max: '' });
+                  }}
+                  className="btn-soft"
+                >
+                  {t.clearFilters}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {showFilters && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-slate-500">{t.lengthRange}</div>
+                <input
+                  type="number"
+                  placeholder={t.minLength}
+                  value={lengthFilter.min}
+                  onChange={(e) => setLengthFilter(prev => ({ ...prev, min: e.target.value }))}
+                  className="input-premium"
+                />
+                <input
+                  type="number"
+                  placeholder={t.maxLength}
+                  value={lengthFilter.max}
+                  onChange={(e) => setLengthFilter(prev => ({ ...prev, max: e.target.value }))}
+                  className="input-premium"
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-slate-500">{t.capacityRange}</div>
+                <input
+                  type="number"
+                  placeholder={t.minCapacity}
+                  value={capacityFilter.min}
+                  onChange={(e) => setCapacityFilter(prev => ({ ...prev, min: e.target.value }))}
+                  className="input-premium"
+                />
+                <input
+                  type="number"
+                  placeholder={t.maxCapacity}
+                  value={capacityFilter.max}
+                  onChange={(e) => setCapacityFilter(prev => ({ ...prev, max: e.target.value }))}
+                  className="input-premium"
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-slate-500">{t.priceRange}</div>
+                <input
+                  type="number"
+                  placeholder={t.minPrice}
+                  value={priceFilter.min}
+                  onChange={(e) => setPriceFilter(prev => ({ ...prev, min: e.target.value }))}
+                  className="input-premium"
+                />
+                <input
+                  type="number"
+                  placeholder={t.maxPrice}
+                  value={priceFilter.max}
+                  onChange={(e) => setPriceFilter(prev => ({ ...prev, max: e.target.value }))}
+                  className="input-premium"
+                />
               </div>
             </div>
+          )}
 
-            {/* Filter Controls */}
-            <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '0.75rem'
-    }}>
-      {/* Minimal Filter Toggle Button */}
-      <button
-        onClick={() => setShowFilters(!showFilters)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '0.5rem',
-          padding: '0.75rem 1rem',
-          backgroundColor: showFilters ? '#f3f4f6' : 'white',
-          color: showFilters ? '#374151' : '#6b7280',
-          border: '1px solid #d1d5db',
-          borderRadius: '0.5rem',
-          cursor: 'pointer',
-          fontWeight: '500',
-          transition: 'all 0.2s',
-          fontSize: '0.875rem',
-          width: '100%',
-          maxWidth: '200px'
-        }}
-        onMouseOver={(e) => {
-          e.target.style.backgroundColor = showFilters ? '#e5e7eb' : '#f9fafb';
-        }}
-        onMouseOut={(e) => {
-          e.target.style.backgroundColor = showFilters ? '#f3f4f6' : 'white';
-        }}
-      >
-        <svg style={{ width: '1rem', height: '1rem' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
-        </svg>
-        {showFilters ? t.hideFilters : t.showFilters}
-      </button>
-
-      {/* Results Count and Clear Button */}
-      {filteredBoats.length > 0 && (
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between',
-          backgroundColor: '#f9fafb',
-          padding: '0.5rem 1rem',
-          borderRadius: '0.5rem',
-          border: '1px solid #e5e7eb',
-          width: '100%'
-        }}>
-          <span style={{ 
-            color: '#374151', 
-            fontSize: '0.875rem',
-            fontWeight: '500'
-          }}>
-            {filteredBoats.length} {t.resultsFound}
-          </span>
-          
           {hasActiveFilters && (
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setLengthFilter({ min: '', max: '' });
-                setCapacityFilter({ min: '', max: '' });
-                setPriceFilter({ min: '', max: '' });
-              }}
-              style={{
-                backgroundColor: '#ef4444',
-                color: 'white',
-                padding: '0.375rem 0.75rem',
-                borderRadius: '0.375rem',
-                fontSize: '0.75rem',
-                fontWeight: '500',
-                border: 'none',
-                cursor: 'pointer',
-                transition: 'background-color 0.2s'
-              }}
-              onMouseOver={(e) => e.target.style.backgroundColor = '#dc2626'}
-              onMouseOut={(e) => e.target.style.backgroundColor = '#ef4444'}
-            >
-              ✕ {t.clearFilters}
-            </button>
+            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+              {searchTerm && <span className="chip">"{searchTerm.length > 18 ? `${searchTerm.substring(0, 18)}...` : searchTerm}"</span>}
+              {(lengthFilter.min || lengthFilter.max) && (
+                <span className="chip">
+                  {t.lengthRange}: {lengthFilter.min || '0'}m - {lengthFilter.max || '∞'}m
+                </span>
+              )}
+              {(capacityFilter.min || capacityFilter.max) && (
+                <span className="chip">
+                  {t.capacityRange}: {capacityFilter.min || '0'} - {capacityFilter.max || '∞'}
+                </span>
+              )}
+              {(priceFilter.min || priceFilter.max) && (
+                <span className="chip">
+                  €{priceFilter.min || '0'} - €{priceFilter.max || '∞'}
+                </span>
+              )}
+            </div>
           )}
-        </div>
-      )}
-    </div>
-  </div>
 
-  {/* Enhanced Filter Panel */}
-  {showFilters && (
-    <div style={{
-      backgroundColor: 'white',
-      border: '2px solid #e5e7eb',
-      borderRadius: '0.75rem',
-      padding: '1rem',
-      marginBottom: '1rem',
-      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-    }}>
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        marginBottom: '1.5rem',
-        paddingBottom: '0.75rem',
-        borderBottom: '1px solid #e5e7eb'
-      }}>
-        <svg style={{ width: '1rem', height: '1rem', marginRight: '0.5rem', color: '#6b7280' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
-        </svg>
-        <h3 style={{ 
-          fontSize: '1.1rem', 
-          fontWeight: '600', 
-          margin: 0,
-          color: '#374151'
-        }}>
-          {t.filters}
-        </h3>
-      </div>
-      
-      {/* Responsive Grid - Single column on mobile, multiple on desktop */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-        gap: '1rem'
-      }}>
-        {/* Length Range Filter */}
-        <div style={{
-          backgroundColor: '#f9fafb',
-          padding: '1rem',
-          borderRadius: '0.5rem',
-          border: '1px solid #e5e7eb'
-        }}>
-          <label style={{ 
-            display: 'flex',
-            alignItems: 'center',
-            marginBottom: '0.75rem', 
-            fontSize: '0.875rem', 
-            fontWeight: '600',
-            color: '#374151'
-          }}>
-            <span style={{ marginRight: '0.5rem' }}>📏</span>
-            {t.lengthRange}
-          </label>
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column',
-            gap: '0.5rem'
-          }}>
-            <input
-              type="number"
-              placeholder={t.minLength}
-              value={lengthFilter.min}
-              onChange={(e) => setLengthFilter(prev => ({ ...prev, min: e.target.value }))}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                fontSize: '0.875rem',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-                boxSizing: 'border-box'
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
-              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
-            />
-            <input
-              type="number"
-              placeholder={t.maxLength}
-              value={lengthFilter.max}
-              onChange={(e) => setLengthFilter(prev => ({ ...prev, max: e.target.value }))}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                fontSize: '0.875rem',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-                boxSizing: 'border-box'
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
-              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
-            />
-          </div>
-        </div>
-
-        {/* Capacity Range Filter */}
-        <div style={{
-          backgroundColor: '#f9fafb',
-          padding: '1rem',
-          borderRadius: '0.5rem',
-          border: '1px solid #e5e7eb'
-        }}>
-          <label style={{ 
-            display: 'flex',
-            alignItems: 'center',
-            marginBottom: '0.75rem', 
-            fontSize: '0.875rem', 
-            fontWeight: '600',
-            color: '#374151'
-          }}>
-            <span style={{ marginRight: '0.5rem' }}>👥</span>
-            {t.capacityRange}
-          </label>
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column',
-            gap: '0.5rem'
-          }}>
-            <input
-              type="number"
-              placeholder={t.minCapacity}
-              value={capacityFilter.min}
-              onChange={(e) => setCapacityFilter(prev => ({ ...prev, min: e.target.value }))}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                fontSize: '0.875rem',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-                boxSizing: 'border-box'
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
-              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
-            />
-            <input
-              type="number"
-              placeholder={t.maxCapacity}
-              value={capacityFilter.max}
-              onChange={(e) => setCapacityFilter(prev => ({ ...prev, max: e.target.value }))}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                fontSize: '0.875rem',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-                boxSizing: 'border-box'
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
-              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
-            />
-          </div>
-        </div>
-
-        {/* Price Range Filter */}
-        <div style={{
-          backgroundColor: '#f9fafb',
-          padding: '1rem',
-          borderRadius: '0.5rem',
-          border: '1px solid #e5e7eb'
-        }}>
-          <label style={{ 
-            display: 'flex',
-            alignItems: 'center',
-            marginBottom: '0.75rem', 
-            fontSize: '0.875rem', 
-            fontWeight: '600',
-            color: '#374151'
-          }}>
-            <span style={{ marginRight: '0.5rem' }}>💰</span>
-            {t.priceRange}
-          </label>
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column',
-            gap: '0.5rem'
-          }}>
-            <input
-              type="number"
-              placeholder={t.minPrice}
-              value={priceFilter.min}
-              onChange={(e) => setPriceFilter(prev => ({ ...prev, min: e.target.value }))}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                fontSize: '0.875rem',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-                boxSizing: 'border-box'
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
-              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
-            />
-            <input
-              type="number"
-              placeholder={t.maxPrice}
-              value={priceFilter.max}
-              onChange={(e) => setPriceFilter(prev => ({ ...prev, max: e.target.value }))}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                fontSize: '0.875rem',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-                boxSizing: 'border-box'
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#4F46E5'}
-              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Active Filters Summary */}
-      {(searchTerm || lengthFilter.min || lengthFilter.max || capacityFilter.min || capacityFilter.max || priceFilter.min || priceFilter.max) && (
-        <div style={{
-          marginTop: '1.5rem',
-          paddingTop: '1rem',
-          borderTop: '1px solid #e5e7eb'
-        }}>
-          <p style={{ 
-            fontSize: '0.75rem', 
-            color: '#6b7280', 
-            margin: '0 0 0.5rem 0',
-            fontWeight: '500'
-          }}>
-            Active Filters:
-          </p>
-          <div style={{ 
-            display: 'flex', 
-            flexWrap: 'wrap', 
-            gap: '0.5rem'
-          }}>
-            {searchTerm && (
-              <span style={{
-                backgroundColor: '#ebf8ff',
-                color: '#1e40af',
-                padding: '0.25rem 0.5rem',
-                borderRadius: '0.375rem',
-                fontSize: '0.75rem',
-                border: '1px solid #bfdbfe',
-                whiteSpace: 'nowrap'
-              }}>
-                Search: "{searchTerm.length > 15 ? searchTerm.substring(0, 15) + '...' : searchTerm}"
-              </span>
-            )}
-            {(lengthFilter.min || lengthFilter.max) && (
-              <span style={{
-                backgroundColor: '#f0fdf4',
-                color: '#15803d',
-                padding: '0.25rem 0.5rem',
-                borderRadius: '0.375rem',
-                fontSize: '0.75rem',
-                border: '1px solid #bbf7d0',
-                whiteSpace: 'nowrap'
-              }}>
-                Length: {lengthFilter.min || '0'}m - {lengthFilter.max || '∞'}m
-              </span>
-            )}
-            {(capacityFilter.min || capacityFilter.max) && (
-              <span style={{
-                backgroundColor: '#fef3c7',
-                color: '#92400e',
-                padding: '0.25rem 0.5rem',
-                borderRadius: '0.375rem',
-                fontSize: '0.75rem',
-                border: '1px solid #fde68a',
-                whiteSpace: 'nowrap'
-              }}>
-                Capacity: {capacityFilter.min || '0'} - {capacityFilter.max || '∞'}
-              </span>
-            )}
-            {(priceFilter.min || priceFilter.max) && (
-              <span style={{
-                backgroundColor: '#fecaca',
-                color: '#991b1b',
-                padding: '0.25rem 0.5rem',
-                borderRadius: '0.375rem',
-                fontSize: '0.75rem',
-                border: '1px solid #fca5a5',
-                whiteSpace: 'nowrap'
-              }}>
-                €{priceFilter.min || '0'} - €{priceFilter.max || '∞'}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  
-          )}
-          
           {/* Boat Grid */}
           {filteredBoats.length === 0 ? (
             <div style={{textAlign: 'center', padding: '2.5rem 1rem', background: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'}}>
@@ -3565,7 +3277,7 @@ function Boats() {
                 return (
                   <div
                     key={boat.id}
-                    className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition cursor-pointer flex flex-col"
+                    className="card-premium overflow-hidden cursor-pointer flex flex-col"
                     onClick={() => { setSelectedBoat(boat); setSelectedBoatPhotoIndex(0); }}
                   >
                     <div className="relative h-44 bg-gray-100">
@@ -3584,12 +3296,12 @@ function Boats() {
                       {(lengthLabel || capacityLabel) && (
                         <div className="absolute bottom-2 left-2 flex gap-2">
                           {lengthLabel && (
-                            <span className="bg-white/90 text-indigo-700 px-2 py-1 rounded text-xs font-medium shadow-sm">
+                            <span className="bg-white/90 text-slate-700 px-2 py-1 rounded text-xs font-medium shadow-sm">
                               {lengthLabel}
                             </span>
                           )}
                           {capacityLabel && (
-                            <span className="bg-white/90 text-indigo-700 px-2 py-1 rounded text-xs font-medium shadow-sm">
+                            <span className="bg-white/90 text-slate-700 px-2 py-1 rounded text-xs font-medium shadow-sm">
                               {capacityLabel}
                             </span>
                           )}
@@ -3605,14 +3317,14 @@ function Boats() {
                         {getLocalizedContent(boat.cruisingArea, language)}
                       </p>
                       {rangeLabel && (
-                        <p className="text-indigo-600 font-semibold text-sm mb-3">{rangeLabel}</p>
+                        <p className="text-slate-700 font-semibold text-sm mb-3">{rangeLabel}</p>
                       )}
 
                       <div className="flex gap-2 mt-auto">
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); setSelectedBoat(boat); setSelectedBoatPhotoIndex(0); }}
-                          className="flex-1 bg-indigo-50 text-indigo-700 rounded px-3 py-2 text-sm font-medium hover:bg-indigo-100 transition"
+                          className="flex-1 btn-soft"
                         >
                           {t.view || 'View'}
                         </button>
@@ -3621,8 +3333,8 @@ function Boats() {
                             href={getBoatDocuments(boat)[0].url}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-center"
-                            style={styles.buttonIcon}
+                            className="btn-soft"
+                            style={{ width: '44px', height: '44px', padding: 0 }}
                             aria-label={language === 'en' ? 'Download PDF' : 'Descarcă PDF'}
                             title={language === 'en' ? 'Download PDF' : 'Descarcă PDF'}
                             onClick={(e) => e.stopPropagation()}
@@ -3649,7 +3361,7 @@ function Boats() {
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); startEditingBoat(boat); }}
-                          className="flex-1 bg-gray-100 text-gray-700 rounded px-3 py-2 text-sm font-medium hover:bg-gray-200 transition"
+                          className="flex-1 btn-soft"
                         >
                           {t.edit}
                         </button>
@@ -3661,7 +3373,8 @@ function Boats() {
                               handleDeleteBoat(boat.id);
                             }
                           }}
-                          style={styles.buttonIconDanger}
+                          className="btn-soft btn-soft-danger"
+                          style={{ width: '44px', height: '44px', padding: 0 }}
                           aria-label={t.delete}
                           title={t.delete}
                         >

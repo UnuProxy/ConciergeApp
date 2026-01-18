@@ -55,6 +55,7 @@ function PropertyDetail() {
       amenities: 'Facilități',
       propertyType: 'Tipul Proprietății',
       villa: 'Vilă',
+      apartment: 'Apartament',
       landParcel: 'Teren',
       status: 'Status',
       available: 'Disponibilă',
@@ -91,6 +92,7 @@ function PropertyDetail() {
       amenities: 'Amenities',
       propertyType: 'Property Type',
       villa: 'Villa',
+      apartment: 'Apartment',
       landParcel: 'Land Parcel',
       status: 'Status',
       available: 'Available',
@@ -268,7 +270,7 @@ function PropertyDetail() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-slate-500"></div>
       </div>
     );
   }
@@ -278,7 +280,7 @@ function PropertyDetail() {
       <div className="bg-rose-50 text-rose-600 p-6 rounded-lg">
         <h2 className="text-xl font-semibold mb-2">{t.error}</h2>
         <p>{error || t.propertyNotFound}</p>
-        <Link to="/services/properties-for-sale" className="mt-4 inline-block text-indigo-600 hover:underline">
+        <Link to="/services/properties-for-sale" className="mt-4 inline-block text-slate-600 hover:underline">
           {t.backToProperties}
         </Link>
       </div>
@@ -335,10 +337,10 @@ function PropertyDetail() {
   };
   
   return (
-    <div className="w-full px-4 sm:px-6 max-w-6xl mx-auto">
+    <div className="w-full px-4 sm:px-6 max-w-6xl mx-auto space-y-6 animate-fade-in">
       {/* Back to Properties link at the top */}
-      <div className="mb-4">
-        <Link to="/services/properties-for-sale" className="text-indigo-600 hover:underline flex items-center">
+      <div>
+        <Link to="/services/properties-for-sale" className="btn-soft inline-flex items-center">
           <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
@@ -347,15 +349,15 @@ function PropertyDetail() {
       </div>
       
       {/* Header with actions */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4 sm:mb-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-semibold text-gray-800">{property.title}</h1>
-          <p className="text-gray-600">{property.location}</p>
+          <h1 className="text-2xl sm:text-3xl font-semibold heading-display text-gray-900">{property.title}</h1>
+          <p className="text-slate-600">{property.location}</p>
         </div>
         <div className="flex space-x-3">
           <Link 
             to={`/services/properties-for-sale/edit/${id}`}
-            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+            className="btn-primary"
           >
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -364,7 +366,7 @@ function PropertyDetail() {
           </Link>
           <button 
             onClick={handleDelete}
-            className="inline-flex items-center px-4 py-2 bg-rose-600 text-white rounded-md hover:bg-rose-700"
+            className="btn-soft btn-soft-danger"
           >
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -384,7 +386,7 @@ function PropertyDetail() {
                 <img 
                   src={property.images[activeImageIndex]} 
                   alt={property.title}
-                  className="w-full h-48 sm:h-64 object-cover"
+                  className="w-full h-72 sm:h-96 object-cover"
                 />
                 
                 {/* Navigation arrows */}
@@ -419,7 +421,7 @@ function PropertyDetail() {
                     <div 
                       key={index}
                       onClick={() => setActiveImageIndex(index)}
-                      className={`cursor-pointer rounded-md overflow-hidden w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 ${index === activeImageIndex ? 'ring-2 ring-indigo-600' : ''}`}
+                      className={`cursor-pointer rounded-md overflow-hidden w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 ${index === activeImageIndex ? 'ring-2 ring-slate-400' : ''}`}
                     >
                       <img 
                         src={image} 
@@ -432,7 +434,7 @@ function PropertyDetail() {
               )}
             </div>
           ) : (
-            <div className="bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center h-48 sm:h-64">
+            <div className="bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center h-72 sm:h-96">
               <svg className="w-12 h-12 sm:w-16 sm:h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
@@ -440,12 +442,12 @@ function PropertyDetail() {
           )}
           
           {/* Property description */}
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+          <div className="card-premium p-4 sm:p-6">
             <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">{t.description}</h2>
             <div className="prose max-w-none">
               {property.description ? (
                 <details className="group">
-                  <summary className="cursor-pointer text-indigo-600 hover:text-indigo-800 font-medium mb-2">
+                  <summary className="cursor-pointer text-slate-700 hover:text-slate-900 font-medium mb-2">
                     {language === 'ro' ? 'Citește descrierea' : 'Read description'}
                   </summary>
                   <p className="text-gray-700 mt-2">{property.description}</p>
@@ -457,10 +459,10 @@ function PropertyDetail() {
           </div>
           
           {/* Documents */}
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+          <div className="card-premium p-4 sm:p-6">
             <div className="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-3">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800">{t.documents}</h2>
-              <label className="inline-flex items-center px-3 py-2 rounded-md border border-gray-200 text-gray-700 hover:border-indigo-200 hover:text-indigo-700 cursor-pointer text-sm">
+              <label className="btn-soft">
                 {isUploadingDoc ? (language === 'ro' ? 'Se încarcă...' : 'Uploading...') : (language === 'ro' ? 'Încarcă PDF' : 'Upload PDF')}
                 <input
                   type="file"
@@ -476,7 +478,7 @@ function PropertyDetail() {
                 {property.documents.map((doc, index) => (
                   <div 
                     key={index}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
+                    className="flex items-center justify-between p-3 bg-slate-50 rounded-md"
                   >
                     <a 
                       href={doc.url}
@@ -487,11 +489,12 @@ function PropertyDetail() {
                       <svg className="w-5 h-5 mr-3 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
-                      <span className="text-indigo-600 truncate">{doc.name || `${t.document} ${index + 1}`}</span>
+                      <span className="text-slate-700 truncate">{doc.name || `${t.document} ${index + 1}`}</span>
                     </a>
                     <button
                       onClick={() => handleDeleteDocument(index)}
-                      className="ml-3 inline-flex items-center justify-center w-10 h-10 rounded-md border border-rose-200 text-rose-600 hover:text-rose-700 hover:border-rose-300"
+                      className="btn-soft btn-soft-danger"
+                      style={{ width: '40px', height: '40px', padding: 0 }}
                       aria-label={t.delete}
                       title={t.delete}
                     >
@@ -520,13 +523,13 @@ function PropertyDetail() {
           </div>
           
           {/* Type-specific details */}
-          {property.type === 'villa' && property.amenities && property.amenities.length > 0 && (
-            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+          {(property.type === 'villa' || property.type === 'apartment') && property.amenities && property.amenities.length > 0 && (
+            <div className="card-premium p-4 sm:p-6">
               <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">{t.amenities}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                 {property.amenities.map((amenity, index) => (
                   <div key={index} className="flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <svg className="w-5 h-5 mr-2 text-slate-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                     <span className="text-gray-700">
@@ -542,9 +545,9 @@ function PropertyDetail() {
         {/* Right column - Key details (sticky on desktop, regular on mobile) */}
         <div className="col-span-1 space-y-4 sm:space-y-6">
           {/* Price and key details card */}
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 lg:sticky lg:top-6">
+          <div className="card-premium p-4 sm:p-6 lg:sticky lg:top-6">
             <div className="mb-4 sm:mb-6">
-              <span className="text-2xl sm:text-3xl font-bold text-indigo-600">{formatPrice(property.price)} €</span>
+              <span className="text-2xl sm:text-3xl font-semibold text-gray-900">{formatPrice(property.price)} €</span>
               <span className="text-gray-500 ml-2 text-sm sm:text-base block sm:inline-block mt-1 sm:mt-0">
                 {property.size && `(${Math.round(property.price / property.size).toLocaleString()} €/m²)`}
               </span>
@@ -555,7 +558,11 @@ function PropertyDetail() {
               <div className="flex justify-between border-b border-gray-100 pb-2">
                 <span className="text-gray-600">{t.propertyType}</span>
                 <span className="font-medium text-gray-800">
-                  {property.type === 'villa' ? t.villa : t.landParcel}
+                  {property.type === 'villa'
+                    ? t.villa
+                    : property.type === 'apartment'
+                      ? t.apartment
+                      : t.landParcel}
                 </span>
               </div>
               
@@ -564,7 +571,7 @@ function PropertyDetail() {
                 <span className="text-gray-600">{t.status}</span>
                 <span className={`font-medium ${
                   property.status === 'available' ? 'text-emerald-600' : 
-                  property.status === 'under_offer' ? 'text-yellow-600' : 
+                  property.status === 'under_offer' ? 'text-amber-600' : 
                   'text-rose-600'
                 }`}>
                   {property.status === 'available' ? t.available :
@@ -579,8 +586,8 @@ function PropertyDetail() {
                 <span className="font-medium text-gray-800">{property.size} m²</span>
               </div>
               
-              {/* Villa specific details */}
-              {property.type === 'villa' && (
+              {/* Residential specific details */}
+              {(property.type === 'villa' || property.type === 'apartment') && (
                 <>
                   {property.bedrooms && (
                     <div className="flex justify-between border-b border-gray-100 pb-2">
@@ -635,30 +642,30 @@ function PropertyDetail() {
             {/* Contact buttons - stacked on mobile, spacing adjusted */}
             <div className="mt-4 sm:mt-6 space-y-3">
               {isAdmin && hasOwnerInfo && showOwnerInfo && (
-                <div className="bg-indigo-50 border border-indigo-100 rounded-md p-3 text-sm text-indigo-900">
+                <div className="bg-slate-50 border border-slate-200 rounded-md p-3 text-sm text-slate-700">
                   <div className="font-semibold mb-2">{t.ownerDetails}</div>
                   {ownerInfo.name && (
                     <div className="flex justify-between">
-                      <span className="text-indigo-700">{t.name}</span>
+                      <span className="text-slate-500">{t.name}</span>
                       <span className="font-medium text-right">{ownerInfo.name}</span>
                     </div>
                   )}
                   {ownerInfo.phone && (
                     <div className="flex justify-between">
-                      <span className="text-indigo-700">{t.phone}</span>
+                      <span className="text-slate-500">{t.phone}</span>
                       <span className="font-medium text-right">{ownerInfo.phone}</span>
                     </div>
                   )}
                   {ownerInfo.email && (
                     <div className="flex justify-between">
-                      <span className="text-indigo-700">{t.email}</span>
+                      <span className="text-slate-500">{t.email}</span>
                       <span className="font-medium text-right break-all">{ownerInfo.email}</span>
                     </div>
                   )}
                 </div>
               )}
               <button
-                className="w-full py-2 sm:py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center justify-center"
+                className="w-full btn-primary"
                 onClick={() => {
                   if (isAdmin && hasOwnerInfo) {
                     setShowOwnerInfo((prev) => !prev);
@@ -677,7 +684,7 @@ function PropertyDetail() {
                   : t.contactAboutProperty}
               </button>
               
-              <button className="w-full py-2 sm:py-3 border border-indigo-600 text-indigo-600 rounded-md hover:bg-indigo-50 flex items-center justify-center">
+              <button className="w-full btn-soft">
                 <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
@@ -685,7 +692,7 @@ function PropertyDetail() {
               </button>
               
               <button
-                className="w-full py-2 sm:py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 flex items-center justify-center"
+                className="w-full btn-soft"
                 onClick={() => {
                   const win = window.open('', '_blank');
                   if (!win) {

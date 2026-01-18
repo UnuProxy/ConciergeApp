@@ -1,7 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
 import { useDatabase } from '../context/DatabaseContext';
-import { useLanguage } from '../utils/languageHelper';
 
 const getInitialMobileState = () => {
   if (typeof window === 'undefined') return true;
@@ -15,8 +14,6 @@ function Sidebar({ open, setOpen }) {
   const [systemExpanded, setSystemExpanded] = useState(false);
   const [isMobile, setIsMobile] = useState(getInitialMobileState);
   const { userRole } = useDatabase();
-  const { language: currentLanguage, setLanguage: updateAppLanguage } = useLanguage();
-
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem('appLanguage') || 'ro';
   });
@@ -44,7 +41,7 @@ function Sidebar({ open, setOpen }) {
       existingClients: 'Clienți Existenți',
       collaborators: 'Colaboratori',
       services: 'Servicii',
-      rentalVillas: 'Vile de Închiriat',
+      rentalVillas: 'Proprietăți de Închiriat',
       boats: 'Bărci',
       cars: 'Mașini',
       propertiesForSale: 'Proprietăți de Vânzare',
@@ -67,7 +64,7 @@ function Sidebar({ open, setOpen }) {
       existingClients: 'Existing Clients',
       collaborators: 'Collaborators',
       services: 'Services',
-      rentalVillas: 'Rental Villas',
+      rentalVillas: 'Rental Properties',
       boats: 'Boats',
       cars: 'Cars',
       propertiesForSale: 'Properties For Sale',
@@ -189,19 +186,6 @@ function Sidebar({ open, setOpen }) {
         </div>
 
         <div className="app-sidebar__nav">
-          <div className="app-sidebar__meta">
-            <div>
-              <div className="app-sidebar__meta-label">{t.language}</div>
-            </div>
-            <button
-              className="pill"
-              style={{ border: 'none', background: 'rgba(255,255,255,0.08)', color: 'white' }}
-              onClick={() => updateAppLanguage(currentLanguage === 'ro' ? 'en' : 'ro')}
-            >
-              {currentLanguage === 'ro' ? 'EN' : 'RO'}
-            </button>
-          </div>
-
           <div className="app-sidebar__category">{t.reservations}</div>
           <Link
             to="/reservations"

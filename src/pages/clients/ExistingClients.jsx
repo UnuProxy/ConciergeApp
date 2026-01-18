@@ -63,6 +63,19 @@ function getLocalizedText(value, language) {
   return safeRender(value, language);
 }
 
+const toLocalISODate = (date) => {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().split('T')[0];
+};
+
+const getTodayISODate = () => toLocalISODate(new Date());
+
+const getFutureISODate = (days) => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return toLocalISODate(date);
+};
+
 const seasonalMonthOrder = ['may', 'june', 'july', 'august', 'september', 'october'];
 const seasonByMonth = {
   may: 'extraSeason',
@@ -727,6 +740,8 @@ const extractImageUrl = (data) => {
 
   const [language, setLanguage] = useState(getCurrentLanguage); 
   const t = translations[language]; // Translation function
+  const todayISO = useMemo(() => getTodayISODate(), []);
+  const getMinDate = (value) => (value && value > todayISO ? value : todayISO);
   
   // Use the database context
   const { currentUser, companyInfo, loading: contextLoading, error: contextError } = useDatabase();
@@ -2565,29 +2580,39 @@ const handleSelectClient = async (client) => {
             .map(eDoc => deleteDoc(eDoc.ref));
           await Promise.all(deleteExpensesPromises);
           
-          // If booking has a collaborator, clean up their payout records
+          // If booking has a collaborator, clean up their payout records only if no other bookings remain
           if (bookingData.collaboratorId) {
-            const collaboratorPayoutsQuery = query(
-              collection(db, "financeRecords"),
+            const collaboratorBookingsQuery = query(
+              collection(db, "reservations"),
               where("companyId", "==", companyInfo.id),
-              where("collaboratorId", "==", bookingData.collaboratorId),
-              where("serviceKey", "==", "collaborator_payout")
+              where("collaboratorId", "==", bookingData.collaboratorId)
             );
-            const collaboratorPayoutsSnapshot = await getDocs(collaboratorPayoutsQuery);
-            const deleteCollaboratorPayoutsPromises = collaboratorPayoutsSnapshot.docs
-              .filter(cpDoc => cpDoc.data()?.companyId === companyInfo.id)
-              .map(cpDoc => deleteDoc(cpDoc.ref));
-            await Promise.all(deleteCollaboratorPayoutsPromises);
-            
-            // Reset collaborator payment data
-            const collaboratorRef = doc(db, "collaborators", bookingData.collaboratorId);
-            const collaboratorDoc = await getDoc(collaboratorRef);
-            if (collaboratorDoc.exists()) {
-              await updateDoc(collaboratorRef, {
-                payments: [],
-                paidTotal: 0,
-                scheduledTotal: 0
-              });
+            const collaboratorBookingsSnapshot = await getDocs(collaboratorBookingsQuery);
+            const hasOtherBookings = collaboratorBookingsSnapshot.docs.some(docSnap => docSnap.id !== bookingDoc.id);
+
+            if (!hasOtherBookings) {
+              const collaboratorPayoutsQuery = query(
+                collection(db, "financeRecords"),
+                where("companyId", "==", companyInfo.id),
+                where("collaboratorId", "==", bookingData.collaboratorId),
+                where("serviceKey", "==", "collaborator_payout")
+              );
+              const collaboratorPayoutsSnapshot = await getDocs(collaboratorPayoutsQuery);
+              const deleteCollaboratorPayoutsPromises = collaboratorPayoutsSnapshot.docs
+                .filter(cpDoc => cpDoc.data()?.companyId === companyInfo.id)
+                .map(cpDoc => deleteDoc(cpDoc.ref));
+              await Promise.all(deleteCollaboratorPayoutsPromises);
+              
+              // Reset collaborator payment data
+              const collaboratorRef = doc(db, "collaborators", bookingData.collaboratorId);
+              const collaboratorDoc = await getDoc(collaboratorRef);
+              if (collaboratorDoc.exists()) {
+                await updateDoc(collaboratorRef, {
+                  payments: [],
+                  paidTotal: 0,
+                  scheduledTotal: 0
+                });
+              }
             }
           }
           
@@ -4571,6 +4596,7 @@ const getUserName = async (userId) => {
                               name="followUpDate"
                               value={editClientData.followUpDate}
                               onChange={handleEditChange}
+                              min={todayISO}
                               className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
                             />
                           </div>
@@ -4640,6 +4666,7 @@ const getUserName = async (userId) => {
                                 name="startDate"
                                 value={editClientData.startDate}
                                 onChange={handleEditChange}
+                                min={todayISO}
                                 className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
                               />
                             </div>
@@ -4650,6 +4677,7 @@ const getUserName = async (userId) => {
                                 name="endDate"
                                 value={editClientData.endDate}
                                 onChange={handleEditChange}
+                                min={getMinDate(editClientData.startDate)}
                                 className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
                               />
                             </div>
@@ -6100,6 +6128,7 @@ const getUserName = async (userId) => {
                           value={reservationData.startDate}
                           onChange={handleReservationChange}
                           required
+                          min={todayISO}
                           className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
                         />
                       </div>
@@ -6113,6 +6142,7 @@ const getUserName = async (userId) => {
                           value={reservationData.endDate}
                           onChange={handleReservationChange}
                           required
+                          min={getMinDate(reservationData.startDate)}
                           className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
                         />
                       </div>
@@ -6484,7 +6514,7 @@ const getUserName = async (userId) => {
                                         `}>
                                           <input
                                             type="date"
-                                            value={item.startDate || new Date().toISOString().split('T')[0]}
+                                            value={item.startDate || todayISO}
                                             onChange={(e) => {
                                               // Update this service's start date
                                               const updatedItems = {...reservationFromOffer};
@@ -6499,6 +6529,7 @@ const getUserName = async (userId) => {
                                                 setReservationFromOffer(updatedItems);
                                               }
                                             }}
+                                            min={todayISO}
                                             className={`
                                               border border-gray-300 rounded-md
                                               p-1.5
@@ -6512,8 +6543,8 @@ const getUserName = async (userId) => {
                                               <span className="text-gray-400 text-xs">→</span>
                                               <input
                                                 type="date"
-                                                value={item.endDate || item.startDate || new Date().toISOString().split('T')[0]}
-                                                min={item.startDate || new Date().toISOString().split('T')[0]}
+                                                value={item.endDate || item.startDate || todayISO}
+                                                min={getMinDate(item.startDate)}
                                                 onChange={(e) => {
                                                   // Update this service's end date
                                                   const updatedItems = {...reservationFromOffer};
@@ -6539,8 +6570,8 @@ const getUserName = async (userId) => {
                                           ) : (
                                             <input
                                               type="date"
-                                              value={item.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
-                                              min={item.startDate || new Date().toISOString().split('T')[0]}
+                                              value={item.endDate || getFutureISODate(7)}
+                                              min={getMinDate(item.startDate)}
                                               onChange={(e) => {
                                                 // Update this service's end date
                                                 const updatedItems = {...reservationFromOffer};

@@ -168,6 +168,7 @@ const clearBrochure = () => {
     name_en: '',
     name_ro: '',
     referenceNumber: '',
+    propertyType: 'villa',
     address_en: '',
     address_ro: '',
     bedrooms: '',
@@ -255,6 +256,13 @@ const clearBrochure = () => {
     if (!value) return '';
     if (typeof value === 'string') return value;
     return value[language] || value.en || value.ro || '';
+  };
+  
+  const resolveMonthLabel = (monthValue) => {
+    const localized = getLoc(monthValue) || monthValue;
+    if (!localized) return '';
+    const key = typeof localized === 'string' ? localized.toLowerCase() : '';
+    return monthLabels[key] || localized;
   };
 
   useEffect(() => {
@@ -390,6 +398,7 @@ const clearBrochure = () => {
     setFormData({
       name_en: '', name_ro: '',
       referenceNumber: '',
+      propertyType: 'villa',
       address_en: '', address_ro: '',
       bedrooms: '', bathrooms: '',
       description_en: '', description_ro: '',
@@ -526,6 +535,7 @@ const clearBrochure = () => {
     return {
       name: { en: formData.name_en || '', ro: formData.name_ro || '' },
       referenceNumber: formData.referenceNumber || '',
+      propertyType: formData.propertyType || 'villa',
       address: { en: formData.address_en || '', ro: formData.address_ro || '' },
       bedrooms: formData.bedrooms || '',
       bathrooms: formData.bathrooms || '',
@@ -684,6 +694,7 @@ const clearBrochure = () => {
       name_en: typeof villa.name === 'string' ? villa.name : (villa.name?.en || ''),
       name_ro: typeof villa.name === 'string' ? villa.name : (villa.name?.ro || ''),
       referenceNumber: villa.referenceNumber || '',
+      propertyType: villa.propertyType || villa.type || 'villa',
       address_en: typeof villa.address === 'string' ? villa.address : (villa.address?.en || ''),
       address_ro: typeof villa.address === 'string' ? villa.address : (villa.address?.ro || ''),
       bedrooms: villa.bedrooms || '',
@@ -745,16 +756,39 @@ const clearBrochure = () => {
       (!priceFilter.min || price >= parseFloat(priceFilter.min)) &&
       (!priceFilter.max || price <= parseFloat(priceFilter.max))
     );
-    const matchesBedrooms = !bedroomFilter || villa.bedrooms === bedroomFilter;
-    const matchesBathrooms = !bathroomFilter || villa.bathrooms === bathroomFilter;
+    const bedroomsValue = parseInt(villa.bedrooms || '0', 10);
+    const bathroomsValue = parseInt(villa.bathrooms || '0', 10);
+    const bedroomThreshold = parseInt(bedroomFilter || '0', 10);
+    const bathroomThreshold = parseInt(bathroomFilter || '0', 10);
+    const matchesBedrooms = !bedroomFilter || (
+      bedroomFilter.includes('+')
+        ? bedroomsValue >= bedroomThreshold
+        : bedroomsValue === bedroomThreshold
+    );
+    const matchesBathrooms = !bathroomFilter || (
+      bathroomFilter.includes('+')
+        ? bathroomsValue >= bathroomThreshold
+        : bathroomsValue === bathroomThreshold
+    );
     return matchesSearch && matchesPrice && matchesBedrooms && matchesBathrooms;
   });
 
+  const villaCount = villas.filter(villa => (villa.propertyType || 'villa') !== 'apartment').length;
+  const apartmentCount = villas.filter(villa => (villa.propertyType || 'villa') === 'apartment').length;
+  const filteredCount = filteredVillas.length;
+  const hasFilters = Boolean(
+    searchTerm ||
+    priceFilter.min ||
+    priceFilter.max ||
+    bedroomFilter ||
+    bathroomFilter
+  );
+
   const translations = {
     ro: {
-      title: 'Vile de Închiriat',
-      addVilla: 'Adaugă Vilă',
-      noVillas: 'Nu există vile',
+      title: 'Proprietăți de Închiriat',
+      addVilla: 'Adaugă Proprietate',
+      noVillas: 'Nu există proprietăți',
       standardRate: 'Tarif Standard',
       uploadPhotos: 'Încarcă Poze',
       beds: 'Dormitoare',
@@ -764,6 +798,22 @@ const clearBrochure = () => {
       delete: 'Șterge',
       edit: 'Editează',
       view: 'Vezi',
+      searchPlaceholder: 'Caută după nume sau locație...',
+      filters: 'Filtre',
+      showFilters: 'Arată filtrele',
+      hideFilters: 'Ascunde filtrele',
+      minPrice: 'Preț minim',
+      maxPrice: 'Preț maxim',
+      anyBedrooms: 'Orice dormitoare',
+      anyBathrooms: 'Orice băi',
+      statsTotal: 'Total proprietăți',
+      statsVillas: 'Vile',
+      statsApartments: 'Apartamente',
+      showing: 'Afișează',
+      results: 'rezultate',
+      propertyType: 'Tip proprietate',
+      villaType: 'Vilă',
+      apartmentType: 'Apartament',
       bedrooms: 'Dormitoare',
       bathrooms: 'Băi',
       propertyLink: 'Link proprietate',
@@ -773,9 +823,9 @@ const clearBrochure = () => {
       nightly: 'Pe noapte'
     },
     en: {
-      title: 'Rental Villas',
-      addVilla: 'Add Villa',
-      noVillas: 'No villas',
+      title: 'Rental Properties',
+      addVilla: 'Add Property',
+      noVillas: 'No properties',
       standardRate: 'Standard Rate',
       uploadPhotos: 'Upload Photos',
       beds: 'Bedrooms',
@@ -785,6 +835,22 @@ const clearBrochure = () => {
       delete: 'Delete',
       edit: 'Edit',
       view: 'View',
+      searchPlaceholder: 'Search by name or location...',
+      filters: 'Filters',
+      showFilters: 'Show filters',
+      hideFilters: 'Hide filters',
+      minPrice: 'Min price',
+      maxPrice: 'Max price',
+      anyBedrooms: 'Any bedrooms',
+      anyBathrooms: 'Any bathrooms',
+      statsTotal: 'Total properties',
+      statsVillas: 'Villas',
+      statsApartments: 'Apartments',
+      showing: 'Showing',
+      results: 'results',
+      propertyType: 'Property type',
+      villaType: 'Villa',
+      apartmentType: 'Apartment',
       bedrooms: 'Bedrooms',
       bathrooms: 'Bathrooms',
       propertyLink: 'Property link',
@@ -798,7 +864,7 @@ const clearBrochure = () => {
   const t = translations[language] || translations.ro;
 
   return (
-    <div className="p-4">
+    <div className="p-6 space-y-6 animate-fade-in">
       {/* Success Message Popup */}
       {successMessage && (
         <div className="fixed top-5 right-5 bg-emerald-500 text-white px-6 py-4 rounded-lg shadow-lg z-50 animate-slide-in flex items-center gap-2">
@@ -809,24 +875,111 @@ const clearBrochure = () => {
         </div>
       )}
 
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">{t.title}</h1>
-        <button
-          onClick={() => setIsAddingVilla(true)}
-          className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-        >
-          {t.addVilla}
-        </button>
+      <div className="page-surface space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-semibold heading-display">{t.title}</h1>
+            <div className="text-xs text-slate-500 mt-1">
+              {t.statsTotal}: {villas.length} · {t.statsVillas}: {villaCount} · {t.statsApartments}: {apartmentCount}
+            </div>
+          </div>
+          <button
+            onClick={() => setIsAddingVilla(true)}
+            className="btn-primary"
+          >
+            {t.addVilla}
+          </button>
+        </div>
+
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder={t.searchPlaceholder}
+              className="input-premium input-premium--icon"
+            />
+            <svg
+              className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M21 21l-4.35-4.35m1.6-5.15a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowFilters(prev => !prev)}
+            className="btn-soft"
+          >
+            {showFilters ? t.hideFilters : t.showFilters}
+          </button>
+        </div>
+
+        {showFilters && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <input
+              type="number"
+              inputMode="numeric"
+              placeholder={t.minPrice}
+              value={priceFilter.min}
+              onChange={(e) => setPriceFilter(prev => ({ ...prev, min: e.target.value }))}
+              className="input-premium"
+            />
+            <input
+              type="number"
+              inputMode="numeric"
+              placeholder={t.maxPrice}
+              value={priceFilter.max}
+              onChange={(e) => setPriceFilter(prev => ({ ...prev, max: e.target.value }))}
+              className="input-premium"
+            />
+            <select
+              value={bedroomFilter}
+              onChange={(e) => setBedroomFilter(e.target.value)}
+              className="input-premium"
+            >
+              <option value="">{t.anyBedrooms}</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5+">5+</option>
+            </select>
+            <select
+              value={bathroomFilter}
+              onChange={(e) => setBathroomFilter(e.target.value)}
+              className="input-premium"
+            >
+              <option value="">{t.anyBathrooms}</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4+">4+</option>
+            </select>
+          </div>
+        )}
+
+        {hasFilters && (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+            <span className="chip">{t.showing} {filteredCount} {t.results}</span>
+            {searchTerm && <span className="chip">"{searchTerm}"</span>}
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredVillas.length === 0 ? (
           <div className="col-span-full text-center text-gray-500">{t.noVillas}</div>
         ) : (
-          filteredVillas.map((villa) => {
+          filteredVillas.map((villa, index) => {
             const mainPhoto = villa.photos?.[0]?.url || villa.photos?.[0] || '';
-            const displayName = villa.name?.[language] || villa.name?.en || villa.name?.ro || villa.name || 'Villa';
-            const displayAddress = villa.address?.[language] || villa.address?.en || villa.address?.ro || villa.address || '';
+            const displayName = getLoc(villa.name) || 'Villa';
+            const displayAddress = getLoc(villa.address) || '';
+            const propertyType = villa.propertyType || 'villa';
+            const propertyTypeLabel = propertyType === 'apartment' ? t.apartmentType : t.villaType;
             const standardRate = villa.priceConfigurations?.[0]?.price || villa.price || '';
             const bedrooms = villa.bedrooms || '-';
             const bathrooms = villa.bathrooms || '-';
@@ -835,32 +988,39 @@ const clearBrochure = () => {
               : [];
             const visibleRates = expandedRates[villa.id]
               ? seasonalRates
-              : seasonalRates.slice(0, 2);
-            const extraCount = Math.max(0, seasonalRates.length - 2);
-            const showToggle = seasonalRates.length > 2;
+              : seasonalRates.slice(0, 1);
+            const extraCount = Math.max(0, seasonalRates.length - 1);
+            const showToggle = seasonalRates.length > 1;
             const formatType = (pc) => (pc.type === 'monthly' ? t.monthly : pc.type || 'week');
 
             return (
-              <div key={villa.id} className="bg-white rounded-lg shadow-sm border overflow-hidden flex flex-col">
+              <div
+                key={villa.id}
+                className="card-premium overflow-hidden flex flex-col animate-slide-up"
+                style={{ animationDelay: `${index * 45}ms`, animationFillMode: 'both' }}
+              >
                 {mainPhoto ? (
-                  <img src={mainPhoto} alt={displayName} className="w-full h-52 object-cover" />
+                  <img src={mainPhoto} alt={displayName} className="w-full h-44 object-cover" />
                 ) : (
-                  <div className="w-full h-52 bg-gray-100 flex items-center justify-center text-gray-400">
-                    No photo
+                  <div className="w-full h-44 bg-gradient-to-br from-amber-50 via-white to-slate-50 flex items-center justify-center text-slate-400">
+                    {language === 'ro' ? 'Fără foto' : 'No photo'}
                   </div>
                 )}
-                <div className="p-4 flex-1">
+                <div className="p-3 flex-1">
                   <h3 className="text-lg font-semibold text-gray-900">{displayName}</h3>
+                  <div className="mt-1">
+                    <span className="chip">{propertyTypeLabel}</span>
+                  </div>
                   <p className="text-sm text-gray-600 mt-1">{displayAddress}</p>
-                  <div className="flex items-center gap-4 text-sm text-gray-700 mt-3">
+                  <div className="flex items-center gap-4 text-sm text-gray-700 mt-2">
                     <span>{bedrooms} {t.bedrooms}</span>
                     <span>{bathrooms} {t.bathrooms}</span>
                   </div>
-                  <div className="mt-2 text-sm text-gray-900 font-medium">
+                  <div className="mt-1 text-sm text-gray-900 font-medium">
                     {t.standardRate}: €{standardRate} / {villa.priceConfigurations?.[0]?.type === 'monthly' ? t.monthly : 'week'}
                   </div>
                   {seasonalRates.length > 0 && (
-                    <div className="mt-2">
+                    <div className="mt-1">
                       <div className="text-xs text-gray-500 mb-1">
                         {language === 'ro' ? 'Tarife sezoniere' : 'Seasonal rates'}
                       </div>
@@ -868,16 +1028,16 @@ const clearBrochure = () => {
                         {visibleRates.map((pc) => (
                           <span
                             key={pc.id || pc.month}
-                            className="px-2 py-1 rounded-full border border-indigo-100 bg-indigo-50 text-indigo-700 text-xs"
+                            className="chip text-[11px]"
                           >
-                            {monthLabels[pc.month?.toLowerCase?.()] || pc.month}: €{pc.price} / {formatType(pc)}
+                            {resolveMonthLabel(pc.month) || pc.month}: €{pc.price} / {formatType(pc)}
                           </span>
                         ))}
                         {showToggle && (
                           <button
                             type="button"
                             onClick={() => toggleRates(villa.id)}
-                            className="px-2 py-1 rounded-full border border-gray-200 text-gray-600 text-xs hover:border-indigo-200 hover:text-indigo-700"
+                            className="chip chip-toggle text-[11px]"
                           >
                             {expandedRates[villa.id]
                               ? language === 'ro' ? 'Ascunde' : 'Hide'
@@ -888,7 +1048,7 @@ const clearBrochure = () => {
                     </div>
                   )}
                 </div>
-                <div className="p-4 border-t flex items-center gap-3 flex-nowrap">
+                <div className="p-3 border-t flex items-center gap-3 flex-nowrap">
                   <button
                     onClick={() => {
                       setViewVilla({ ...villa, activePhotoIndex: 0 });
@@ -897,7 +1057,7 @@ const clearBrochure = () => {
                         scrollRef.current.scrollTop = 0;
                       }
                     }}
-                    className="flex-1 min-w-[96px] btn-soft bg-white border border-gray-200 text-gray-700 hover:border-indigo-200 hover:text-indigo-700"
+                    className="flex-1 min-w-[96px] btn-soft"
                   >
                     {t.view}
                   </button>
@@ -906,8 +1066,8 @@ const clearBrochure = () => {
                       href={villa.brochureUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center justify-center rounded-md border border-gray-300 text-gray-700 hover:text-gray-900 hover:border-gray-400 bg-white transition"
-                      style={{width: '44px', height: '44px'}}
+                      className="btn-soft"
+                      style={{width: '44px', height: '44px', padding: 0}}
                       aria-label={language === 'ro' ? 'Descarcă PDF' : 'Download PDF'}
                       title={language === 'ro' ? 'Descarcă PDF' : 'Download PDF'}
                     >
@@ -938,8 +1098,8 @@ const clearBrochure = () => {
                   </button>
                   <button
                     onClick={() => handleDeleteVilla(villa.id)}
-                    className="inline-flex items-center justify-center rounded-md border border-rose-200 text-rose-600 hover:text-rose-700 hover:border-rose-300 bg-white transition"
-                    style={{width: '44px', height: '44px'}}
+                    className="btn-soft btn-soft-danger"
+                    style={{width: '44px', height: '44px', padding: 0}}
                     aria-label={t.delete}
                     title={t.delete}
                   >
@@ -991,6 +1151,18 @@ const clearBrochure = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Address ({formLanguage.toUpperCase()})</label>
                   <input name={`address_${formLanguage}`} value={formData[`address_${formLanguage}`]} onChange={handleInputChange} className="w-full border rounded px-3 py-2" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">{t.propertyType}</label>
+                  <select
+                    name="propertyType"
+                    value={formData.propertyType}
+                    onChange={handleInputChange}
+                    className="w-full border rounded px-3 py-2"
+                  >
+                    <option value="villa">{t.villaType}</option>
+                    <option value="apartment">{t.apartmentType}</option>
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Bedrooms</label>
@@ -1143,11 +1315,11 @@ const clearBrochure = () => {
               </div>
 
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => { resetForm(); setIsAddingVilla(false); }} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
+                <button type="button" onClick={() => { resetForm(); setIsAddingVilla(false); }} className="btn-soft">Cancel</button>
                 <button
                   type="submit"
                   disabled={isSaving || isUploading}
-                  className={`px-4 py-2 rounded text-white ${isSaving || isUploading ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                  className="btn-primary"
                 >
                   {isSaving ? 'Saving...' : 'Save'}
                 </button>
@@ -1185,6 +1357,18 @@ const clearBrochure = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Address ({formLanguage.toUpperCase()})</label>
                   <input name={`address_${formLanguage}`} value={formData[`address_${formLanguage}`]} onChange={handleInputChange} className="w-full border rounded px-3 py-2" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">{t.propertyType}</label>
+                  <select
+                    name="propertyType"
+                    value={formData.propertyType}
+                    onChange={handleInputChange}
+                    className="w-full border rounded px-3 py-2"
+                  >
+                    <option value="villa">{t.villaType}</option>
+                    <option value="apartment">{t.apartmentType}</option>
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Bedrooms</label>
@@ -1398,11 +1582,11 @@ const clearBrochure = () => {
              </div>
 
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => { resetForm(); setIsEditingVilla(false); setCurrentVilla(null); }} className="px-4 py-2 bg-gray-200 rounded">Cancel</button>
+                <button type="button" onClick={() => { resetForm(); setIsEditingVilla(false); setCurrentVilla(null); }} className="btn-soft">Cancel</button>
                 <button
                   type="submit"
                   disabled={isSaving || isUploading}
-                  className={`px-4 py-2 rounded text-white ${isSaving || isUploading ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                  className="btn-primary"
                 >
                   {isSaving ? 'Saving...' : 'Save'}
                 </button>
@@ -1682,6 +1866,12 @@ const clearBrochure = () => {
                     {/* Key Specs */}
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
+                        <span className="text-gray-600">{t.propertyType}</span>
+                        <span className="font-medium text-gray-900">
+                          {viewVilla.propertyType === 'apartment' ? t.apartmentType : t.villaType}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
                         <span className="text-gray-600">{t.bedrooms}</span>
                         <span className="font-medium text-gray-900">{viewVilla.bedrooms || '-'}</span>
                       </div>
@@ -1697,7 +1887,7 @@ const clearBrochure = () => {
                         <h3 className="font-medium text-gray-900 mb-3">{t.standardRate}</h3>
                         <div className="space-y-2 text-sm">
                           {viewVilla.priceConfigurations.map((pc, idx) => {
-                            const monthLabel = pc.month ? (monthLabels[pc.month.toLowerCase?.()] || pc.month) : null;
+                            const monthLabel = pc.month ? resolveMonthLabel(pc.month) : null;
                             const hasRange = pc.dateRange_start || pc.dateRange_end;
                             const dateRangeLabel = hasRange
                               ? `${pc.dateRange_start || '—'} → ${pc.dateRange_end || '—'}`
