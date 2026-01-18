@@ -75,6 +75,7 @@ function AddProperty() {
       errorLoadingProperty: 'Eroare la încărcarea proprietății. Încercați din nou.',
       propertyType: 'Tipul Proprietății',
       villa: 'Vilă',
+      apartment: 'Apartament',
       landParcel: 'Teren',
       propertyTitle: 'Titlul Proprietății',
       location: 'Locație',
@@ -87,6 +88,7 @@ function AddProperty() {
       underOffer: 'Ofertă în Curs',
       sold: 'Vândută',
       villaDetails: 'Detalii Vilă',
+      apartmentDetails: 'Detalii Apartament',
       bedrooms: 'Dormitoare',
       bathrooms: 'Băi',
       yearBuilt: 'Anul Construcției',
@@ -138,6 +140,7 @@ function AddProperty() {
       errorLoadingProperty: 'Error loading property. Please try again.',
       propertyType: 'Property Type',
       villa: 'Villa',
+      apartment: 'Apartment',
       landParcel: 'Land Parcel',
       propertyTitle: 'Property Title',
       location: 'Location',
@@ -150,6 +153,7 @@ function AddProperty() {
       underOffer: 'Under Offer',
       sold: 'Sold',
       villaDetails: 'Villa Details',
+      apartmentDetails: 'Apartment Details',
       bedrooms: 'Bedrooms',
       bathrooms: 'Bathrooms',
       yearBuilt: 'Year Built',
@@ -634,22 +638,22 @@ function AddProperty() {
           ro: formData.description?.ro || ''
         },
         
-        // Specifications based on property type
-        specs: formData.type === 'villa' 
-          ? {
-              // Villa specs
-              bedrooms: parseInt(formData.bedrooms, 10) || 0,
-              bathrooms: parseInt(formData.bathrooms, 10) || 0,
-              year: parseInt(formData.yearBuilt, 10) || null,
-              livingArea: parseFloat(formData.livingArea.replace(/,/g, '')) || 0,
-              gardenArea: parseFloat(formData.gardenArea.replace(/,/g, '')) || 0
-            }
-          : {
-              // Land specs
-              zoning: formData.zoning || '',
-              buildableArea: parseFloat(formData.buildableArea.replace(/,/g, '')) || 0,
-              terrain: formData.terrain || ''
-            },
+      // Specifications based on property type
+      specs: formData.type === 'land'
+        ? {
+            // Land specs
+            zoning: formData.zoning || '',
+            buildableArea: parseFloat(formData.buildableArea.replace(/,/g, '')) || 0,
+            terrain: formData.terrain || ''
+          }
+        : {
+            // Villa/apartment specs
+            bedrooms: parseInt(formData.bedrooms, 10) || 0,
+            bathrooms: parseInt(formData.bathrooms, 10) || 0,
+            year: parseInt(formData.yearBuilt, 10) || null,
+            livingArea: parseFloat(formData.livingArea.replace(/,/g, '')) || 0,
+            gardenArea: parseFloat(formData.gardenArea.replace(/,/g, '')) || 0
+          },
         
         // Convert amenities array to object of booleans
         amenities: availableAmenities.reduce((obj, amenity) => ({
@@ -706,6 +710,8 @@ function AddProperty() {
       setSaving(false);
     }
   };
+
+  const isResidentialType = formData.type === 'villa' || formData.type === 'apartment';
   
   if (loading) {
     return <div className="flex justify-center items-center h-64">
@@ -729,7 +735,7 @@ function AddProperty() {
         {/* Property Type */}
         <div className="mb-4 sm:mb-6">
           <label className="block text-gray-700 font-medium mb-2">{t.propertyType}</label>
-          <div className="flex space-x-4">
+          <div className="flex flex-wrap gap-4">
             <label className="inline-flex items-center">
               <input
                 type="radio"
@@ -740,6 +746,17 @@ function AddProperty() {
                 className="h-5 w-5 text-indigo-600"
               />
               <span className="ml-2 text-gray-700">{t.villa}</span>
+            </label>
+            <label className="inline-flex items-center">
+              <input
+                type="radio"
+                name="type"
+                value="apartment"
+                checked={formData.type === 'apartment'}
+                onChange={handleChange}
+                className="h-5 w-5 text-indigo-600"
+              />
+              <span className="ml-2 text-gray-700">{t.apartment}</span>
             </label>
             <label className="inline-flex items-center">
               <input
@@ -804,8 +821,8 @@ function AddProperty() {
           <div>
           </div>
 
-          {/* Interior and garden sizes (villas) */}
-          {formData.type === 'villa' && (
+          {/* Interior and garden sizes (residential) */}
+          {isResidentialType && (
             <>
               <div>
                 <label className="block text-gray-700 font-medium mb-2">{t.livingArea} (m²)</label>
@@ -853,10 +870,12 @@ function AddProperty() {
         </div>
         
         {/* Type-specific fields */}
-        {formData.type === 'villa' ? (
-          // Villa specific fields
+        {formData.type !== 'land' ? (
+          // Residential specific fields
           <div className="mb-4 sm:mb-6">
-            <h3 className="text-lg font-medium text-gray-800 mb-4">{t.villaDetails}</h3>
+            <h3 className="text-lg font-medium text-gray-800 mb-4">
+              {formData.type === 'apartment' ? t.apartmentDetails : t.villaDetails}
+            </h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
               <div>
                 <label className="block text-gray-700 font-medium mb-2">{t.bedrooms}</label>

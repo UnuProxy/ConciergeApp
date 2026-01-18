@@ -228,13 +228,24 @@ const PaymentIcon = ({ type, size = "small" }) => {
   }
 };
 
+const toNumber = (value) => {
+  if (value === null || value === undefined || value === '') return 0;
+  if (typeof value === 'number') return Number.isNaN(value) ? 0 : value;
+  const cleaned = String(value).replace(/[^\d.-]/g, '');
+  const parsed = parseFloat(cleaned);
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
 // Compute per-service payment summary based on recorded payments
 const getServicePaymentInfo = (service, payments = [], safeRenderFn = (v) => v) => {
-  const total = ((parseFloat(service?.price || 0) * parseInt(service?.quantity || 1))) || 0;
+  const explicitTotal = toNumber(service?.totalValue);
+  const unitPrice = toNumber(service?.price);
+  const quantity = toNumber(service?.quantity) || 1;
+  const total = explicitTotal > 0 ? explicitTotal : (unitPrice * quantity);
   
   // ONLY use the stored amountPaid - this is set correctly when service is added or paid
   // DO NOT use name matching - multiple services can have the same name!
-  const storedPaid = parseFloat(service?.amountPaid || 0);
+  const storedPaid = toNumber(service?.amountPaid);
   
   // Cross-check with payment history by BOTH serviceId AND bookingId
   // This prevents the bug where payments are double-counted across bookings with same serviceId
@@ -249,13 +260,14 @@ const getServicePaymentInfo = (service, payments = [], safeRenderFn = (v) => v) 
       const paymentMatchesBooking = !serviceBookingId || !payment.bookingId || payment.bookingId === serviceBookingId;
       
       if (paymentMatchesService && paymentMatchesBooking) {
-        paidFromHistory += parseFloat(payment.amount || 0);
+        paidFromHistory += toNumber(payment.amount || 0);
       }
     });
   }
 
-  // Use the HIGHER of stored vs calculated from history
-  const paid = Math.max(storedPaid, paidFromHistory);
+  // Prefer explicit payment history when present, otherwise trust stored amountPaid
+  const paidRaw = paidFromHistory > 0 ? paidFromHistory : storedPaid;
+  const paid = total > 0 ? Math.min(total, paidRaw) : paidRaw;
   const due = Math.max(0, total - paid);
   
   return { total, paid, due };
@@ -1905,7 +1917,7 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
 };
 
 // CLIENT CARD COMPONENT
-const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpenShopping }) => {
+const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) => {
   // Get translations from the context
   const language = localStorage.getItem('appLanguage') || 'en';
   
@@ -1995,14 +2007,6 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
   
   const t = translations[language];
   
-  // Get check-in date from the earliest upcoming booking if it exists
-  const earliestBooking = [...client.bookings].sort((a, b) => 
-    new Date(a.checkIn || 0) - new Date(b.checkIn || 0)
-  )[0] || {};
-  const villaName = earliestBooking?.accommodationType
-    ? safeRender(earliestBooking.accommodationType)
-    : '';
-  
   // Helper functions
   const formatShortDate = (dateStr) => {
     if (!dateStr) return '';
@@ -2012,6 +2016,58 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
       month: '2-digit'
     });
   };
+
+  const normalizeCardDate = (value) => {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    parsed.setHours(0, 0, 0, 0);
+    return parsed;
+  };
+
+  const pickProgressBooking = (bookings = []) => {
+    if (!bookings.length) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const normalized = bookings
+      .map(booking => {
+        const start = normalizeCardDate(booking.checkIn);
+        const end = normalizeCardDate(booking.checkOut || booking.checkIn);
+        if (!start || !end) return null;
+        return { ...booking, _start: start, _end: end };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a._start - b._start);
+
+    const active = normalized.find(booking => today >= booking._start && today <= booking._end);
+    if (active) return active;
+
+    const upcoming = normalized.find(booking => booking._start > today);
+    if (upcoming) return upcoming;
+
+    return normalized.length ? normalized[normalized.length - 1] : null;
+  };
+
+  // Get check-in date from the earliest upcoming booking if it exists
+  const earliestBooking = [...client.bookings].sort((a, b) => 
+    new Date(a.checkIn || 0) - new Date(b.checkIn || 0)
+  )[0] || {};
+  const villaName = earliestBooking?.accommodationType
+    ? safeRender(earliestBooking.accommodationType)
+    : '';
+  const progressBooking = pickProgressBooking(client.bookings || []) || earliestBooking;
+  const progressTotal = toNumber(progressBooking?.totalValue ?? client.totalValue);
+  const progressPaid = toNumber(progressBooking?.paidAmount ?? client.paidAmount);
+  const progressStatus = progressTotal > 0
+    ? (progressPaid >= progressTotal ? 'paid' : (progressPaid > 0 ? 'partiallyPaid' : 'notPaid'))
+    : (client.paymentStatus || 'notPaid');
+  const displayStatus = client.bookings.length > 1 ? progressStatus : client.paymentStatus;
+  const progressLabel = client.bookings.length > 1 && progressBooking?.checkIn
+    ? `${formatShortDate(progressBooking.checkIn)}${progressBooking.checkOut ? ` - ${formatShortDate(progressBooking.checkOut)}` : ''}`
+    : '';
+  const headerBooking = client.bookings.length > 1 ? (progressBooking || earliestBooking) : earliestBooking;
+  const displayTotalValue = client.bookings.length > 1 ? progressTotal : client.totalValue;
   
   // Helper function to get client name
   const getClientName = (clientId) => {
@@ -2136,14 +2192,14 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
   };
   
   return (
-    <div className={`bg-white rounded-lg shadow-sm overflow-hidden border-l-4 w-full max-w-full ${getBorderColorClass(client.paymentStatus)}`}>
+    <div className={`bg-white rounded-lg shadow-sm overflow-hidden border-l-4 w-full max-w-full ${getBorderColorClass(displayStatus)}`}>
       {/* Client header with avatar and details */}
       <div className="p-4">
         <div className="flex justify-between">
           <div className="flex items-center flex-1 min-w-0">
             <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-white text-sm font-semibold ${
-              client.paymentStatus === 'paid' ? 'bg-emerald-500' : 
-              client.paymentStatus === 'partiallyPaid' ? 'bg-amber-500' : 
+              displayStatus === 'paid' ? 'bg-emerald-500' : 
+              displayStatus === 'partiallyPaid' ? 'bg-amber-500' : 
               'bg-slate-400'
             }`}>
               {getClientInitials(client.clientName)}
@@ -2151,17 +2207,17 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
             <div className="ml-3 truncate flex-1 min-w-0">
               <h3 className="font-medium leading-tight truncate">{safeRender(client.clientName)}</h3>
               <div className="flex items-center mt-1 flex-wrap gap-1">
-                <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusBadgeClass(client.paymentStatus)}`}>
-                  {getPaymentStatusText(client.paymentStatus)}
+                <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusBadgeClass(displayStatus)}`}>
+                  {getPaymentStatusText(displayStatus)}
                 </div>
                 
-                {earliestBooking.checkIn && (
+                {headerBooking.checkIn && (
                   <div className="ml-2 text-xs text-gray-600 flex items-center flex-wrap gap-1">
                     <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16"></path>
                     </svg>
-                    {formatShortDate(earliestBooking.checkIn)}
-                    {earliestBooking.checkOut && ` - ${formatShortDate(earliestBooking.checkOut)}`}
+                    {formatShortDate(headerBooking.checkIn)}
+                    {headerBooking.checkOut && ` - ${formatShortDate(headerBooking.checkOut)}`}
                     {client.bookings.length > 1 && (
                       <span className="ml-1 text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-bold border border-purple-200">
                         📅 {client.bookings.length} {language === 'ro' ? 'rezervări' : 'bookings'}
@@ -2173,37 +2229,35 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
             </div>
           </div>
           <div className="text-right">
-            <div className="text-lg font-bold">{client.totalValue.toLocaleString()} €</div>
-            {client.paymentStatus !== 'paid' && (
+            <div className="text-lg font-bold">{displayTotalValue.toLocaleString()} €</div>
+            {displayStatus !== 'paid' && (
               <div className="text-xs text-rose-600 font-medium mt-1">
-                {getDaysLeft(earliestBooking.checkIn)}
+                {getDaysLeft(headerBooking.checkIn)}
               </div>
             )}
           </div>
         </div>
         
         {/* Payment progress bar */}
-        {client.totalValue > 0 && (
+        {progressTotal > 0 && (
           <div className="mt-3">
             <div className="flex justify-between items-center text-xs mb-1">
-              <span className="text-gray-600">{t.paymentProgress}</span>
+              <span className="text-gray-600">
+                {t.paymentProgress}
+                {progressLabel && <span className="ml-1 text-[10px] text-gray-400">({progressLabel})</span>}
+              </span>
               <div className="flex gap-2 items-center">
-                {client.paidAmount > client.totalValue && (
-                  <span className="text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
-                    +{ (client.paidAmount - client.totalValue).toLocaleString() } € Credit
-                  </span>
-                )}
-                <span className="font-medium">{client.paidAmount.toLocaleString()} / {client.totalValue.toLocaleString()} €</span>
+                <span className="font-medium">{progressPaid.toLocaleString()} / {progressTotal.toLocaleString()} €</span>
               </div>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div 
                 className={`h-2 rounded-full transition-all duration-500 ${
-                  client.paidAmount >= client.totalValue ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' : 
-                  client.paidAmount > 0 ? 'bg-gradient-to-r from-amber-500 to-amber-400' : 
+                  progressPaid >= progressTotal ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' : 
+                  progressPaid > 0 ? 'bg-gradient-to-r from-amber-500 to-amber-400' : 
                   'bg-slate-300'
                 }`}
-                style={{ width: `${Math.min(100, (client.paidAmount / client.totalValue) * 100)}%` }}
+                style={{ width: `${Math.min(100, (progressPaid / progressTotal) * 100)}%` }}
               ></div>
             </div>
           </div>
@@ -2322,7 +2376,7 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
       </div>
       
       {/* Action buttons - FIXED with direct prop callbacks */}
-      <div className="grid grid-cols-4 border-t bg-gray-50">
+      <div className="grid grid-cols-3 border-t bg-gray-50">
   <button 
     className="flex flex-col items-center justify-center py-3 text-gray-700 hover:bg-gray-100 transition-colors active:bg-gray-200"
     onClick={(e) => {
@@ -2336,28 +2390,6 @@ const ClientCard = ({ client, onViewDetails, onOpenPayment, onOpenService, onOpe
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
     <span className="text-xs font-medium">{t.details}</span>
-  </button>
-  
-  <button 
-    className={`flex flex-col items-center justify-center py-3 transition-colors active:bg-slate-100 ${
-      client.paymentStatus === 'paid' 
-        ? 'text-emerald-700 bg-emerald-50'
-        : 'text-slate-600 hover:bg-slate-50'
-    }`}
-    onClick={(e) => {
-      e.preventDefault();
-      e.stopPropagation();
-  // console.log('Pay button clicked for client:', client.clientName, 'Due amount:', client.dueAmount); // Removed for production
-      if (client.paymentStatus !== 'paid') {
-        onOpenPayment?.(client);
-      }
-    }}
-    disabled={client.paymentStatus === 'paid'}
-  >
-    <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
-    </svg>
-    <span className="text-xs font-medium">{client.paymentStatus === 'paid' ? t.paid : t.pay}</span>
   </button>
   
   <button 
@@ -3301,54 +3333,71 @@ useEffect(() => {
             ? booking.services
             : (Array.isArray(booking.extras) ? booking.extras : []);
           
+          const paymentHistory = Array.isArray(booking.paymentHistory) ? booking.paymentHistory : [];
+
+          const getServiceTotalValue = (svc) => {
+            const explicit = toNumber(svc?.totalValue);
+            if (explicit > 0) return explicit;
+            const price = toNumber(svc?.price);
+            const qty = toNumber(svc?.quantity) || 1;
+            return price * qty;
+          };
+
           // 1. CALCULATE TOTAL VALUE (Sum of all services)
           const serviceTotalForBooking = bookingServices.reduce((sum, svc) => {
-            const price = parseFloat(svc?.price || 0);
-            const qty = parseInt(svc?.quantity || 1);
-            return sum + (price * qty);
+            return sum + getServiceTotalValue(svc);
           }, 0);
-          
-          // 2. CALCULATE TOTAL PAID FROM HISTORY (The absolute Source of Truth)
-          const paymentHistory = Array.isArray(booking.paymentHistory) ? booking.paymentHistory : [];
-          const totalPaidFromHistory = paymentHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-          
-          // 3. PRESERVE SERVICE PAYMENT DATA FROM DATABASE (Trust the stored values!)
-          // The database stores the correct amountPaid and paymentStatus for each service.
-          // We should NOT recalculate these on load - only trust what's stored.
+
+          // 2. PRESERVE SERVICE PAYMENT DATA, BUT CLAMP TO SERVICE TOTAL
           const finalServices = bookingServices.map(svc => {
-            const svcTotal = parseFloat(svc.price || 0) * parseInt(svc.quantity || 1);
-            
-            // TRUST the stored amountPaid from database
-            const storedAmountPaid = parseFloat(svc.amountPaid || 0);
-            
-            // Derive status from stored data
+            const svcTotal = getServiceTotalValue(svc);
+            const storedAmountPaid = toNumber(svc.amountPaid || 0);
+
+            let paidFromHistory = 0;
+            const sId = svc.id || null;
+            if (sId && paymentHistory.length > 0) {
+              paymentHistory.forEach(payment => {
+                const matchesService = payment.serviceId && payment.serviceId === sId;
+                const matchesBooking = !svc.bookingId || !payment.bookingId || payment.bookingId === svc.bookingId;
+                if (matchesService && matchesBooking) {
+                  paidFromHistory += toNumber(payment.amount || 0);
+                }
+              });
+            }
+
+            const paidRaw = paidFromHistory > 0 ? paidFromHistory : storedAmountPaid;
+            const safePaid = svcTotal > 0 ? Math.min(svcTotal, paidRaw) : paidRaw;
+
             let status = svc.paymentStatus || 'unpaid';
-            if (storedAmountPaid >= svcTotal && svcTotal > 0) status = 'paid';
-            else if (storedAmountPaid > 0) status = 'partiallyPaid';
+            if (safePaid >= svcTotal && svcTotal > 0) status = 'paid';
+            else if (safePaid > 0) status = 'partiallyPaid';
             else status = 'unpaid';
-            
+
             return {
               ...svc,
-              amountPaid: storedAmountPaid,
+              amountPaid: safePaid,
               paymentStatus: status,
               svcTotal
             };
           });
 
-          // 4. CALCULATE UNALLOCATED CREDIT (if total paid > total allocated to services)
-          const totalAllocatedToServices = finalServices.reduce((sum, s) => sum + (s.amountPaid || 0), 0);
-          const unallocatedCredit = Math.max(0, totalPaidFromHistory - totalAllocatedToServices);
+          // 3. DEFINE BOOKING TOTALS
+          const bookingTotalValue = serviceTotalForBooking > 0
+            ? serviceTotalForBooking
+            : toNumber(booking.totalValue || booking.totalAmount || 0);
 
-          // 5. DEFINE BOOKING TOTALS
-          const bookingTotalValue = serviceTotalForBooking || booking.totalValue || booking.totalAmount || 0;
-          const bookingPaidAmount = totalPaidFromHistory;
-          
+          const totalPaidFromHistory = paymentHistory.reduce((sum, p) => sum + toNumber(p.amount || 0), 0);
+          const totalAllocatedToServices = finalServices.reduce((sum, s) => sum + toNumber(s.amountPaid || 0), 0);
+          const bookingPaidAmount = bookingServices.length > 0
+            ? Math.min(totalAllocatedToServices, bookingTotalValue)
+            : Math.min(totalPaidFromHistory || toNumber(booking.paidAmount || 0), bookingTotalValue);
+
           const enrichedBooking = {
             ...booking,
             services: finalServices,
             totalValue: bookingTotalValue,
             paidAmount: bookingPaidAmount,
-            unallocatedCredit: unallocatedCredit
+            unallocatedCredit: 0
           };
 
           groups[clientId].totalValue += bookingTotalValue;
@@ -3676,15 +3725,6 @@ const showBottomSheetWithContent = (content, item, secondaryItem = null) => {
       checkIn: secondaryItem?.checkIn || '',
       checkOut: secondaryItem?.checkOut || ''
     });
-  } else if (content === 'quick-payment') {
-    setPaymentData({
-      amount: item?.dueAmount || 0,
-      method: 'cash',
-      notes: '',
-      receiptNumber: '',
-      createdAt: new Date(),
-      modifiedAt: new Date()
-    });
   }
   
   // Show the modal
@@ -3888,10 +3928,6 @@ const renderMainContent = (filteredClients) => {
   // console.log('ClientCard onViewDetails called with:', clientId); // Removed for production
             viewClientDetails(clientId);
           }}
-          onOpenPayment={(client) => {
-  // console.log('ClientCard onOpenPayment called with:', client); // Removed for production
-            openPaymentModal(client);
-          }}
           onOpenService={(client) => {
   // console.log('ClientCard onOpenService called with:', client); // Removed for production
             openAddServiceModal(client);
@@ -3957,42 +3993,17 @@ const renderMainContent = (filteredClients) => {
               <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusBadgeClass(selectedItem.paymentStatus)}`}>
                 {getPaymentStatusText(selectedItem.paymentStatus)}
               </div>
-              <div className="mt-2">
-                <button 
-                  onClick={() => handleRecalculateTotals(selectedItem)}
-                  className="text-xs text-blue-600 hover:text-blue-800 underline flex items-center justify-center mx-auto gap-1"
-                >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Recalculate Balances
-                </button>
-              </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-3 pt-4 border-t">
+            <div className="pt-4 border-t">
               <button 
-                className="py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600"
+                className="w-full py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600"
                 onClick={() => {
                   closeBottomSheet();
                   setTimeout(() => openAddServiceModal(selectedItem), 100);
                 }}
               >
                 {t.addService || 'Add Service'}
-              </button>
-              <button 
-                className={`py-3 rounded-lg font-medium ${
-                  selectedItem.paymentStatus === 'paid'
-                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                    : 'btn-success'
-                }`}
-                onClick={() => {
-                  closeBottomSheet();
-                  setTimeout(() => openPaymentModal(selectedItem), 100);
-                }}
-                disabled={selectedItem.paymentStatus === 'paid'}
-              >
-                {t.addPayment || 'Add Payment'}
               </button>
             </div>
           </div>
@@ -4004,7 +4015,8 @@ const renderMainContent = (filteredClients) => {
             {(() => {
               const paymentContext = getPaymentContext(selectedItem, paymentTargetService, selectedItem.paymentHistory || [], safeRender);
               const clientDue = Math.max(0, (selectedItem.totalValue || 0) - (selectedItem.paidAmount || 0));
-              const isAlreadyFullyPaid = clientDue <= 0;
+              const maxDue = paymentTargetService ? paymentContext.due : clientDue;
+              const isAlreadyFullyPaid = maxDue <= 0;
               
               return (
                 <>
@@ -4048,16 +4060,16 @@ const renderMainContent = (filteredClients) => {
                             onChange={(e) => {
                               const val = parseFloat(e.target.value) || 0;
                               // Cap at client's due amount to prevent overpayment
-                              setPaymentData({...paymentData, amount: Math.min(val, clientDue)});
-                            }}
-                            max={clientDue}
+                          setPaymentData({...paymentData, amount: Math.min(val, maxDue)});
+                        }}
+                            max={maxDue}
                             className="w-full pl-8 pr-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
                             placeholder="0.00"
                           />
                           <span className="absolute left-3 top-3 text-gray-500 font-medium">€</span>
                         </div>
-                        {paymentData.amount > clientDue && (
-                          <p className="text-amber-600 text-xs mt-1">⚠️ {t.maxPaymentWarning || 'Maximum payment is'} {clientDue.toLocaleString()} €</p>
+                        {paymentData.amount > maxDue && (
+                          <p className="text-amber-600 text-xs mt-1">⚠️ {t.maxPaymentWarning || 'Maximum payment is'} {maxDue.toLocaleString()} €</p>
                         )}
                       </div>
                       
@@ -4220,33 +4232,43 @@ const renderMainContent = (filteredClients) => {
         await Promise.all(deleteExpensesPromises);
       }
 
-      // 3b. If booking has a collaborator, clean up collaborator payout records
+      // 3b. If booking has a collaborator, clean up payout records only if no other bookings remain
       if (bookingData.collaboratorId) {
-        // Delete financeRecords for this collaborator's payouts
-        const collaboratorPayoutsQuery = query(
-          collection(db, 'financeRecords'),
+        const collaboratorBookingsQuery = query(
+          collection(db, 'reservations'),
           where('companyId', '==', userCompanyId),
-          where('collaboratorId', '==', bookingData.collaboratorId),
-          where('serviceKey', '==', 'collaborator_payout')
+          where('collaboratorId', '==', bookingData.collaboratorId)
         );
-        const collaboratorPayoutsDocs = await getDocs(collaboratorPayoutsQuery);
-        
-        if (!collaboratorPayoutsDocs.empty) {
-          const deleteCollaboratorPayoutsPromises = collaboratorPayoutsDocs.docs
-            .filter(cpDoc => cpDoc.data()?.companyId === userCompanyId)
-            .map(cpDoc => deleteDoc(cpDoc.ref));
-          await Promise.all(deleteCollaboratorPayoutsPromises);
-        }
-        
-        // Also reset the collaborator's payment data
-        const collaboratorRef = doc(db, 'collaborators', bookingData.collaboratorId);
-        const collaboratorDoc = await getDoc(collaboratorRef);
-        if (collaboratorDoc.exists()) {
-          await updateDoc(collaboratorRef, {
-            payments: [],
-            paidTotal: 0,
-            scheduledTotal: 0
-          });
+        const collaboratorBookingsSnapshot = await getDocs(collaboratorBookingsQuery);
+        const hasOtherBookings = collaboratorBookingsSnapshot.docs.some(docSnap => docSnap.id !== booking.id);
+
+        if (!hasOtherBookings) {
+          // Delete financeRecords for this collaborator's payouts
+          const collaboratorPayoutsQuery = query(
+            collection(db, 'financeRecords'),
+            where('companyId', '==', userCompanyId),
+            where('collaboratorId', '==', bookingData.collaboratorId),
+            where('serviceKey', '==', 'collaborator_payout')
+          );
+          const collaboratorPayoutsDocs = await getDocs(collaboratorPayoutsQuery);
+          
+          if (!collaboratorPayoutsDocs.empty) {
+            const deleteCollaboratorPayoutsPromises = collaboratorPayoutsDocs.docs
+              .filter(cpDoc => cpDoc.data()?.companyId === userCompanyId)
+              .map(cpDoc => deleteDoc(cpDoc.ref));
+            await Promise.all(deleteCollaboratorPayoutsPromises);
+          }
+          
+          // Also reset the collaborator's payment data
+          const collaboratorRef = doc(db, 'collaborators', bookingData.collaboratorId);
+          const collaboratorDoc = await getDoc(collaboratorRef);
+          if (collaboratorDoc.exists()) {
+            await updateDoc(collaboratorRef, {
+              payments: [],
+              paidTotal: 0,
+              scheduledTotal: 0
+            });
+          }
         }
       }
 
@@ -5156,9 +5178,13 @@ async function handleShoppingFormSubmit(shoppingExpense) {
         companyId: userCompanyId // Add company ID to payment record
       };
       
-      const currentPaid = bookingData.paidAmount || 0;
-      const newPaidAmount = currentPaid + amount;
       const bookingTotal = bookingData.totalValue || 0;
+      
+      // Add payment to history
+      const paymentHistory = Array.isArray(bookingData.paymentHistory) ? [...bookingData.paymentHistory] : [];
+      paymentHistory.push(payment);
+      
+      const newPaidAmount = paymentHistory.reduce((sum, p) => sum + toNumber(p.amount || 0), 0);
       
       // Determine new payment status for the booking
       let newPaymentStatus = 'notPaid';
@@ -5167,10 +5193,6 @@ async function handleShoppingFormSubmit(shoppingExpense) {
       } else if (newPaidAmount > 0) {
         newPaymentStatus = 'partiallyPaid';
       }
-      
-      // Add payment to history
-      const paymentHistory = Array.isArray(bookingData.paymentHistory) ? [...bookingData.paymentHistory] : [];
-      paymentHistory.push(payment);
       
       // 3. Update Services with Rocket Science Allocation
       const services = Array.isArray(bookingData.services) ? [...bookingData.services] : [];
@@ -5713,17 +5735,6 @@ async function handleShoppingFormSubmit(shoppingExpense) {
               <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusBadgeClass(selectedItem.paymentStatus)}`}>
                 {getPaymentStatusText(selectedItem.paymentStatus)}
               </div>
-              <div className="mt-2">
-                <button 
-                  onClick={() => handleRecalculateTotals(selectedItem)}
-                  className="text-xs text-blue-600 hover:text-blue-800 underline flex items-center justify-center mx-auto gap-1"
-                >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Recalculate Balances
-                </button>
-              </div>
             </div>
             
             {/* Bookings & Associated Services Section */}
@@ -5757,13 +5768,6 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                       </div>
                     </div>
                     
-                    {/* UNALLOCATED CREDIT DISPLAY */}
-                    {booking.unallocatedCredit > 0.01 && (
-                      <div className="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded text-xs flex justify-between items-center">
-                        <span className="text-emerald-700 font-medium">Overpayment (Credit):</span>
-                        <span className="text-emerald-800 font-bold">{booking.unallocatedCredit.toLocaleString()} €</span>
-                      </div>
-                    )}
                   </div>
 
                   {/* Services for THIS Booking */}
@@ -5902,15 +5906,15 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                                     }`}
                                     disabled={isProcessingPayment}
                                     onClick={() => {
-                                      if (ctx.due > 0 && !isProcessingPayment) {
-                                        handleQuickPayment(selectedItem, ctx.due, { ...service, bookingId: booking.id }, { method: 'cash' });
+                                      if (!isProcessingPayment) {
+                                        openPaymentModal(selectedItem, { ...service, bookingId: booking.id });
                                       }
                                     }}
                                   >
                                     <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v8m-4-4h8" />
                                     </svg>
-                                    <span className="text-[10px] font-bold uppercase">{isProcessingPayment ? '...' : (t.markPaid || 'Paid')}</span>
+                                    <span className="text-[10px] font-bold uppercase">{isProcessingPayment ? '...' : (t.addPayment || 'Add Payment')}</span>
                                   </button>
                                 )}
                               </div>
@@ -5993,12 +5997,12 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                                 }`}
                                 disabled={isProcessingPayment}
                                 onClick={() => {
-                                  if (ctx.due > 0 && !isProcessingPayment) {
-                                    handleQuickPayment(selectedItem, ctx.due, { ...service, bookingId: service.bookingId }, { method: 'cash' });
+                                  if (!isProcessingPayment) {
+                                    openPaymentModal(selectedItem, { ...service, bookingId: service.bookingId });
                                   }
                                 }}
                               >
-                                {isProcessingPayment ? '...' : (t.markPaid || 'Paid')}
+                                {isProcessingPayment ? '...' : (t.addPayment || 'Add Payment')}
                               </button>
                             )}
                           </div>
@@ -6050,9 +6054,9 @@ async function handleShoppingFormSubmit(shoppingExpense) {
             </div>
 
             {/* Action Buttons */}
-            <div className="grid grid-cols-2 gap-3 pt-4 border-t sticky bottom-0 bg-white pb-2">
+            <div className="pt-4 border-t sticky bottom-0 bg-white pb-2">
               <button 
-                className="py-3 btn-primary rounded-xl font-semibold active:scale-[0.98] transition-all"
+                className="w-full py-3 btn-primary rounded-xl font-semibold active:scale-[0.98] transition-all"
                 onClick={() => {
                   closeBottomSheet();
                   setTimeout(() => openAddServiceModal(selectedItem), 300);
@@ -6060,35 +6064,24 @@ async function handleShoppingFormSubmit(shoppingExpense) {
               >
                 {t.addService || 'Add Service'}
               </button>
-              <button 
-                className={`py-3 rounded-xl font-semibold active:scale-[0.98] transition-all ${
-                  selectedItem.paymentStatus === 'paid'
-                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                    : 'btn-success'
-                }`}
-                onClick={() => {
-                  if (selectedItem.paymentStatus !== 'paid') {
-                    closeBottomSheet();
-                    setTimeout(() => openPaymentModal(selectedItem), 300);
-                  }
-                }}
-                disabled={selectedItem.paymentStatus === 'paid'}
-              >
-                {selectedItem.paymentStatus === 'paid' ? t.paid : (t.addPayment || 'Add Payment')}
-              </button>
             </div>
           </div>
         )}
         
         {/* PAYMENT FORM */}
         {(bottomSheetContent === 'quick-payment' || bottomSheetContent === 'edit-payment') && selectedItem && (() => {
+          const paymentContext = getPaymentContext(selectedItem, paymentTargetService, selectedItem.paymentHistory || [], safeRender);
           const clientDue = Math.max(0, (selectedItem.totalValue || 0) - (selectedItem.paidAmount || 0));
-          const isAlreadyFullyPaid = clientDue <= 0;
+          const maxDue = paymentTargetService ? paymentContext.due : clientDue;
+          const isAlreadyFullyPaid = maxDue <= 0;
           
           return (
             <div className="p-4 bg-white space-y-4">
               <div className="text-center border-b pb-4">
-                <h2 className="text-lg font-semibold text-gray-900">{t.client || 'Client'}: {safeRender(selectedItem.clientName)}</h2>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {paymentTargetService ? (t.service || 'Service') : (t.client || 'Client')}:{' '}
+                  {paymentTargetService ? safeRender(paymentTargetService.name) : safeRender(selectedItem.clientName)}
+                </h2>
                 
                 {isAlreadyFullyPaid ? (
                   <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
@@ -6096,7 +6089,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                     <p className="text-emerald-600 text-sm mt-1">{t.noPaymentNeeded || 'No additional payment is needed.'}</p>
                   </div>
                 ) : (
-                  <p className="text-rose-600 font-bold text-xl">{t.amountDue || 'Due'}: {clientDue.toLocaleString()} €</p>
+                  <p className="text-rose-600 font-bold text-xl">{t.amountDue || 'Due'}: {maxDue.toLocaleString()} €</p>
                 )}
               </div>
 
@@ -6111,9 +6104,9 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                         value={paymentData.amount || ''}
                         onChange={(e) => {
                           const val = parseFloat(e.target.value) || 0;
-                          setPaymentData({...paymentData, amount: Math.min(val, clientDue)});
+                          setPaymentData({...paymentData, amount: Math.min(val, maxDue)});
                         }}
-                        max={clientDue}
+                        max={maxDue}
                         className="w-full pl-8 pr-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
                         placeholder="0.00"
                       />
@@ -6122,14 +6115,14 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                     <div className="flex gap-2 mt-2">
                       <button
                         type="button"
-                        onClick={() => setPaymentData({...paymentData, amount: clientDue})}
+                        onClick={() => setPaymentData({...paymentData, amount: maxDue})}
                         className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
                       >
                         {t.fullAmount || 'Full Amount'}
                       </button>
                       <button
                         type="button"
-                        onClick={() => setPaymentData({...paymentData, amount: Math.round(clientDue / 2)})}
+                        onClick={() => setPaymentData({...paymentData, amount: Math.round(maxDue / 2)})}
                         className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
                       >
                         {t.half || 'Half'}

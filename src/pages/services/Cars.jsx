@@ -804,6 +804,19 @@ function Cars() {
   };
 
   const filteredCars = getFilteredCars();
+  const hasActiveFilters = Boolean(
+    searchTerm ||
+    filters.make ||
+    filters.fuel ||
+    filters.transmission ||
+    filters.yearMin ||
+    filters.yearMax ||
+    filters.seatsMin ||
+    filters.seatsMax ||
+    filters.priceMin ||
+    filters.priceMax ||
+    (filters.features && filters.features.length > 0)
+  );
 
   // Enhanced authentication useEffect that properly sets up auth state listener
   useEffect(() => {
@@ -2916,9 +2929,16 @@ function Cars() {
         </div>
       )}
 
-      <div style={styles.header}>
-        <h1 style={styles.title}>{t.carList.title}</h1>
-      </div>
+      {(isAddingCar || isEditingCar) && (
+        <div style={styles.header}>
+          <h1 style={styles.title}>{t.carList.title}</h1>
+        </div>
+      )}
+      {!isAddingCar && !isEditingCar && (
+        <div className="sr-only" aria-hidden="true">
+          {t.carList.title}
+        </div>
+      )}
       
       {/* Add/Edit Forms */}
       {(isAddingCar || isEditingCar) && (
@@ -3028,22 +3048,231 @@ function Cars() {
       
       {/* Car List */}
       {!isAddingCar && !isEditingCar && (
-        <div>
-          <div style={styles.headerRow}>
+        <div className="page-surface space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-semibold heading-display">{t.carList.title}</h1>
+              <div className="text-xs text-slate-500 mt-1">
+                {filteredCars.length} {t.search.resultsCount}
+              </div>
+            </div>
             <button
               type="button"
               onClick={() => {
                 resetForm();
                 setIsAddingCar(true);
               }}
-              style={styles.buttonPrimary}
+              className="btn-primary"
             >
               {t.carList.addNew}
             </button>
           </div>
 
-          {/* NEW: Filters and Search Section */}
-          {renderFiltersSection()}
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                placeholder={t.search.placeholder}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="input-premium input-premium--icon"
+              />
+              <svg
+                className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M21 21l-4.35-4.35m1.6-5.15a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setShowFilters(!showFilters)}
+                className="btn-soft"
+              >
+                {showFilters ? t.search.hideFilters : t.search.showFilters}
+              </button>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="btn-soft"
+                >
+                  {t.search.clearFilters}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {showFilters && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div>
+                <div className="text-xs font-semibold text-slate-500">{t.filters.make}</div>
+                <select
+                  value={filters.make}
+                  onChange={(e) => handleFilterChange('make', e.target.value)}
+                  className="input-premium"
+                >
+                  <option value="">{t.filters.anyMake}</option>
+                  {getUniqueCarMakes().map(make => (
+                    <option key={make} value={make}>{make}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-slate-500">{t.filters.fuel}</div>
+                <select
+                  value={filters.fuel}
+                  onChange={(e) => handleFilterChange('fuel', e.target.value)}
+                  className="input-premium"
+                >
+                  <option value="">{t.filters.anyFuel}</option>
+                  <option value="petrol">{t.fuelTypes.petrol}</option>
+                  <option value="diesel">{t.fuelTypes.diesel}</option>
+                  <option value="hybrid">{t.fuelTypes.hybrid}</option>
+                  <option value="electric">{t.fuelTypes.electric}</option>
+                </select>
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-slate-500">{t.filters.transmission}</div>
+                <select
+                  value={filters.transmission}
+                  onChange={(e) => handleFilterChange('transmission', e.target.value)}
+                  className="input-premium"
+                >
+                  <option value="">{t.filters.anyTransmission}</option>
+                  <option value="automatic">{t.transmissionTypes.automatic}</option>
+                  <option value="manual">{t.transmissionTypes.manual}</option>
+                </select>
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-slate-500">{t.filters.yearMin}</div>
+                <input
+                  type="number"
+                  placeholder="1900"
+                  value={filters.yearMin}
+                  onChange={(e) => handleFilterChange('yearMin', e.target.value)}
+                  className="input-premium"
+                  min="1900"
+                  max={new Date().getFullYear() + 1}
+                />
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-slate-500">{t.filters.yearMax}</div>
+                <input
+                  type="number"
+                  placeholder={new Date().getFullYear().toString()}
+                  value={filters.yearMax}
+                  onChange={(e) => handleFilterChange('yearMax', e.target.value)}
+                  className="input-premium"
+                  min="1900"
+                  max={new Date().getFullYear() + 1}
+                />
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-slate-500">{t.filters.seatsMin}</div>
+                <input
+                  type="number"
+                  placeholder="1"
+                  value={filters.seatsMin}
+                  onChange={(e) => handleFilterChange('seatsMin', e.target.value)}
+                  className="input-premium"
+                  min="1"
+                  max="20"
+                />
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-slate-500">{t.filters.seatsMax}</div>
+                <input
+                  type="number"
+                  placeholder="20"
+                  value={filters.seatsMax}
+                  onChange={(e) => handleFilterChange('seatsMax', e.target.value)}
+                  className="input-premium"
+                  min="1"
+                  max="20"
+                />
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-slate-500">{t.filters.priceMin}</div>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={filters.priceMin}
+                  onChange={(e) => handleFilterChange('priceMin', e.target.value)}
+                  className="input-premium"
+                  min="0"
+                />
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-slate-500">{t.filters.priceMax}</div>
+                <input
+                  type="number"
+                  placeholder="1000"
+                  value={filters.priceMax}
+                  onChange={(e) => handleFilterChange('priceMax', e.target.value)}
+                  className="input-premium"
+                  min="0"
+                />
+              </div>
+              <div className="md:col-span-2 lg:col-span-3">
+                <div className="text-xs font-semibold text-slate-500">{t.filters.features}</div>
+                <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-600">
+                  {[
+                    { key: 'airConditioning', label: t.features.airConditioning },
+                    { key: 'bluetooth', label: t.features.bluetooth },
+                    { key: 'navigation', label: t.features.navigation },
+                    { key: 'leatherSeats', label: t.features.leatherSeats },
+                    { key: 'sunroof', label: t.features.sunroof },
+                    { key: 'cruiseControl', label: t.features.cruiseControl }
+                  ].map(feature => (
+                    <label key={feature.key} htmlFor={`filter-${feature.key}`} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id={`filter-${feature.key}`}
+                        checked={filters.features.includes(feature.key)}
+                        onChange={(e) => handleFeatureFilterChange(feature.key, e.target.checked)}
+                      />
+                      {feature.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {hasActiveFilters && (
+            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+              {searchTerm && (
+                <span className="chip">
+                  "{searchTerm.length > 18 ? `${searchTerm.substring(0, 18)}...` : searchTerm}"
+                </span>
+              )}
+              {filters.make && <span className="chip">{t.filters.make}: {filters.make}</span>}
+              {filters.fuel && <span className="chip">{t.filters.fuel}: {t.fuelTypes[filters.fuel] || filters.fuel}</span>}
+              {filters.transmission && <span className="chip">{t.filters.transmission}: {t.transmissionTypes[filters.transmission]}</span>}
+              {(filters.yearMin || filters.yearMax) && (
+                <span className="chip">
+                  {t.filters.year}: {filters.yearMin || '1900'} - {filters.yearMax || new Date().getFullYear()}
+                </span>
+              )}
+              {(filters.seatsMin || filters.seatsMax) && (
+                <span className="chip">
+                  {t.filters.seats}: {filters.seatsMin || '1'} - {filters.seatsMax || '20'}
+                </span>
+              )}
+              {(filters.priceMin || filters.priceMax) && (
+                <span className="chip">
+                  {t.filters.price}: €{filters.priceMin || '0'} - €{filters.priceMax || '∞'}
+                </span>
+              )}
+              {filters.features.length > 0 && (
+                <span className="chip">{t.filters.features}: {filters.features.length}</span>
+              )}
+            </div>
+          )}
           
           {filteredCars.length === 0 ? (
             <div style={{textAlign: 'center', padding: '40px 0', background: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'}}>
@@ -3052,24 +3281,18 @@ function Cars() {
               </p>
             </div>
           ) : (
-            <div style={{
-              ...styles.carListContainer,
-              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))'
-            }}>
+            <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
               {filteredCars.map((car) => (
-                <div key={car.id} style={styles.carCard}>
-                  {/* Car image or placeholder with error handling */}
-                  <div style={styles.carImageContainer}>
+                <div key={car.id} className="card-premium overflow-hidden flex flex-col">
+                  <div className="relative h-44 bg-gray-100">
                     {renderCarImage(car)}
                   </div>
-                  
-                  {/* Car details */}
-                  <div style={styles.carCardContent}>
-                    <h3 style={styles.carCardTitle}>
+                  <div className="p-3 flex flex-col flex-grow">
+                    <h3 className="text-base font-semibold text-gray-900 mb-1 line-clamp-2">
                       {getLocalizedContent(car.name, language)}
                     </h3>
-                    <div style={styles.carCardDetails}>
-                      <p style={{marginBottom: '4px'}}>
+                    <div className="text-sm text-gray-600">
+                      <p className="mb-1">
                         {car.make} {car.model} {car.year && `(${car.year})`}
                       </p>
                       <p>{car.seats && `${car.seats} ${language === 'en' ? 'seats' : 'locuri'}`} • {car.transmission && t.transmissionTypes[car.transmission]}</p>
@@ -3086,17 +3309,17 @@ function Cars() {
                         const displayPrice = car.pricing?.daily || (cheapestMonthlyPrice !== null ? cheapestMonthlyPrice : null);
                         if (!displayPrice) return null;
                         return (
-                          <p style={{fontWeight: '600', color: '#1f2937', marginTop: '8px'}}>
+                          <p className="mt-2 text-sm font-semibold text-gray-900">
                             €{displayPrice}/{language === 'en' ? 'day' : 'zi'}
                           </p>
                         );
                       })()}
                     </div>
-                    <div style={styles.buttonRow}>
+                    <div className="flex gap-2 mt-4">
                       <button
                         type="button"
                         onClick={() => setSelectedCar(car)}
-                        style={isMobile ? {...styles.buttonSecondary, flex: 1} : styles.buttonSecondary}
+                        className="flex-1 btn-soft"
                       >
                         {t.view || 'Vezi'}
                       </button>
@@ -3105,7 +3328,8 @@ function Cars() {
                           href={getCarDocuments(car)[0].url}
                           target="_blank"
                           rel="noreferrer"
-                          style={styles.buttonIcon}
+                          className="btn-soft"
+                          style={{ width: '44px', height: '44px', padding: 0 }}
                           aria-label={language === 'en' ? 'Download PDF' : 'Descarcă PDF'}
                           title={language === 'en' ? 'Download PDF' : 'Descarcă PDF'}
                           onClick={(e) => e.stopPropagation()}
@@ -3132,7 +3356,7 @@ function Cars() {
                       <button
                         type="button"
                         onClick={() => startEditingCar(car)}
-                        style={isMobile ? {...styles.buttonSecondary, flex: 1} : styles.buttonSecondary}
+                        className="flex-1 btn-soft"
                       >
                         {t.edit}
                       </button>
@@ -3143,7 +3367,8 @@ function Cars() {
                             handleDeleteCar(car.id);
                           }
                         }}
-                        style={styles.buttonIconDanger}
+                        className="btn-soft btn-soft-danger"
+                        style={{ width: '44px', height: '44px', padding: 0 }}
                         aria-label={t.delete}
                         title={t.delete}
                       >
@@ -3225,6 +3450,9 @@ function CarViewModal({ car, onClose, language, t, getLocalizedContent }) {
 
   const displayName = getLocalizedContent(car.name, language) || `${car.make || ''} ${car.model || ''}`;
   const displayLocation = getLocalizedContent(car.pickupLocation, language);
+  const displayBookingNotes = getLocalizedContent(car.bookingNotes, language);
+  const hasContactInfo = Boolean(car.contact?.name || car.contact?.phone || car.contact?.email);
+  const hasBookingInfo = Boolean(displayLocation || displayBookingNotes);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -3459,13 +3687,19 @@ function CarViewModal({ car, onClose, language, t, getLocalizedContent }) {
                 )}
                 
                 {/* Contact Info if available */}
-                {(car.contact?.name || car.contact?.phone || car.contact?.email) && (
+                {(hasContactInfo || hasBookingInfo) && (
                    <div className="mt-4 pt-4 border-t border-gray-100">
                      <h3 className="font-medium text-gray-900 mb-3">{t.contact.title}</h3>
                      <div className="text-sm space-y-1">
-                        {car.contact.name && <p><span className="text-gray-600">{t.contact.name}:</span> {car.contact.name}</p>}
-                        {car.contact.phone && <p><span className="text-gray-600">{t.contact.phone}:</span> {car.contact.phone}</p>}
-                        {car.contact.email && <p><span className="text-gray-600">{t.contact.email}:</span> {car.contact.email}</p>}
+                        {car.contact?.name && <p><span className="text-gray-600">{t.contact.name}:</span> {car.contact.name}</p>}
+                        {car.contact?.phone && <p><span className="text-gray-600">{t.contact.phone}:</span> {car.contact.phone}</p>}
+                        {car.contact?.email && <p><span className="text-gray-600">{t.contact.email}:</span> {car.contact.email}</p>}
+                        {displayLocation && <p><span className="text-gray-600">{t.contact.pickupLocation}:</span> {displayLocation}</p>}
+                        {displayBookingNotes && (
+                          <p className="whitespace-pre-line">
+                            <span className="text-gray-600">{t.contact.bookingNotes}:</span> {displayBookingNotes}
+                          </p>
+                        )}
                      </div>
                    </div>
                 )}

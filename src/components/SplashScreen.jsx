@@ -58,7 +58,7 @@ const styles = {
       linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 75%, #475569 100%)
     `,
     zIndex: 9999,
-    fontFamily: "'Inter', sans-serif",
+    fontFamily: "'Manrope', sans-serif",
     animation: 'backgroundShift 8s ease-in-out infinite alternate'
   },
   
@@ -146,7 +146,7 @@ const styles = {
   },
   
   brandName: {
-    fontFamily: "'Playfair Display', serif",
+    fontFamily: "'Fraunces', serif",
     fontSize: '2.5rem',
     fontWeight: 600,
     color: '#ffffff',
@@ -162,7 +162,7 @@ const styles = {
   },
   
   tagline: {
-    fontFamily: "'Inter', sans-serif",
+    fontFamily: "'Manrope', sans-serif",
     fontSize: '1rem',
     fontWeight: 300,
     color: '#cbd5e1',
@@ -206,7 +206,7 @@ const styles = {
     bottom: '80px',
     left: '50%',
     transform: 'translateX(-50%)',
-    fontFamily: "'Inter', sans-serif",
+    fontFamily: "'Manrope', sans-serif",
     fontSize: '0.875rem',
     fontWeight: 400,
     color: '#94a3b8',
@@ -219,7 +219,7 @@ const styles = {
     position: 'absolute',
     bottom: '20px',
     right: '20px',
-    fontFamily: "'Inter', sans-serif",
+    fontFamily: "'Manrope', sans-serif",
     fontSize: '0.75rem',
     color: '#64748b',
     opacity: 0,

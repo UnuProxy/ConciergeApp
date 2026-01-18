@@ -161,6 +161,12 @@ const translations = {
   }
 };
 
+const getTodayISODate = () => {
+  const now = new Date();
+  const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return localDate.toISOString().split('T')[0];
+};
+
 function AddClient() {
   // Get the language from localStorage (via helper) instead of using local state
   const [language, setLanguage] = useState(getCurrentLanguage);
@@ -233,6 +239,11 @@ function AddClient() {
     // Contact persons
     contactPersons: [{ name: '', email: '', phone: '' }],
   });
+
+  const minDate = getTodayISODate();
+  const minEndDate = clientData.startDate && clientData.startDate > minDate
+    ? clientData.startDate
+    : minDate;
 
   // Fetch team members when the component loads
   useEffect(() => {
@@ -674,6 +685,7 @@ function AddClient() {
                     name="followUpDate" 
                     value={clientData.followUpDate} 
                     onChange={handleChange} 
+                    min={minDate}
                     className="w-full py-2.5 px-3 border border-gray-200 rounded-md text-base" 
                   />
                 </div>
@@ -746,6 +758,7 @@ function AddClient() {
                         name="startDate" 
                         value={clientData.startDate} 
                         onChange={handleChange} 
+                        min={minDate}
                         className="w-full py-2.5 px-3 border border-gray-200 rounded-md text-base" 
                       />
                     </div>
@@ -756,6 +769,7 @@ function AddClient() {
                         name="endDate" 
                         value={clientData.endDate} 
                         onChange={handleChange} 
+                        min={minEndDate}
                         className="w-full py-2.5 px-3 border border-gray-200 rounded-md text-base" 
                       />
                     </div>

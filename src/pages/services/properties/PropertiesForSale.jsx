@@ -36,11 +36,13 @@ const PropertiesForSale = () => {
       addProperty: 'Add Property',
       all: 'All',
       villas: 'Villas',
+      apartments: 'Apartments',
       land: 'Land',
       noProperties: 'No properties found',
       beds: 'beds',
       baths: 'baths',
       villa: 'Villa',
+      apartment: 'Apartment',
       landParcel: 'Land',
       available: 'Available',
       pending: 'Pending',
@@ -61,6 +63,7 @@ const PropertiesForSale = () => {
       anyBedrooms: "Any Bedrooms",
       anyBathrooms: "Any Bathrooms",
       anyStatus: "Any Status",
+      statusLabel: "Status",
       clearFilters: "Clear Filters",
       resultsFound: "properties found",
       size: "Size",
@@ -72,11 +75,13 @@ const PropertiesForSale = () => {
       addProperty: 'Adaugă Proprietate',
       all: 'Toate',
       villas: 'Vile',
+      apartments: 'Apartamente',
       land: 'Terenuri',
       noProperties: 'Nu s-au găsit proprietăți',
       beds: 'dormitoare',
       baths: 'băi',
       villa: 'Vilă',
+      apartment: 'Apartament',
       landParcel: 'Teren',
       available: 'Disponibil',
       pending: 'În așteptare',
@@ -97,6 +102,7 @@ const PropertiesForSale = () => {
       anyBedrooms: "Orice Dormitoare",
       anyBathrooms: "Orice Băi",
       anyStatus: "Orice Status",
+      statusLabel: "Status",
       clearFilters: "Șterge Filtrele",
       resultsFound: "proprietăți găsite",
       size: "Suprafață",
@@ -194,8 +200,8 @@ const PropertiesForSale = () => {
         }
       }
 
-      // Bedroom filter (only for villas)
-      if (bedroomFilter && property.type === 'villa') {
+      // Bedroom filter (only for residential types)
+      if (bedroomFilter && (property.type === 'villa' || property.type === 'apartment')) {
         const beds = parseInt(property.bedrooms || '0', 10);
         if (Number.isNaN(beds)) return false;
 
@@ -208,8 +214,8 @@ const PropertiesForSale = () => {
         }
       }
 
-      // Bathroom filter (only for villas)
-      if (bathroomFilter && property.type === 'villa') {
+      // Bathroom filter (only for residential types)
+      if (bathroomFilter && (property.type === 'villa' || property.type === 'apartment')) {
         const baths = parseInt(property.bathrooms || '0', 10);
         if (Number.isNaN(baths)) return false;
 
@@ -294,6 +300,18 @@ const PropertiesForSale = () => {
     }
   };
 
+  const filteredProperties = getFilteredProperties();
+  const hasActiveFilters = Boolean(
+    searchTerm ||
+    priceFilter.min ||
+    priceFilter.max ||
+    sizeFilter.min ||
+    sizeFilter.max ||
+    bedroomFilter ||
+    bathroomFilter ||
+    statusFilter
+  );
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -303,436 +321,312 @@ const PropertiesForSale = () => {
   }
 
   return (
-    <div className="bg-gray-50 pb-20 min-h-screen overflow-x-hidden">
-      {/* Header with Add Property Button */}
-      <div className="p-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">{t.title}</h1>
-        <button
-          onClick={() => navigate('/services/properties-for-sale/add')}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white py-3 px-4 rounded-lg font-medium flex items-center justify-center transition-colors"
-        >
-          <svg
-            className="w-5 h-5 mr-2"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-            />
-          </svg>
-          {t.addProperty}
-        </button>
-      </div>
-
-      {/* Search and Filter Controls */}
-      <div className="px-4 mb-4">
-        {/* Search Bar and Controls Row */}
-        <div className="flex flex-col md:flex-row gap-4 mb-4">
-          {/* Search Bar */}
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder={t.search}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:ring-0 outline-none transition-colors"
-              />
-              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
-                🔍
-              </div>
+    <div className="p-6 space-y-6 animate-fade-in">
+      <div className="page-surface space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-semibold heading-display">{t.title}</h1>
+            <div className="text-xs text-slate-500 mt-1">
+              {filteredProperties.length} {t.resultsFound}
             </div>
           </div>
+          <button
+            onClick={() => navigate('/services/properties-for-sale/add')}
+            className="btn-primary"
+          >
+            {t.addProperty}
+          </button>
+        </div>
 
-          {/* Controls */}
-          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-            {/* Minimal Filter Toggle Button */}
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder={t.search}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="input-premium input-premium--icon"
+            />
+            <svg
+              className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M21 21l-4.35-4.35m1.6-5.15a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center justify-center gap-2 px-4 py-3 rounded border font-medium transition-colors text-sm ${
-                showFilters 
-                  ? 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200' 
-                  : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
-              }`}
+              className="btn-soft"
+              type="button"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
-              </svg>
               {showFilters ? t.hideFilters : t.showFilters}
             </button>
-
-            {/* Results Count and Clear Button */}
-            <div className="flex items-center justify-between sm:justify-center gap-3 bg-gray-100 px-4 py-2 rounded-lg border">
-              <span className="text-gray-700 text-sm font-medium whitespace-nowrap">
-                {getFilteredProperties().length} {t.resultsFound}
-              </span>
-              
-              {(searchTerm || priceFilter.min || priceFilter.max || sizeFilter.min || sizeFilter.max || bedroomFilter || bathroomFilter || statusFilter) && (
-                <button
-                  onClick={() => {
-                    setSearchTerm('');
-                    setPriceFilter({ min: '', max: '' });
-                    setSizeFilter({ min: '', max: '' });
-                    setBedroomFilter('');
-                    setBathroomFilter('');
-                    setStatusFilter('');
-                  }}
-                  className="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
-                >
-                  ✕ {t.clearFilters}
-                </button>
-              )}
-            </div>
+            {hasActiveFilters && (
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setPriceFilter({ min: '', max: '' });
+                  setSizeFilter({ min: '', max: '' });
+                  setBedroomFilter('');
+                  setBathroomFilter('');
+                  setStatusFilter('');
+                }}
+                className="btn-soft"
+                type="button"
+              >
+                {t.clearFilters}
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Enhanced Filter Panel */}
-        {showFilters && (
-          <div className="bg-white border-2 border-gray-200 rounded-xl p-4 md:p-6 mb-4 shadow-sm">
-            <div className="flex items-center mb-6 pb-3 border-b border-gray-200">
-              <svg className="w-4 h-4 text-gray-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z" />
-              </svg>
-              <h3 className="text-lg font-semibold text-gray-900">
-                {t.filters}
-              </h3>
-            </div>
-            
-            {/* Responsive Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-              {/* Price Range Filter */}
-              <div className="bg-gray-50 p-4 rounded-lg border">
-                <label className="flex items-center mb-3 text-sm font-semibold text-gray-700">
-                  <span className="mr-2">💰</span>
-                  {t.priceRange} (€)
-                </label>
-                <div className="flex flex-col sm:flex-row gap-2 items-center">
-                  <input
-                    type="number"
-                    placeholder={t.minPrice}
-                    value={priceFilter.min}
-                    onChange={(e) => setPriceFilter(prev => ({ ...prev, min: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:border-indigo-500 focus:ring-0 outline-none text-sm"
-                  />
-                  <span className="text-gray-500 font-medium hidden sm:block">—</span>
-                  <input
-                    type="number"
-                    placeholder={t.maxPrice}
-                    value={priceFilter.max}
-                    onChange={(e) => setPriceFilter(prev => ({ ...prev, max: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:border-indigo-500 focus:ring-0 outline-none text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Size Range Filter */}
-              <div className="bg-gray-50 p-4 rounded-lg border">
-                <label className="flex items-center mb-3 text-sm font-semibold text-gray-700">
-                  <span className="mr-2">📐</span>
-                  {t.sizeRange}
-                </label>
-                <div className="flex flex-col sm:flex-row gap-2 items-center">
-                  <input
-                    type="number"
-                    placeholder={t.minSize}
-                    value={sizeFilter.min}
-                    onChange={(e) => setSizeFilter(prev => ({ ...prev, min: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:border-indigo-500 focus:ring-0 outline-none text-sm"
-                  />
-                  <span className="text-gray-500 font-medium hidden sm:block">—</span>
-                  <input
-                    type="number"
-                    placeholder={t.maxSize}
-                    value={sizeFilter.max}
-                    onChange={(e) => setSizeFilter(prev => ({ ...prev, max: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:border-indigo-500 focus:ring-0 outline-none text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Status Filter */}
-              <div className="bg-gray-50 p-4 rounded-lg border">
-                <label className="flex items-center mb-3 text-sm font-semibold text-gray-700">
-                  <span className="mr-2">📊</span>
-                  Status
-                </label>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:border-indigo-500 focus:ring-0 outline-none text-sm bg-white"
-                >
-                  <option value="">{t.anyStatus}</option>
-                  <option value="available">{t.available}</option>
-                  <option value="pending">{t.pending}</option>
-                  <option value="under_offer">{t.underOffer}</option>
-                  <option value="sold">{t.sold}</option>
-                </select>
-              </div>
-
-              {/* Bedrooms Filter - Only show when villa type is active or all types */}
-              {(activeFilter === 'all' || activeFilter === 'villa') && (
-                <div className="bg-gray-50 p-4 rounded-lg border">
-                  <label className="flex items-center mb-3 text-sm font-semibold text-gray-700">
-                    <span className="mr-2">🛏️</span>
-                    {t.beds}
-                  </label>
-                  <select
-                    value={bedroomFilter}
-                    onChange={(e) => setBedroomFilter(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:border-indigo-500 focus:ring-0 outline-none text-sm bg-white"
-                  >
-                    <option value="">{t.anyBedrooms}</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5+">5+</option>
-                  </select>
-                </div>
-              )}
-
-              {/* Bathrooms Filter - Only show when villa type is active or all types */}
-              {(activeFilter === 'all' || activeFilter === 'villa') && (
-                <div className="bg-gray-50 p-4 rounded-lg border">
-                  <label className="flex items-center mb-3 text-sm font-semibold text-gray-700">
-                    <span className="mr-2">🚿</span>
-                    {t.baths}
-                  </label>
-                  <select
-                    value={bathroomFilter}
-                    onChange={(e) => setBathroomFilter(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:border-indigo-500 focus:ring-0 outline-none text-sm bg-white"
-                  >
-                    <option value="">{t.anyBathrooms}</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4+">4+</option>
-                  </select>
-                </div>
-              )}
-            </div>
-
-            {/* Active Filters Summary */}
-            {(searchTerm || priceFilter.min || priceFilter.max || sizeFilter.min || sizeFilter.max || bedroomFilter || bathroomFilter || statusFilter) && (
-              <div className="mt-6 pt-4 border-t border-gray-200">
-                <p className="text-xs text-gray-600 mb-2 font-medium">
-                  Active Filters:
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {searchTerm && (
-                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs border border-blue-200">
-                      Search: "{searchTerm.length > 15 ? searchTerm.substring(0, 15) + '...' : searchTerm}"
-                    </span>
-                  )}
-                  {(priceFilter.min || priceFilter.max) && (
-                    <span className="bg-emerald-50 text-emerald-700 px-2 py-1 rounded text-xs border border-emerald-200">
-                      €{priceFilter.min || '0'} - €{priceFilter.max || '∞'}
-                    </span>
-                  )}
-                  {(sizeFilter.min || sizeFilter.max) && (
-                    <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs border border-yellow-200">
-                      {sizeFilter.min || '0'}m² - {sizeFilter.max || '∞'}m²
-                    </span>
-                  )}
-                  {bedroomFilter && (
-                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs border border-blue-200">
-                      {bedroomFilter} Bed
-                    </span>
-                  )}
-                  {bathroomFilter && (
-                    <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs border border-slate-200">
-                      {bathroomFilter} Bath
-                    </span>
-                  )}
-                  {statusFilter && (
-                    <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs border border-purple-200">
-                      {getStatusLabel(statusFilter)}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Tabs */}
-      <div className="border-b border-gray-200 px-4">
-        <div className="flex -mb-px overflow-x-auto">
+        <div className="flex flex-wrap gap-2">
           {[
             { key: 'all', label: t.all },
             { key: 'villa', label: t.villas },
+            { key: 'apartment', label: t.apartments },
             { key: 'land', label: t.land }
           ].map(tab => (
             <button
               key={tab.key}
+              type="button"
               onClick={() => setActiveFilter(tab.key)}
-              className={`mr-8 py-4 whitespace-nowrap flex-shrink-0 ${
-                activeFilter === tab.key
-                  ? 'text-indigo-600 border-b-2 border-indigo-600 font-medium'
-                  : 'text-gray-500'
-              }`}
+              className={activeFilter === tab.key ? 'chip' : 'chip chip-toggle'}
             >
               {tab.label}
             </button>
           ))}
         </div>
+
+        {showFilters && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div>
+              <div className="text-xs font-semibold text-slate-500">{t.priceRange}</div>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  placeholder={t.minPrice}
+                  value={priceFilter.min}
+                  onChange={(e) => setPriceFilter(prev => ({ ...prev, min: e.target.value }))}
+                  className="input-premium"
+                />
+                <input
+                  type="number"
+                  placeholder={t.maxPrice}
+                  value={priceFilter.max}
+                  onChange={(e) => setPriceFilter(prev => ({ ...prev, max: e.target.value }))}
+                  className="input-premium"
+                />
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-slate-500">{t.sizeRange}</div>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  placeholder={t.minSize}
+                  value={sizeFilter.min}
+                  onChange={(e) => setSizeFilter(prev => ({ ...prev, min: e.target.value }))}
+                  className="input-premium"
+                />
+                <input
+                  type="number"
+                  placeholder={t.maxSize}
+                  value={sizeFilter.max}
+                  onChange={(e) => setSizeFilter(prev => ({ ...prev, max: e.target.value }))}
+                  className="input-premium"
+                />
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-slate-500">{t.statusLabel}</div>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="input-premium"
+              >
+                <option value="">{t.anyStatus}</option>
+                <option value="available">{t.available}</option>
+                <option value="pending">{t.pending}</option>
+                <option value="under_offer">{t.underOffer}</option>
+                <option value="sold">{t.sold}</option>
+              </select>
+            </div>
+            {(activeFilter === 'all' || activeFilter === 'villa' || activeFilter === 'apartment') && (
+              <div>
+                <div className="text-xs font-semibold text-slate-500">{t.beds}</div>
+                <select
+                  value={bedroomFilter}
+                  onChange={(e) => setBedroomFilter(e.target.value)}
+                  className="input-premium"
+                >
+                  <option value="">{t.anyBedrooms}</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5+">5+</option>
+                </select>
+              </div>
+            )}
+            {(activeFilter === 'all' || activeFilter === 'villa' || activeFilter === 'apartment') && (
+              <div>
+                <div className="text-xs font-semibold text-slate-500">{t.baths}</div>
+                <select
+                  value={bathroomFilter}
+                  onChange={(e) => setBathroomFilter(e.target.value)}
+                  className="input-premium"
+                >
+                  <option value="">{t.anyBathrooms}</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4+">4+</option>
+                </select>
+              </div>
+            )}
+          </div>
+        )}
+
+        {hasActiveFilters && (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+            {searchTerm && (
+              <span className="chip">
+                "{searchTerm.length > 18 ? `${searchTerm.substring(0, 18)}...` : searchTerm}"
+              </span>
+            )}
+            {(priceFilter.min || priceFilter.max) && (
+              <span className="chip">
+                €{priceFilter.min || '0'} - €{priceFilter.max || '∞'}
+              </span>
+            )}
+            {(sizeFilter.min || sizeFilter.max) && (
+              <span className="chip">
+                {sizeFilter.min || '0'}m² - {sizeFilter.max || '∞'}m²
+              </span>
+            )}
+            {bedroomFilter && <span className="chip">{bedroomFilter} {t.beds}</span>}
+            {bathroomFilter && <span className="chip">{bathroomFilter} {t.baths}</span>}
+            {statusFilter && <span className="chip">{getStatusLabel(statusFilter)}</span>}
+          </div>
+        )}
       </div>
 
-      {/* Property Grid or Empty State - FIXED VERSION */}
-      {getFilteredProperties().length === 0 ? (
+      {filteredProperties.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-          <svg className="w-16 h-16 text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-16 h-16 text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
           </svg>
-          <p className="text-gray-500 mb-4">{t.noProperties}</p>
-          <button onClick={() => navigate('/services/properties-for-sale/add')} className="bg-indigo-600 text-white px-6 py-2 rounded-md">
+          <p className="text-slate-500 mb-4">{t.noProperties}</p>
+          <button onClick={() => navigate('/services/properties-for-sale/add')} className="btn-primary">
             {t.addProperty}
           </button>
         </div>
       ) : (
-        <div className="px-4 pt-4">
-          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 justify-items-stretch">
-            {getFilteredProperties().map(prop => (
-              <div
-                key={prop.id}
-                onClick={() => navigate(`/services/properties-for-sale/${prop.id}`)}
-                className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-200 w-full h-full flex flex-col"
-              >
-                {/* Fixed height image container */}
-                <div className="relative h-40 md:h-44 flex-shrink-0">
-                  {prop.images.length > 0 ? (
-                    <img src={prop.images[0]} alt={prop.title} className="w-full h-full object-cover" loading="lazy" />
-                  ) : (
-                    <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                      <svg className="w-12 h-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                  )}
-                  <div className="absolute top-2 left-2 text-indigo-600 font-medium text-sm bg-white/90 px-2 py-1 rounded">
-                    {prop.type === 'villa' ? t.villa : t.landParcel}
+        <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
+          {filteredProperties.map(prop => (
+            <div
+              key={prop.id}
+              onClick={() => navigate(`/services/properties-for-sale/${prop.id}`)}
+              className="card-premium overflow-hidden cursor-pointer flex flex-col"
+            >
+              <div className="relative h-44 flex-shrink-0">
+                {prop.images.length > 0 ? (
+                  <img src={prop.images[0]} alt={prop.title} className="w-full h-full object-cover" loading="lazy" />
+                ) : (
+                  <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-400">
+                    {language === 'ro' ? 'Fără foto' : 'No photo'}
                   </div>
-                  <div className={`absolute top-2 right-2 ${getStatusColor(prop.status)} text-white px-2 py-1 rounded text-xs font-medium`}>
-                    {getStatusLabel(prop.status)}
+                )}
+                {/* Image area intentionally clean */}
+              </div>
+
+              <div className="p-3 flex flex-col flex-grow">
+                <div className="flex items-start justify-between gap-3">
+                  <h2 className="text-base font-semibold text-gray-900 line-clamp-2">
+                    {prop.title}
+                  </h2>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <span className="chip bg-white text-slate-900 border-slate-900/15 shadow-sm">
+                      {prop.type === 'villa'
+                        ? t.villa
+                        : prop.type === 'apartment'
+                          ? t.apartment
+                          : t.landParcel}
+                    </span>
+                    <span
+                      className={`chip ${
+                        prop.status === 'available'
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : prop.status === 'under_offer'
+                            ? 'bg-amber-500 text-white border-amber-500'
+                            : prop.status === 'pending'
+                              ? 'bg-amber-500 text-white border-amber-500'
+                              : 'bg-rose-600 text-white border-rose-600'
+                      }`}
+                    >
+                      {getStatusLabel(prop.status)}
+                    </span>
                   </div>
                 </div>
+                <div className="flex items-center text-slate-500 text-sm mb-2">
+                  <svg className="w-4 h-4 mr-1 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span className="truncate">{prop.location}</span>
+                </div>
+                <div className="text-lg font-semibold text-gray-900">
+                  €{formatPrice(prop.price)}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
+                  {prop.livingArea > 0 && (
+                    <span className="chip">{prop.livingArea} m<sup>2</sup> {t.livingArea}</span>
+                  )}
+                  {prop.gardenArea > 0 && (
+                    <span className="chip">{prop.gardenArea} m<sup>2</sup> {t.gardenArea}</span>
+                  )}
+                  {prop.livingArea <= 0 && prop.gardenArea <= 0 && (
+                    <span className="chip">{prop.size} m<sup>2</sup></span>
+                  )}
+                </div>
+                {(prop.type === 'villa' || prop.type === 'apartment') && (
+                  <div className="mt-2 text-sm text-slate-600 flex gap-4">
+                    <span>{prop.bedrooms} {t.beds}</span>
+                    <span>{prop.bathrooms} {t.baths}</span>
+                  </div>
+                )}
 
-                {/* Content container that grows to fill available space */}
-                <div className="p-3 flex flex-col flex-grow">
-                  {/* Title with fixed height to prevent overflow - FIXED VERSION */}
-                  <h2 className="text-base md:text-lg font-semibold mb-2 h-12 flex items-start">
-                    <span style={{
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      lineHeight: '1.2',
-                      width: '100%'
-                    }}>
-                      {prop.title}
-                    </span>
-                  </h2>
-                  
-                  {/* Location with fixed height */}
-                  <div className="flex items-center text-gray-600 mb-3 min-w-0 h-5">
-                    <svg className="w-4 h-4 text-indigo-600 mr-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                <div className="flex items-center gap-2 mt-4">
+                  <button
+                    onClick={e => { e.stopPropagation(); navigate(`/services/properties-for-sale/edit/${prop.id}`); }}
+                    className="btn-soft"
+                    style={{ width: '40px', height: '40px', padding: 0 }}
+                    aria-label="Edit"
+                    title="Edit"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                     </svg>
-                    <span className="truncate text-sm">{prop.location}</span>
-                  </div>
-
-                  <div className="border-t border-gray-100 my-3" />
-
-                  {/* Price and size section */}
-                  <div className="flex flex-col gap-2 mb-3">
-                    <div className="text-indigo-600 text-lg font-bold flex items-center min-w-0">
-                      <span className="mr-1">€</span>
-                      <span className="truncate">{formatPrice(prop.price)}</span>
-                    </div>
-                    <div className="flex items-center text-gray-600 gap-2 flex-wrap">
-                      {prop.livingArea > 0 && (
-                        <div className="flex items-center bg-indigo-50 text-indigo-700 rounded px-2 py-1 text-xs font-medium">
-                          <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h10a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z" />
-                          </svg>
-                          <span>{prop.livingArea} m<sup>2</sup> {t.livingArea}</span>
-                        </div>
-                      )}
-                      {prop.gardenArea > 0 && (
-                        <div className="flex items-center bg-emerald-50 text-emerald-700 rounded px-2 py-1 text-xs font-medium">
-                          <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          <span>{prop.gardenArea} m<sup>2</sup> {t.gardenArea}</span>
-                        </div>
-                      )}
-                      {prop.livingArea <= 0 && prop.gardenArea <= 0 && (
-                        <div className="flex items-center">
-                          <svg className="w-4 h-4 text-indigo-600 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-                          </svg>
-                          <span className="text-sm">{prop.size} m<sup>2</sup></span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Beds and baths section with fixed height */}
-                  <div className="h-6 mb-3">
-                    {prop.type === 'villa' && (
-                      <div className="flex gap-4">
-                        <div className="flex items-center text-gray-700">
-                          <svg className="w-4 h-4 text-indigo-600 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
-                          </svg>
-                          <span className="text-sm">{prop.bedrooms} {t.beds}</span>
-                        </div>
-                        <div className="flex items-center text-gray-700">
-                          <svg className="w-4 h-4 text-indigo-600 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                          </svg>
-                          <span className="text-sm">{prop.bathrooms} {t.baths}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Spacer to push buttons to bottom */}
-                  <div className="flex-grow"></div>
-
-                  {/* Action buttons - always at bottom */}
-                  <div className="flex justify-end gap-2 mt-auto">
-                    <button
-                      onClick={e => { e.stopPropagation(); navigate(`/services/properties-for-sale/edit/${prop.id}`); }}
-                      className="p-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                      aria-label="Edit"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={e => handleDelete(prop.id, e)}
-                      className="p-2 bg-rose-50 text-rose-600 rounded hover:bg-rose-100 transition-colors"
-                      aria-label="Delete"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
+                  </button>
+                  <button
+                    onClick={e => handleDelete(prop.id, e)}
+                    className="btn-soft btn-soft-danger"
+                    style={{ width: '40px', height: '40px', padding: 0 }}
+                    aria-label="Delete"
+                    title="Delete"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

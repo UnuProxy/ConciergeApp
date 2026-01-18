@@ -239,13 +239,13 @@ function Collaborators() {
             query(
               collection(db, 'reservations'),
               where('companyId', '==', companyId),
-              where('collaboratorId', '==', c.id),
-              where('status', '==', 'confirmed')
+              where('collaboratorId', '==', c.id)
             )
           );
-          const bookings = bookingSnap.docs.map(d => d.data());
+          const bookings = bookingSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const confirmedBookings = bookings.filter(b => b.status === 'confirmed');
           // Calculate commission using custom amount if available, otherwise use collaborator's default rate
-          const totalCommission = bookings.reduce(
+          const totalCommission = confirmedBookings.reduce(
             (sum, b) => {
               if (b.customCommissionAmount !== undefined) {
                 return sum + b.customCommissionAmount;
@@ -254,7 +254,41 @@ function Collaborators() {
             },
             0
           );
-          return { ...c, bookingCount: bookings.length, totalCommission };
+
+          const paidTotalValue = Number(c.paidTotal || 0);
+          const scheduledTotalValue = Number(c.scheduledTotal || 0);
+          const hasLedger =
+            (Array.isArray(c.payments) && c.payments.length > 0) ||
+            paidTotalValue !== 0 ||
+            scheduledTotalValue !== 0;
+
+          if (bookings.length === 0 && hasLedger) {
+            await updateDoc(doc(db, 'collaborators', c.id), {
+              payments: [],
+              paidTotal: 0,
+              scheduledTotal: 0
+            });
+
+            const payoutsSnapshot = await getDocs(
+              query(
+                collection(db, 'financeRecords'),
+                where('companyId', '==', companyId),
+                where('collaboratorId', '==', c.id),
+                where('serviceKey', '==', 'collaborator_payout')
+              )
+            );
+
+            if (!payoutsSnapshot.empty) {
+              const payoutDeletes = payoutsSnapshot.docs
+                .filter(docSnap => docSnap.data()?.companyId === companyId)
+                .map(docSnap => deleteDoc(docSnap.ref));
+              await Promise.all(payoutDeletes);
+            }
+
+            return { ...c, payments: [], paidTotal: 0, scheduledTotal: 0, bookingCount: 0, totalCommission: 0 };
+          }
+
+          return { ...c, bookingCount: confirmedBookings.length, totalCommission };
         })
       );
       setColls(withStats);

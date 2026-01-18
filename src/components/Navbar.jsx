@@ -10,7 +10,7 @@ const NAVBAR_TRANSLATIONS = {
       addClient: 'Add Client',
       existingClients: 'Existing Clients',
       collaborators: 'Collaborators',
-      rentalVillas: 'Rental Villas',
+      rentalVillas: 'Rental Properties',
       boats: 'Boats',
       cars: 'Cars',
       security: 'Security',
@@ -36,7 +36,7 @@ const NAVBAR_TRANSLATIONS = {
       addClient: 'Adaugă Client',
       existingClients: 'Clienți Existenți',
       collaborators: 'Colaboratori',
-      rentalVillas: 'Vile de Închiriat',
+      rentalVillas: 'Proprietăți de Închiriat',
       boats: 'Bărci',
       cars: 'Mașini',
       security: 'Securitate',
@@ -109,24 +109,6 @@ function Navbar({ sidebarOpen, setSidebarOpen }) {
     }
   };
   
-  const getPageTitle = () => {
-    const path = location.pathname;
-    
-    if (path === '/') return navbarStrings.pageTitles.dashboard;
-    if (path.startsWith('/clients/add')) return navbarStrings.pageTitles.addClient;
-    if (path.startsWith('/clients/existing')) return navbarStrings.pageTitles.existingClients;
-    if (path.startsWith('/clients/collaborators')) return navbarStrings.pageTitles.collaborators;
-    if (path.startsWith('/services/villas')) return navbarStrings.pageTitles.rentalVillas;
-    if (path.startsWith('/services/boats')) return navbarStrings.pageTitles.boats;
-    if (path.startsWith('/services/cars')) return navbarStrings.pageTitles.cars;
-    if (path.startsWith('/services/security')) return navbarStrings.pageTitles.security;
-    if (path.startsWith('/services/chef')) return navbarStrings.pageTitles.chef;
-    if (path.startsWith('/finance')) return navbarStrings.pageTitles.finance;
-    if (path.startsWith('/settings')) return navbarStrings.pageTitles.settings;
-    
-    return navbarStrings.pageTitles.dashboard;
-  };
-  
   const roleDisplay = useMemo(() => {
     if (!userRole || typeof userRole !== 'string') {
       return navbarStrings.roles.user;
@@ -177,7 +159,6 @@ function Navbar({ sidebarOpen, setSidebarOpen }) {
             </svg>
           </button>
         )}
-        <div className="app-navbar__page">{getPageTitle()}</div>
         {!isMobile && getCompanyName() && (
           <div className="app-navbar__company-pill">
             <div className="app-navbar__company-name">{getCompanyName()}</div>
