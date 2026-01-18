@@ -749,6 +749,8 @@ const extractImageUrl = (data) => {
   // Client states
   const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState(null);
+  const [pendingOfferId, setPendingOfferId] = useState(null);
+  const [pendingOfferClientId, setPendingOfferClientId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all');
   const [showFilter, setShowFilter] = useState(false);
@@ -1660,19 +1662,70 @@ setAvailableServices(services);
   
   // Handle navigation from other pages with clientId in state
   useEffect(() => {
-    if (location.state?.clientId && clients.length > 0 && !selectedClient) {
+    if (location.state?.offerId) {
+      setPendingOfferId(location.state.offerId);
+      setPendingOfferClientId(location.state.clientId || null);
+    }
+
+    if (location.state?.clientId && clients.length > 0) {
       const clientToSelect = clients.find(c => c.id === location.state.clientId);
+      const shouldSelectClient = !selectedClient || selectedClient.id !== location.state.clientId;
       if (clientToSelect) {
-        handleSelectClient(clientToSelect);
-        // On mobile, navigate to details view
-        if (isMobile) {
-          setCurrentView('details');
+        if (shouldSelectClient) {
+          handleSelectClient(clientToSelect);
+          // On mobile, navigate to details view
+          if (isMobile) {
+            setCurrentView('details');
+          }
         }
         // Clear the location state to prevent re-selection on component updates
         window.history.replaceState({}, document.title);
       }
     }
   }, [location.state, clients, selectedClient, isMobile]);
+
+  useEffect(() => {
+    if (!pendingOfferId || !selectedClient) return;
+    if (pendingOfferClientId && selectedClient.id !== pendingOfferClientId) return;
+
+    if (showCreateOffer) setShowCreateOffer(false);
+    if (showCreateReservation) setShowCreateReservation(false);
+    if (showEditClient) setShowEditClient(false);
+    if (isMobile && currentView !== 'details') setCurrentView('details');
+
+    const offerIdToFocus = pendingOfferId;
+    let attempts = 0;
+    let timeoutId;
+
+    const attemptFocus = () => {
+      const focused = focusOfferCard(offerIdToFocus);
+      if (focused) {
+        setPendingOfferId(null);
+        setPendingOfferClientId(null);
+        return;
+      }
+
+      const offerExistsInHistory = offersHistory.some(offer => offer.id === offerIdToFocus);
+      if (offersHistory.length > 0 && !offerExistsInHistory) {
+        setPendingOfferId(null);
+        setPendingOfferClientId(null);
+        return;
+      }
+
+      attempts += 1;
+      if (attempts >= 6) {
+        setPendingOfferId(null);
+        setPendingOfferClientId(null);
+        return;
+      }
+
+      timeoutId = setTimeout(attemptFocus, 150);
+    };
+
+    timeoutId = setTimeout(attemptFocus, 150);
+
+    return () => clearTimeout(timeoutId);
+  }, [pendingOfferId, pendingOfferClientId, selectedClient, offersHistory, isMobile, currentView, showCreateOffer, showCreateReservation, showEditClient]);
   
   // Fetch real-time reservations and finances for the selected client
   useEffect(() => {
@@ -3067,6 +3120,17 @@ const handleSelectClient = async (client) => {
     }
   };
   
+  const focusOfferCard = (offerId) => {
+    if (!offerId) return false;
+    const target = document.getElementById(`offer-card-${offerId}`);
+    if (!target) return false;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.classList.remove('offer-attention');
+    void target.offsetHeight;
+    target.classList.add('offer-attention');
+    return true;
+  };
+
   // View offer details
   const handleViewOfferDetails = (offer) => {
     if (!offer) return;
@@ -7387,7 +7451,11 @@ const getUserName = async (userId) => {
                           style={{ gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(280px, 1fr))' }}
                         >
                           {offersHistory.map(offer => (
-                            <div key={offer.id} className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm translate-y-0 hover:-translate-y-0.5 transition-transform min-h-[320px]">
+                            <div
+                              key={offer.id}
+                              id={`offer-card-${offer.id}`}
+                              className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm translate-y-0 hover:-translate-y-0.5 transition-transform min-h-[320px]"
+                            >
                               <div className="p-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center min-h-[60px]">
                                 <div>
                                   <div className="text-xs font-semibold text-gray-600">#{offer.id.slice(-5)}</div>
