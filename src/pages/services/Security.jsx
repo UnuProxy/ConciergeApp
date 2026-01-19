@@ -13,6 +13,7 @@ import {
 import { db } from '../../firebase/config';
 import { getCurrentLanguage } from "../../utils/languageHelper"; // Import the language helper
 import { useDatabase } from '../../context/DatabaseContext';
+import { isAdminRole } from '../../utils/roleUtils';
 
 // Translation strings for Security component
 const translations = {
@@ -187,13 +188,13 @@ function Security() {
   const canManage = security => {
     if (!userCompanyId) return false;
     // Admins can claim legacy security profiles that never had a companyId set
-    if (!security?.companyId) return userRole === 'admin';
+    if (!security?.companyId) return isAdminRole(userRole);
     return security.companyId === userCompanyId;
   };
 
   const manageReason = security => {
     if (!userCompanyId) return t.managePermission;
-    if (!security?.companyId) return userRole === 'admin' ? '' : t.manageUnassigned;
+    if (!security?.companyId) return isAdminRole(userRole) ? '' : t.manageUnassigned;
     if (security.companyId !== userCompanyId) return t.manageOtherCompany;
     return '';
   };

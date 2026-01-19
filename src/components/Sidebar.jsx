@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
 import { useDatabase } from '../context/DatabaseContext';
+import { isAdminRole } from '../utils/roleUtils';
 
 const getInitialMobileState = () => {
   if (typeof window === 'undefined') return true;
@@ -29,8 +30,8 @@ function Sidebar({ open, setOpen }) {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [language]);
 
-  const isAdmin = userRole === 'admin';
-  const canViewFinance = userRole === 'admin';
+  const isAdmin = isAdminRole(userRole);
+  const canViewFinance = isAdmin;
 
   const translations = {
     ro: {

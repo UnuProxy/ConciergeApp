@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { collection, getDocs, query, where, getFirestore, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { isAdminRole } from '../utils/roleUtils';
 
 /**
  * Mobile App Interface Finance Component
@@ -773,7 +774,7 @@ const Finance = () => {
 
       const isOwnedByCurrentUser = (record) => {
         // Admins can see all records within their company
-        if (userRole === 'admin') {
+        if (isAdminRole(userRole)) {
           return true;
         }
         
