@@ -13,6 +13,7 @@ import {
 import { db } from '../../firebase/config';
 import { getCurrentLanguage } from "../../utils/languageHelper"; // Import the language helper
 import { useDatabase } from '../../context/DatabaseContext';
+import { isAdminRole } from '../../utils/roleUtils';
 
 // Translation strings for Chef component
 const translations = {
@@ -154,13 +155,13 @@ function Chef() {
   const canManage = chef => {
     if (!userCompanyId) return false;
     // Admins can claim legacy chef profiles that never had a companyId set
-    if (!chef?.companyId) return userRole === 'admin';
+    if (!chef?.companyId) return isAdminRole(userRole);
     return chef.companyId === userCompanyId;
   };
 
   const manageReason = chef => {
     if (!userCompanyId) return t.managePermission;
-    if (!chef?.companyId) return userRole === 'admin' ? '' : t.manageUnassigned;
+    if (!chef?.companyId) return isAdminRole(userRole) ? '' : t.manageUnassigned;
     if (chef.companyId !== userCompanyId) return t.manageOtherCompany;
     return '';
   };

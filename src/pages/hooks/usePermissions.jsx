@@ -1,8 +1,9 @@
 import { useDatabase } from '../context/DatabaseContext';
+import { isAdminRole } from '../../utils/roleUtils';
 
 export function usePermissions() {
   const { userRole } = useDatabase();
-  const isAdmin = userRole === 'admin';
+  const isAdmin = isAdminRole(userRole);
   
   // Define permissions based on userRole from your DatabaseContext
   const permissions = {

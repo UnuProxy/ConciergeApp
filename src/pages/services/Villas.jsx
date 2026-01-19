@@ -4,6 +4,7 @@ import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebas
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import { db, storage } from '../../firebase/config';
 import { useDatabase } from '../../context/DatabaseContext';
+import { isAdminRole } from '../../utils/roleUtils';
 
 const monthKeys = [
   'january', 'february', 'march', 'april',
@@ -1810,7 +1811,7 @@ const clearBrochure = () => {
                   })()}
 
                   {/* Owner Info (Admin Only) */}
-                  {viewVilla.owner && (!viewVilla.owner.confidential || userRole === 'admin') && (
+                  {viewVilla.owner && (!viewVilla.owner.confidential || isAdminRole(userRole)) && (
                     <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-amber-400">
                       <div className="flex items-center justify-between mb-4">
                         <h2 className="text-xl font-semibold text-gray-800">

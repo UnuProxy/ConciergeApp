@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useDatabase } from '../../../context/DatabaseContext';
+import { isAdminRole } from '../../../utils/roleUtils';
 import { 
   doc, getDoc, deleteDoc, updateDoc,
   collection, query, where, getDocs 
@@ -287,8 +288,7 @@ function PropertyDetail() {
     );
   }
 
-  const normalizedRole = (userRole || '').toString().toLowerCase();
-  const isAdmin = normalizedRole.includes('admin');
+  const isAdmin = isAdminRole(userRole);
   const ownerInfo = property.owner || {
     name: property.ownerName || '',
     email: property.ownerEmail || '',
