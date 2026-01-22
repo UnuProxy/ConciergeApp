@@ -149,6 +149,7 @@ function Villas() {
   const [isUploading, setIsUploading] = useState(false);
   const [photoFiles, setPhotoFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
+  const [photoNotice, setPhotoNotice] = useState('');
 const [brochureFile, setBrochureFile] = useState(null);
 const [brochureUrl, setBrochureUrl] = useState('');
 const clearBrochure = () => {
@@ -276,6 +277,32 @@ const clearBrochure = () => {
     }
     const raw = String(localized).trim().toLowerCase();
     if (!raw) return '';
+    const roMonthMap = {
+      ianuarie: 'january',
+      februarie: 'february',
+      martie: 'march',
+      aprilie: 'april',
+      mai: 'may',
+      iunie: 'june',
+      iulie: 'july',
+      august: 'august',
+      septembrie: 'september',
+      octombrie: 'october',
+      noiembrie: 'november',
+      decembrie: 'december',
+      ian: 'january',
+      feb: 'february',
+      mar: 'march',
+      apr: 'april',
+      iun: 'june',
+      iul: 'july',
+      aug: 'august',
+      sept: 'september',
+      oct: 'october',
+      nov: 'november',
+      dec: 'december'
+    };
+    if (roMonthMap[raw]) return roMonthMap[raw];
     if (monthKeys.includes(raw)) return raw;
     const numeric = parseInt(raw, 10);
     if (!Number.isNaN(numeric) && numeric >= 1 && numeric <= 12) {
@@ -286,8 +313,16 @@ const clearBrochure = () => {
 
   const getMonthSortIndex = (monthValue) => {
     const key = normalizeMonthKey(monthValue);
+    const seasonalIndex = seasonalMonthOrder.indexOf(key);
+    if (seasonalIndex !== -1) return seasonalIndex;
     const index = monthKeys.indexOf(key);
-    return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+    return index === -1 ? Number.MAX_SAFE_INTEGER : seasonalMonthOrder.length + index;
+  };
+
+  const getSeasonalMonthKey = (rate) => {
+    if (!rate) return '';
+    const labelValue = getLoc(rate.label) || rate.label_en || rate.label_ro || rate.label;
+    return normalizeMonthKey(rate.month || labelValue);
   };
 
   useEffect(() => {
@@ -444,22 +479,38 @@ const clearBrochure = () => {
     setExistingPhotos([]);
     setPhotoFiles([]);
     setPreviewUrls([]);
+    setPhotoNotice('');
     setBrochureFile(null);
     setBrochureUrl('');
   };
 
   const handlePhotoChange = async (e) => {
     if (!e.target.files) return;
+    const maxPhotos = 25;
     const filesArray = Array.from(e.target.files);
     const currentPhotoCount = existingPhotos.length + photoFiles.length;
-    const newTotalCount = currentPhotoCount + filesArray.length;
-    if (newTotalCount > 24) {
-      alert('You can only upload a maximum of 24 photos.');
+    const remainingSlots = maxPhotos - currentPhotoCount;
+    if (remainingSlots <= 0) {
+      setPhotoNotice(
+        language === 'ro'
+          ? `Poți încărca maxim ${maxPhotos} poze.`
+          : `You can upload a maximum of ${maxPhotos} photos.`
+      );
       return;
     }
-    setPhotoFiles(prev => [...prev, ...filesArray]);
+    const selectedFiles = filesArray.slice(0, remainingSlots);
+    if (selectedFiles.length < filesArray.length) {
+      setPhotoNotice(
+        language === 'ro'
+          ? `Poți încărca maxim ${maxPhotos} poze. Imaginile extra au fost ignorate.`
+          : `You can upload a maximum of ${maxPhotos} photos. Extra images were skipped.`
+      );
+    } else {
+      setPhotoNotice('');
+    }
+    setPhotoFiles(prev => [...prev, ...selectedFiles]);
     try {
-      const newPreviewUrls = await Promise.all(filesArray.map(file => readFileAsDataURL(file)));
+      const newPreviewUrls = await Promise.all(selectedFiles.map(file => readFileAsDataURL(file)));
       setPreviewUrls(prev => [...prev, ...newPreviewUrls]);
     } catch (previewError) {
       console.error('Error creating image previews:', previewError);
@@ -1011,13 +1062,14 @@ const clearBrochure = () => {
             const seasonalRates = Array.isArray(villa.priceConfigurations)
               ? villa.priceConfigurations
                   .slice(1)
-                  .filter((pc) => pc.month)
+                  .map((pc) => ({ ...pc, _monthKey: getSeasonalMonthKey(pc) }))
+                  .filter((pc) => pc._monthKey)
                   .sort((a, b) => {
-                    const indexA = getMonthSortIndex(a.month);
-                    const indexB = getMonthSortIndex(b.month);
+                    const indexA = getMonthSortIndex(a._monthKey);
+                    const indexB = getMonthSortIndex(b._monthKey);
                     if (indexA !== indexB) return indexA - indexB;
-                    const keyA = normalizeMonthKey(a.month);
-                    const keyB = normalizeMonthKey(b.month);
+                    const keyA = normalizeMonthKey(a._monthKey);
+                    const keyB = normalizeMonthKey(b._monthKey);
                     return keyA.localeCompare(keyB);
                   })
               : [];
@@ -1065,7 +1117,7 @@ const clearBrochure = () => {
                             key={pc.id || pc.month}
                             className="chip text-[11px]"
                           >
-                            {resolveMonthLabel(pc.month) || pc.month}: €{pc.price} / {formatType(pc)}
+                            {resolveMonthLabel(pc.month || pc._monthKey || pc.label) || pc.month || pc._monthKey}: €{pc.price} / {formatType(pc)}
                           </span>
                         ))}
                         {showToggle && (
@@ -1347,6 +1399,9 @@ const clearBrochure = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700">Upload Photos</label>
                 <input type="file" accept="image/*" multiple onChange={handlePhotoChange} className="mt-1" />
+                {photoNotice && (
+                  <p className="mt-1 text-xs text-amber-600">{photoNotice}</p>
+                )}
                 <label className="block text-sm font-medium text-gray-700 mt-4">PDF Brochure (optional)</label>
                 <input
                   type="file"
@@ -1614,6 +1669,9 @@ const clearBrochure = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700">Upload Photos</label>
                 <input type="file" accept="image/*" multiple onChange={handlePhotoChange} className="mt-1" />
+                {photoNotice && (
+                  <p className="mt-1 text-xs text-amber-600">{photoNotice}</p>
+                )}
                 <label className="block text-sm font-medium text-gray-700 mt-4">PDF Brochure (optional)</label>
                 <input
                   type="file"

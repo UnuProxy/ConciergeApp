@@ -96,6 +96,8 @@ const DASHBOARD_TRANSLATIONS = {
     },
     statusLabels: {
       paid: 'Paid',
+      partiallyPaid: 'Partially paid',
+      partially_paid: 'Partially paid',
       pending: 'Pending',
       notPaid: 'Not paid',
       cancelled: 'Cancelled',
@@ -187,6 +189,8 @@ const DASHBOARD_TRANSLATIONS = {
     },
     statusLabels: {
       paid: 'Plătit',
+      partiallyPaid: 'Parțial plătit',
+      partially_paid: 'Parțial plătit',
       pending: 'În așteptare',
       notPaid: 'Neplătit',
       cancelled: 'Anulat',
@@ -223,6 +227,14 @@ function Dashboard() {
   const formatCount = (template, count) => {
     if (!template) return `+${count}`;
     return template.replace('{count}', count);
+  };
+
+  const toNumber = (value) => {
+    if (value === null || value === undefined || value === '') return 0;
+    if (typeof value === 'number') return Number.isNaN(value) ? 0 : value;
+    const cleaned = String(value).replace(/[^\d.-]/g, '');
+    const parsed = parseFloat(cleaned);
+    return Number.isNaN(parsed) ? 0 : parsed;
   };
 
   const getLocalizedValue = (value) => {
@@ -273,6 +285,15 @@ function Dashboard() {
     );
   };
 
+  const getServiceItemTotal = (serviceItem) => {
+    if (!serviceItem) return 0;
+    const explicitTotal = toNumber(serviceItem.totalValue || serviceItem.totalAmount);
+    if (explicitTotal > 0) return explicitTotal;
+    const unitPrice = toNumber(serviceItem.price || serviceItem.clientAmount || serviceItem.amount);
+    const quantity = Math.max(1, toNumber(serviceItem.quantity || 1));
+    return unitPrice * quantity;
+  };
+
   const getServiceNamesFromBooking = (booking) => {
     if (!booking) return [];
     const services = [
@@ -311,6 +332,75 @@ function Dashboard() {
     ].map(getLocalizedValue).find(label => label && !isGenericServiceLabel(label));
     if (directLabel) return directLabel;
     return accommodationLabel || t.actions.reservations;
+  };
+
+  const getBookingTotalValue = (booking) => {
+    if (!booking) return 0;
+    const direct = toNumber(
+      booking.totalValue ??
+      booking.totalAmount ??
+      booking.baseAmount ??
+      booking.clientAmount ??
+      booking.clientIncome ??
+      booking.amount ??
+      0
+    );
+    if (direct > 0) return direct;
+    const services = [
+      ...extractServiceItems(booking.services),
+      ...extractServiceItems(booking.selectedServices),
+      ...extractServiceItems(booking.bookingServices)
+    ];
+    if (services.length > 0) {
+      return services.reduce((sum, serviceItem) => sum + getServiceItemTotal(serviceItem), 0);
+    }
+    return 0;
+  };
+
+  const normalizePaymentStatus = (status) => {
+    if (!status) return '';
+    const raw = String(status).trim().toLowerCase();
+    if (!raw) return '';
+    if (raw === 'paid') return 'paid';
+    if (raw === 'partiallypaid' || raw === 'partially_paid' || raw === 'partial') return 'partiallyPaid';
+    if (raw === 'notpaid' || raw === 'not_paid' || raw === 'unpaid') return 'notPaid';
+    if (raw === 'pending') return 'pending';
+    return status;
+  };
+
+  const getBookingPaidAmount = (booking) => {
+    if (!booking) return 0;
+    const direct = toNumber(
+      booking.paidAmount ??
+      booking.totalPaid ??
+      booking.amountPaid ??
+      booking.clientPaidAmount ??
+      0
+    );
+    const historyTotal = Array.isArray(booking.paymentHistory)
+      ? booking.paymentHistory.reduce((sum, payment) => sum + toNumber(payment.amount || 0), 0)
+      : 0;
+    const services = [
+      ...extractServiceItems(booking.services),
+      ...extractServiceItems(booking.selectedServices),
+      ...extractServiceItems(booking.bookingServices)
+    ];
+    const servicesPaid = services.length > 0
+      ? services.reduce((sum, serviceItem) => sum + toNumber(serviceItem?.amountPaid || 0), 0)
+      : 0;
+    return Math.max(direct, historyTotal, servicesPaid);
+  };
+
+  const getBookingPaymentStatus = (booking) => {
+    if (!booking) return 'pending';
+    const total = getBookingTotalValue(booking);
+    const paid = getBookingPaidAmount(booking);
+    if (total > 0) {
+      if (paid >= total) return 'paid';
+      if (paid > 0) return 'partiallyPaid';
+      return 'notPaid';
+    }
+    return normalizePaymentStatus(booking.paymentStatus) || 'pending';
   };
 
   const getBookingClientName = (booking, clientsById) => {
@@ -487,7 +577,7 @@ function Dashboard() {
           
           const createdAt = data.createdAt?.toDate?.() || new Date(data.createdAt);
           if (createdAt >= today) {
-            todayRevenue += data.totalValue || 0;
+            todayRevenue += getBookingTotalValue(data);
           }
           
           if (data.status === 'pending' || data.paymentStatus === 'notPaid') {
@@ -513,8 +603,8 @@ function Dashboard() {
               client: clientName,
               accommodationType: serviceSummary,
               bookingStatus,
-              status: item.paymentStatus || 'pending',
-              value: item.totalValue || 0,
+              status: getBookingPaymentStatus(item),
+              value: getBookingTotalValue(item),
               createdAt
             };
           });
@@ -526,7 +616,10 @@ function Dashboard() {
           .filter(booking => {
             if (!booking.checkIn) return false;
             const checkInDate = booking.checkIn.toDate ? booking.checkIn.toDate() : new Date(booking.checkIn);
-            return checkInDate >= today;
+            if (checkInDate < today) return false;
+            const client = booking.clientId ? clientsById.get(booking.clientId) : null;
+            const isVip = client?.isVip || client?.clientType === 'vip' || booking.isVip || booking.clientType === 'vip';
+            return Boolean(isVip);
           })
           .sort((a, b) => {
             const dateA = a.checkIn.toDate ? a.checkIn.toDate() : new Date(a.checkIn);
@@ -547,7 +640,7 @@ function Dashboard() {
               title,
               checkInDate,
               priority: isToday ? 'urgent' : isTomorrow ? 'high' : 'normal',
-              value: booking.totalValue || 0,
+              value: getBookingTotalValue(booking),
               type: 'checkin'
             };
           });

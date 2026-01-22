@@ -2405,9 +2405,6 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) =>
                     <span className={`px-3 py-1 rounded-full border font-semibold ${getServiceTagClasses('villa')}`}>
                       {villaName}
                     </span>
-                    <span className="uppercase tracking-wide text-[0.65rem] text-gray-500">
-                      {t.primaryResidence || 'Villa'}
-                    </span>
                   </div>
                 )}
                 {client.services.length > 0 && (
