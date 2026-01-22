@@ -905,12 +905,6 @@ const extractImageUrl = (data) => {
     
     if (window.confirm(t.confirmDeleteOffer)) {
       try {
-        // Check if this is a booked offer
-        if (offer.status === 'booked') {
-          alert(t.cannotDeleteBookedOffer);
-          return;
-        }
-        
         // Delete the offer from Firestore
         const offerRef = doc(db, "offers", offer.id);
         await deleteDoc(offerRef);
@@ -6717,9 +6711,11 @@ const getUserName = async (userId) => {
                                             }}
                                             className={`
                                               py-${isMobile ? '2' : '1'} px-3
-                                              rounded text-xs
-                                              border-none
-                                              ${item.paymentStatus === 'unpaid' ? 'bg-gray-200 font-semibold' : 'bg-transparent'}
+                                              rounded-md text-sm font-semibold
+                                              border transition-colors
+                                              ${item.paymentStatus === 'unpaid'
+                                                ? 'bg-gray-200 border-gray-300 text-gray-800 shadow-sm'
+                                                : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-100'}
                                               cursor-pointer
                                               ${isMobile ? 'flex-1' : ''}
                                             `}
@@ -6747,9 +6743,11 @@ const getUserName = async (userId) => {
                                             }}
                                             className={`
                                               py-${isMobile ? '2' : '1'} px-3
-                                              rounded text-xs
-                                              border-none
-                                              ${item.paymentStatus === 'partially_paid' ? 'bg-amber-100 text-amber-800 font-semibold' : 'bg-transparent'}
+                                              rounded-md text-sm font-semibold
+                                              border transition-colors
+                                              ${item.paymentStatus === 'partially_paid'
+                                                ? 'bg-amber-100 border-amber-200 text-amber-800 shadow-sm'
+                                                : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-100'}
                                               cursor-pointer
                                               ${isMobile ? 'flex-1' : ''}
                                             `}
@@ -6777,9 +6775,11 @@ const getUserName = async (userId) => {
                                             }}
                                             className={`
                                               py-${isMobile ? '2' : '1'} px-3
-                                              rounded text-xs
-                                              border-none
-                                              ${item.paymentStatus === 'paid' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'bg-transparent'}
+                                              rounded-md text-sm font-semibold
+                                              border transition-colors
+                                              ${item.paymentStatus === 'paid'
+                                                ? 'bg-emerald-100 border-emerald-200 text-emerald-800 shadow-sm'
+                                                : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-100'}
                                               cursor-pointer
                                               ${isMobile ? 'flex-1' : ''}
                                             `}
@@ -7517,21 +7517,19 @@ const getUserName = async (userId) => {
                                   </button>
                                   <div className="flex gap-2">
                                     {offer.status !== 'booked' && (
-                                      <>
-                                        <button 
-                                          onClick={() => handleConvertOfferToReservation(offer)} 
-                                          className="btn-success text-xs font-medium py-1.5 px-2 rounded border-none cursor-pointer"
-                                        >
-                                          {t.convertToBooking}
-                                        </button>
-                                        <button 
-                                          onClick={() => handleDeleteOffer(offer)}
-                                          className="bg-rose-50 text-rose-600 text-xs font-medium py-1.5 px-2 rounded border-none cursor-pointer"
-                                        >
-                                          {t.deleteOffer}
-                                        </button>
-                                      </>
+                                      <button 
+                                        onClick={() => handleConvertOfferToReservation(offer)} 
+                                        className="btn-success text-xs font-medium py-1.5 px-2 rounded border-none cursor-pointer"
+                                      >
+                                        {t.convertToBooking}
+                                      </button>
                                     )}
+                                    <button 
+                                      onClick={() => handleDeleteOffer(offer)}
+                                      className="bg-rose-50 text-rose-600 text-xs font-medium py-1.5 px-2 rounded border-none cursor-pointer"
+                                    >
+                                      {t.deleteOffer}
+                                    </button>
                                     <button 
                                       onClick={() => handleGeneratePdf(offer)}
                                       className="bg-gray-100 text-gray-600 text-xs font-medium py-1 px-2 rounded border-none cursor-pointer"

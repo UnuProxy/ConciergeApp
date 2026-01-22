@@ -266,6 +266,30 @@ const clearBrochure = () => {
     return monthLabels[key] || localized;
   };
 
+  const normalizeMonthKey = (monthValue) => {
+    if (monthValue === null || monthValue === undefined || monthValue === '') return '';
+    const localized = getLoc(monthValue) || monthValue;
+    if (localized === null || localized === undefined || localized === '') return '';
+    if (typeof localized === 'number') {
+      const index = Math.floor(localized) - 1;
+      return monthKeys[index] || '';
+    }
+    const raw = String(localized).trim().toLowerCase();
+    if (!raw) return '';
+    if (monthKeys.includes(raw)) return raw;
+    const numeric = parseInt(raw, 10);
+    if (!Number.isNaN(numeric) && numeric >= 1 && numeric <= 12) {
+      return monthKeys[numeric - 1] || raw;
+    }
+    return raw;
+  };
+
+  const getMonthSortIndex = (monthValue) => {
+    const key = normalizeMonthKey(monthValue);
+    const index = monthKeys.indexOf(key);
+    return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+  };
+
   useEffect(() => {
     fetchVillas();
     // Villas are shared across companies; no companyId filter needed
@@ -985,7 +1009,17 @@ const clearBrochure = () => {
             const bedrooms = villa.bedrooms || '-';
             const bathrooms = villa.bathrooms || '-';
             const seasonalRates = Array.isArray(villa.priceConfigurations)
-              ? villa.priceConfigurations.slice(1).filter((pc) => pc.month)
+              ? villa.priceConfigurations
+                  .slice(1)
+                  .filter((pc) => pc.month)
+                  .sort((a, b) => {
+                    const indexA = getMonthSortIndex(a.month);
+                    const indexB = getMonthSortIndex(b.month);
+                    if (indexA !== indexB) return indexA - indexB;
+                    const keyA = normalizeMonthKey(a.month);
+                    const keyB = normalizeMonthKey(b.month);
+                    return keyA.localeCompare(keyB);
+                  })
               : [];
             const visibleRates = expandedRates[villa.id]
               ? seasonalRates
@@ -1203,6 +1237,73 @@ const clearBrochure = () => {
                     ))}
                   </div>
                 </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-semibold text-gray-900">Owner / Manager</h3>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="owner_confidential_add"
+                      name="owner_confidential"
+                      checked={formData.owner_confidential}
+                      onChange={(e) => setFormData(prev => ({ ...prev, owner_confidential: e.target.checked }))}
+                      className="h-4 w-4"
+                    />
+                    <label htmlFor="owner_confidential_add" className="text-sm text-gray-700">
+                      Confidential (admin only)
+                    </label>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Owner Name <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      name="owner_name"
+                      value={formData.owner_name}
+                      onChange={handleInputChange}
+                      className="w-full border border-gray-300 rounded px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Owner Email <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      name="owner_email"
+                      value={formData.owner_email}
+                      onChange={handleInputChange}
+                      className="w-full border border-gray-300 rounded px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Owner Phone <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      name="owner_phone"
+                      value={formData.owner_phone}
+                      onChange={handleInputChange}
+                      className="w-full border border-gray-300 rounded px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Owner Notes ({formLanguage.toUpperCase()})</label>
+                    <textarea
+                      name={`owner_notes_${formLanguage}`}
+                      value={formData[`owner_notes_${formLanguage}`]}
+                      onChange={handleInputChange}
+                      className="w-full border border-gray-300 rounded px-3 py-2"
+                      rows={2}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  These details are confidential and visible only to administrators.
+                </p>
               </div>
 
               <div>

@@ -102,7 +102,8 @@ const DASHBOARD_TRANSLATIONS = {
       confirmed: 'Confirmed'
     },
     misc: {
-      unknownClient: 'Unknown client'
+      unknownClient: 'Unknown client',
+      moreServices: '+{count} more'
     }
   },
   ro: {
@@ -192,7 +193,8 @@ const DASHBOARD_TRANSLATIONS = {
       confirmed: 'Confirmat'
     },
     misc: {
-      unknownClient: 'Client necunoscut'
+      unknownClient: 'Client necunoscut',
+      moreServices: '+{count} mai multe'
     }
   }
 };
@@ -217,6 +219,111 @@ function Dashboard() {
     offers: []
   });
   const [offersLoading, setOffersLoading] = useState(true);
+
+  const formatCount = (template, count) => {
+    if (!template) return `+${count}`;
+    return template.replace('{count}', count);
+  };
+
+  const getLocalizedValue = (value) => {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string' || typeof value === 'number') return String(value);
+    if (typeof value === 'object') {
+      return value[language] || value.en || value.ro || '';
+    }
+    return '';
+  };
+
+  const getClientDisplayName = (client) => {
+    if (!client) return '';
+    const fromName = getLocalizedValue(client.name);
+    if (fromName) return fromName;
+    const full = getLocalizedValue(client.fullName) || getLocalizedValue(client.companyName);
+    if (full) return full;
+    const composed = [client.firstName, client.lastName].filter(Boolean).join(' ');
+    return composed;
+  };
+
+  const isGenericServiceLabel = (label) => {
+    if (!label) return false;
+    const normalized = String(label).trim().toLowerCase();
+    return normalized === 'various services' || normalized === 'check-in';
+  };
+
+  const extractServiceItems = (servicesField) => {
+    if (Array.isArray(servicesField)) return servicesField;
+    if (servicesField && typeof servicesField === 'object') {
+      return Object.values(servicesField).flatMap(value => (
+        Array.isArray(value) ? value : value ? [value] : []
+      ));
+    }
+    return [];
+  };
+
+  const getServiceItemName = (serviceItem) => {
+    if (!serviceItem) return '';
+    if (typeof serviceItem === 'string') return serviceItem;
+    return (
+      getLocalizedValue(serviceItem.name) ||
+      getLocalizedValue(serviceItem.title) ||
+      getLocalizedValue(serviceItem.type) ||
+      getLocalizedValue(serviceItem.serviceType) ||
+      getLocalizedValue(serviceItem.service) ||
+      getLocalizedValue(serviceItem.category)
+    );
+  };
+
+  const getServiceNamesFromBooking = (booking) => {
+    if (!booking) return [];
+    const services = [
+      ...extractServiceItems(booking.services),
+      ...extractServiceItems(booking.selectedServices),
+      ...extractServiceItems(booking.bookingServices)
+    ];
+    const names = services.map(getServiceItemName).filter(Boolean);
+    return [...new Set(names)];
+  };
+
+  const formatServiceSummary = (names) => {
+    if (!names.length) return '';
+    if (names.length <= 2) return names.join(', ');
+    const extraLabel = formatCount(t.misc.moreServices, names.length - 2);
+    return `${names.slice(0, 2).join(', ')} ${extraLabel}`.trim();
+  };
+
+  const getBookingServiceSummary = (booking) => {
+    if (!booking) return t.actions.reservations;
+    const accommodationLabel = getLocalizedValue(booking.accommodationType);
+    if (accommodationLabel && !isGenericServiceLabel(accommodationLabel)) {
+      return accommodationLabel;
+    }
+    const serviceNames = getServiceNamesFromBooking(booking);
+    if (serviceNames.length > 0) {
+      return formatServiceSummary(serviceNames);
+    }
+    const directLabel = [
+      booking.serviceType,
+      booking.service,
+      booking.category,
+      booking.propertyName,
+      booking.villaName,
+      booking.serviceName
+    ].map(getLocalizedValue).find(label => label && !isGenericServiceLabel(label));
+    if (directLabel) return directLabel;
+    return accommodationLabel || t.actions.reservations;
+  };
+
+  const getBookingClientName = (booking, clientsById) => {
+    if (!booking) return t.misc.unknownClient;
+    const direct = getLocalizedValue(booking.clientName) ||
+      getLocalizedValue(booking.client?.name) ||
+      getLocalizedValue(booking.client?.fullName);
+    if (direct) return direct;
+    if (booking.clientId && clientsById?.has(booking.clientId)) {
+      return getClientDisplayName(clientsById.get(booking.clientId)) || t.misc.unknownClient;
+    }
+    return t.misc.unknownClient;
+  };
 
   // Update time every minute
   useEffect(() => {
@@ -358,8 +465,16 @@ function Dashboard() {
           collection(db, 'reservations'),
           where('companyId', '==', userCompanyId)
         );
-        const reservationsSnapshot = await getDocs(reservationsQuery);
+        const clientsQuery = query(
+          collection(db, 'clients'),
+          where('companyId', '==', userCompanyId)
+        );
+        const [reservationsSnapshot, clientsSnapshot] = await Promise.all([
+          getDocs(reservationsQuery),
+          getDocs(clientsQuery)
+        ]);
         const reservations = [];
+        const clientsById = new Map(clientsSnapshot.docs.map(doc => [doc.id, doc.data()]));
         let todayRevenue = 0;
         let pendingCount = 0;
         
@@ -390,11 +505,13 @@ function Dashboard() {
           .map(item => {
             const createdAt = item.createdAt?.toDate?.() || new Date(item.createdAt || Date.now());
             const bookingStatus = item.status || 'confirmed';
+            const clientName = getBookingClientName(item, clientsById);
+            const serviceSummary = getBookingServiceSummary(item);
             return {
               id: item.id,
               type: 'booking',
-              client: item.clientName || t.misc.unknownClient,
-              accommodationType: item.accommodationType || t.actions.reservations,
+              client: clientName,
+              accommodationType: serviceSummary,
               bookingStatus,
               status: item.paymentStatus || 'pending',
               value: item.totalValue || 0,
@@ -421,10 +538,13 @@ function Dashboard() {
             const checkInDate = booking.checkIn.toDate ? booking.checkIn.toDate() : new Date(booking.checkIn);
             const isToday = checkInDate.toDateString() === today.toDateString();
             const isTomorrow = checkInDate.toDateString() === tomorrow.toDateString();
+            const clientName = getBookingClientName(booking, clientsById);
+            const serviceSummary = getBookingServiceSummary(booking);
+            const title = [serviceSummary, clientName].filter(Boolean).join(' - ');
             
             return {
               id: booking.id,
-              title: `${booking.accommodationType || 'Check-in'} - ${booking.clientName}`,
+              title,
               checkInDate,
               priority: isToday ? 'urgent' : isTomorrow ? 'high' : 'normal',
               value: booking.totalValue || 0,

@@ -2025,8 +2025,24 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) =>
     return parsed;
   };
 
-  const pickProgressBooking = (bookings = []) => {
-    if (!bookings.length) return null;
+  const buildBookingRangeLabel = (bookings = []) => {
+    if (!bookings.length) return '';
+    const starts = bookings.map(b => normalizeCardDate(b.checkIn)).filter(Boolean);
+    const ends = bookings.map(b => normalizeCardDate(b.checkOut || b.checkIn)).filter(Boolean);
+    if (!starts.length || !ends.length) return '';
+    const startDate = new Date(Math.min(...starts.map(d => d.getTime())));
+    const endDate = new Date(Math.max(...ends.map(d => d.getTime())));
+    const startLabel = formatShortDate(startDate);
+    const endLabel = formatShortDate(endDate);
+    if (!startLabel && !endLabel) return '';
+    if (!endLabel || startLabel === endLabel) return startLabel || endLabel || '';
+    return `${startLabel} - ${endLabel}`;
+  };
+
+  const getProgressContext = (bookings = []) => {
+    if (!bookings.length) {
+      return { focusBookings: [], headerBooking: null, label: '' };
+    }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -2040,13 +2056,47 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) =>
       .filter(Boolean)
       .sort((a, b) => a._start - b._start);
 
-    const active = normalized.find(booking => today >= booking._start && today <= booking._end);
-    if (active) return active;
+    if (!normalized.length) {
+      return { focusBookings: [], headerBooking: null, label: '' };
+    }
 
-    const upcoming = normalized.find(booking => booking._start > today);
-    if (upcoming) return upcoming;
+    const active = normalized.filter(booking => today >= booking._start && today <= booking._end);
+    if (active.length) {
+      return {
+        focusBookings: active,
+        headerBooking: active[0],
+        label: buildBookingRangeLabel(active)
+      };
+    }
 
-    return normalized.length ? normalized[normalized.length - 1] : null;
+    const upcoming = normalized.filter(booking => booking._start > today);
+    if (upcoming.length) {
+      const nextStart = upcoming[0]._start.getTime();
+      const sameDay = upcoming.filter(booking => booking._start.getTime() === nextStart);
+      return {
+        focusBookings: sameDay,
+        headerBooking: sameDay[0],
+        label: buildBookingRangeLabel(sameDay)
+      };
+    }
+
+    const last = normalized[normalized.length - 1];
+    return {
+      focusBookings: [last],
+      headerBooking: last,
+      label: buildBookingRangeLabel([last])
+    };
+  };
+
+  const sumBookingPayments = (bookings = []) => {
+    return bookings.reduce(
+      (acc, booking) => {
+        acc.total += toNumber(booking?.totalValue || 0);
+        acc.paid += toNumber(booking?.paidAmount || 0);
+        return acc;
+      },
+      { total: 0, paid: 0 }
+    );
   };
 
   // Get check-in date from the earliest upcoming booking if it exists
@@ -2056,17 +2106,19 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) =>
   const villaName = earliestBooking?.accommodationType
     ? safeRender(earliestBooking.accommodationType)
     : '';
-  const progressBooking = pickProgressBooking(client.bookings || []) || earliestBooking;
-  const progressTotal = toNumber(progressBooking?.totalValue ?? client.totalValue);
-  const progressPaid = toNumber(progressBooking?.paidAmount ?? client.paidAmount);
+  const progressContext = getProgressContext(client.bookings || []);
+  const focusBookings = progressContext.focusBookings.length
+    ? progressContext.focusBookings
+    : (progressContext.headerBooking ? [progressContext.headerBooking] : []);
+  const { total: focusTotal, paid: focusPaid } = sumBookingPayments(focusBookings);
+  const progressTotal = focusBookings.length ? focusTotal : toNumber(client.totalValue);
+  const progressPaid = focusBookings.length ? focusPaid : toNumber(client.paidAmount);
   const progressStatus = progressTotal > 0
     ? (progressPaid >= progressTotal ? 'paid' : (progressPaid > 0 ? 'partiallyPaid' : 'notPaid'))
     : (client.paymentStatus || 'notPaid');
-  const displayStatus = client.bookings.length > 1 ? progressStatus : client.paymentStatus;
-  const progressLabel = client.bookings.length > 1 && progressBooking?.checkIn
-    ? `${formatShortDate(progressBooking.checkIn)}${progressBooking.checkOut ? ` - ${formatShortDate(progressBooking.checkOut)}` : ''}`
-    : '';
-  const headerBooking = client.bookings.length > 1 ? (progressBooking || earliestBooking) : earliestBooking;
+  const displayStatus = client.bookings.length > 1 ? progressStatus : (client.paymentStatus || progressStatus);
+  const progressLabel = client.bookings.length > 1 ? progressContext.label : '';
+  const headerBooking = client.bookings.length > 1 ? (progressContext.headerBooking || earliestBooking) : earliestBooking;
   const displayTotalValue = client.bookings.length > 1 ? progressTotal : client.totalValue;
   
   // Helper function to get client name
@@ -2210,22 +2262,23 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) =>
                 <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusBadgeClass(displayStatus)}`}>
                   {getPaymentStatusText(displayStatus)}
                 </div>
-                
-                {headerBooking.checkIn && (
-                  <div className="ml-2 text-xs text-gray-600 flex items-center flex-wrap gap-1">
-                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16"></path>
-                    </svg>
-                    {formatShortDate(headerBooking.checkIn)}
-                    {headerBooking.checkOut && ` - ${formatShortDate(headerBooking.checkOut)}`}
-                    {client.bookings.length > 1 && (
-                      <span className="ml-1 text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-bold border border-purple-200">
-                        📅 {client.bookings.length} {language === 'ro' ? 'rezervări' : 'bookings'}
-                      </span>
-                    )}
-                  </div>
+
+                {client.bookings.length > 1 && (
+                  <span className="ml-1 text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-bold border border-purple-200">
+                    📅 {client.bookings.length} {language === 'ro' ? 'rezervări' : 'bookings'}
+                  </span>
                 )}
               </div>
+              {headerBooking.checkIn && (
+                <div className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-800 bg-slate-100 border border-slate-300 px-2.5 py-1 rounded-md">
+                  <svg className="w-3 h-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16"></path>
+                  </svg>
+                  {formatShortDate(headerBooking.checkIn)}
+                  <span className="text-slate-500">→</span>
+                  {formatShortDate(headerBooking.checkOut || headerBooking.checkIn)}
+                </div>
+              )}
             </div>
           </div>
           <div className="text-right">
@@ -2281,7 +2334,7 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) =>
                     // Format booking dates
                     const checkInDate = booking.checkIn ? new Date(booking.checkIn) : null;
                     const checkOutDate = booking.checkOut ? new Date(booking.checkOut) : null;
-                    const formatDate = (d) => d ? `${d.getDate()}/${d.getMonth() + 1}` : '';
+                    const formatDate = (d) => d ? formatShortDate(d) : '';
                     const isToday = checkInDate && checkInDate.toDateString() === new Date().toDateString();
                     const isTomorrow = checkInDate && checkInDate.toDateString() === new Date(Date.now() + 86400000).toDateString();
                     
@@ -2297,7 +2350,7 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) =>
                         }`}
                       >
                         {/* Booking date header */}
-                        <div className="flex items-center gap-2 mb-2">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
                           <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
                             isToday 
                               ? 'bg-amber-200 text-amber-800' 
@@ -2309,8 +2362,11 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) =>
                              isTomorrow ? (language === 'ro' ? 'Mâine' : 'Tomorrow') :
                              formatDate(checkInDate)}
                           </span>
-                          <span className="text-[10px] text-gray-500">
-                            {formatDate(checkInDate)} → {formatDate(checkOutDate)}
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 bg-white border border-slate-300 px-2.5 py-1 rounded-md shadow-sm">
+                            <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16" />
+                            </svg>
+                            {formatDate(checkInDate)} → {formatDate(checkOutDate || checkInDate)}
                           </span>
                         </div>
                         
@@ -2324,10 +2380,13 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) =>
                             >
                               <span>{safeRender(service.name)}</span>
                               {service.startDate && (
-                                <span className="text-[9px] opacity-75 font-medium">
-                                  📅 {formatShortDate(service.startDate).split('/').slice(0, 2).join('/')}
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-700 bg-white border border-slate-300 px-1.5 py-0.5 rounded-full">
+                                  <svg className="w-2.5 h-2.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16" />
+                                  </svg>
+                                  {formatShortDate(service.startDate)}
                                   {service.endDate && service.endDate !== service.startDate && (
-                                    <>-{formatShortDate(service.endDate).split('/').slice(0, 2).join('/')}</>
+                                    <>→{formatShortDate(service.endDate)}</>
                                   )}
                                 </span>
                               )}
@@ -2939,6 +2998,8 @@ const UpcomingBookings = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [selectedService, setSelectedService] = useState(null);
+  const [isEditingServiceDates, setIsEditingServiceDates] = useState(false);
+  const [editServiceDates, setEditServiceDates] = useState({ startDate: '', endDate: '' });
   const [selectedBookingToEdit, setSelectedBookingToEdit] = useState(null);
   const [editBookingDates, setEditBookingDates] = useState({ checkIn: '', checkOut: '' });
   const [paymentTargetService, setPaymentTargetService] = useState(null);
@@ -3623,58 +3684,97 @@ useEffect(() => {
       );
     };
     
-    return Object.values(clientGroups).filter(client => {
-      const bookingsForFilter = getBookingsForFilter(client);
-      if (bookingsForFilter.length === 0) return false;
-      
-      // Search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        // Check if client name matches
-        const nameMatch = safeRender(client.clientName).toLowerCase().includes(query);
-        // Check if any booking details match
-        const bookingMatch = bookingsForFilter.some(booking =>
-          (booking.accommodationType && safeRender(booking.accommodationType).toLowerCase().includes(query)) ||
-          (booking.status && booking.status.toLowerCase().includes(query))
-        );
-        // Check if any service details match - FIXED: search in services too
-        const serviceMatch = client.services.some(service =>
-          (service.name && safeRender(service.name).toLowerCase().includes(query)) ||
-          (service.type && service.type.toLowerCase().includes(query))
-        );
-        
-        if (!nameMatch && !bookingMatch && !serviceMatch) return false;
-      }
-    
-      return true;
-    }).sort((a, b) => {
-      // Sort by selected option
-      if (sortOption === 'date') {
-        // Get earliest check-in date for each client
-        const getEarliestDate = (client) => {
-          const bookingsForFilter = getBookingsForFilter(client);
-          if (!bookingsForFilter.length) return new Date(9999, 11, 31);
-          return bookingsForFilter.reduce((earliest, booking) => {
-            const checkIn = normalizeDateValue(booking.checkIn);
-            if (!checkIn) return earliest;
-            if (!earliest || checkIn < earliest) return checkIn;
-            return earliest;
-          }, null) || new Date(9999, 11, 31);
-        };
-        const dateA = getEarliestDate(a);
-        const dateB = getEarliestDate(b);
-        return dateA - dateB;
-      } else if (sortOption === 'client') {
-        return safeRender(a.clientName).localeCompare(safeRender(b.clientName));
-      } else if (sortOption === 'lastActivity') {
-        const dateA = a.lastActivity ? new Date(a.lastActivity) : new Date(0);
-        const dateB = b.lastActivity ? new Date(b.lastActivity) : new Date(0);
-        return dateB - dateA; // Most recent first
-      } else if (sortOption === 'value') {
-        return b.totalValue - a.totalValue; // Highest value first
-      }
-      return 0;
-    });
+    const buildFilteredClient = (client, bookingsForFilter) => {
+      const filteredServices = [];
+      bookingsForFilter.forEach(booking => {
+        if (Array.isArray(booking.services)) {
+          booking.services.forEach(service => {
+            filteredServices.push({ ...service, bookingId: booking.id });
+          });
+        }
+      });
+
+      const totalValue = bookingsForFilter.reduce((sum, booking) => sum + (booking.totalValue || 0), 0);
+      const paidAmount = bookingsForFilter.reduce((sum, booking) => sum + (booking.paidAmount || 0), 0);
+      const dueAmount = Math.max(0, totalValue - paidAmount);
+      const paymentStatus = totalValue > 0
+        ? (paidAmount >= totalValue ? 'paid' : (paidAmount > 0 ? 'partiallyPaid' : 'notPaid'))
+        : (client.paymentStatus || 'notPaid');
+
+      const lastActivity = bookingsForFilter.reduce((latest, booking) => {
+        const candidate = booking.lastPaymentDate?.toDate?.() || booking.lastPaymentDate || booking.createdAt || booking.checkIn;
+        if (!candidate) return latest;
+        const candidateDate = new Date(candidate);
+        if (!latest || candidateDate > latest) return candidateDate;
+        return latest;
+      }, null);
+
+      return {
+        ...client,
+        bookings: bookingsForFilter,
+        services: filteredServices,
+        totalValue,
+        paidAmount,
+        dueAmount,
+        paymentStatus,
+        lastActivity: lastActivity || client.lastActivity
+      };
+    };
+
+    return Object.values(clientGroups)
+      .map(client => {
+        const bookingsForFilter = getBookingsForFilter(client);
+        if (bookingsForFilter.length === 0) return null;
+        const filteredClient = buildFilteredClient(client, bookingsForFilter);
+
+        // Search filter
+        if (searchQuery) {
+          const query = searchQuery.toLowerCase();
+          // Check if client name matches
+          const nameMatch = safeRender(filteredClient.clientName).toLowerCase().includes(query);
+          // Check if any booking details match
+          const bookingMatch = filteredClient.bookings.some(booking =>
+            (booking.accommodationType && safeRender(booking.accommodationType).toLowerCase().includes(query)) ||
+            (booking.status && booking.status.toLowerCase().includes(query))
+          );
+          // Check if any service details match
+          const serviceMatch = filteredClient.services.some(service =>
+            (service.name && safeRender(service.name).toLowerCase().includes(query)) ||
+            (service.type && service.type.toLowerCase().includes(query))
+          );
+
+          if (!nameMatch && !bookingMatch && !serviceMatch) return null;
+        }
+
+        return filteredClient;
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        // Sort by selected option
+        if (sortOption === 'date') {
+          const getEarliestDate = (client) => {
+            if (!client.bookings.length) return new Date(9999, 11, 31);
+            return client.bookings.reduce((earliest, booking) => {
+              const checkIn = normalizeDateValue(booking.checkIn);
+              if (!checkIn) return earliest;
+              if (!earliest || checkIn < earliest) return checkIn;
+              return earliest;
+            }, null) || new Date(9999, 11, 31);
+          };
+          const dateA = getEarliestDate(a);
+          const dateB = getEarliestDate(b);
+          return dateA - dateB;
+        } else if (sortOption === 'client') {
+          return safeRender(a.clientName).localeCompare(safeRender(b.clientName));
+        } else if (sortOption === 'lastActivity') {
+          const dateA = a.lastActivity ? new Date(a.lastActivity) : new Date(0);
+          const dateB = b.lastActivity ? new Date(b.lastActivity) : new Date(0);
+          return dateB - dateA; // Most recent first
+        } else if (sortOption === 'value') {
+          return b.totalValue - a.totalValue; // Highest value first
+        }
+        return 0;
+      });
   }
   
   // Bottom sheet handling
@@ -3719,6 +3819,10 @@ const showBottomSheetWithContent = (content, item, secondaryItem = null) => {
     });
   } else if (content === 'edit-service') {
     setSelectedService(secondaryItem);
+    const startDate = secondaryItem?.startDate || secondaryItem?.date || '';
+    const endDate = secondaryItem?.endDate || secondaryItem?.startDate || secondaryItem?.date || '';
+    setEditServiceDates({ startDate, endDate });
+    setIsEditingServiceDates(false);
   } else if (content === 'edit-booking') {
     setSelectedBookingToEdit(secondaryItem);
     setEditBookingDates({
@@ -3743,6 +3847,8 @@ const closeBottomSheet = () => {
     setSelectedItem(null);
     setSelectedPayment(null);
     setSelectedService(null);
+    setIsEditingServiceDates(false);
+    setEditServiceDates({ startDate: '', endDate: '' });
     setPaymentTargetService(null);
     setPaymentData({
       amount: 0,
@@ -3881,6 +3987,159 @@ const handleUpdateBookingDates = async () => {
   } catch (err) {
     console.error('Error updating booking:', err);
     showNotificationMessage('Failed to update booking', 'error');
+  }
+};
+
+const handleUpdateServiceDates = async () => {
+  if (!selectedItem || !selectedService) return;
+
+  const startDate = editServiceDates.startDate || selectedService.startDate || selectedService.date || '';
+  const endDate = editServiceDates.endDate || editServiceDates.startDate || selectedService.endDate || selectedService.startDate || selectedService.date || '';
+
+  if (!startDate || !endDate) {
+    showNotificationMessage(t.serviceDatesRequired || 'Select service dates', 'error');
+    return;
+  }
+
+  const resolveServiceBooking = () => {
+    if (selectedService.bookingId) {
+      return selectedItem.bookings?.find(b => b.id === selectedService.bookingId) || null;
+    }
+    return (selectedItem.bookings || []).find(b => Array.isArray(b.services) && b.services.some(s => {
+      if (s?.id && selectedService?.id) return s.id === selectedService.id;
+      return s?.name === selectedService?.name && s?.price === selectedService?.price && s?.quantity === selectedService?.quantity;
+    })) || null;
+  };
+
+  const booking = resolveServiceBooking();
+  if (!booking) {
+    showNotificationMessage(t.bookingNotFound || 'Booking not found', 'error');
+    return;
+  }
+
+  try {
+    showNotificationMessage(t.updatingBooking || 'Updating booking...');
+
+    const bookingRef = doc(db, 'reservations', booking.id);
+    const bookingDoc = await getDoc(bookingRef);
+    if (!bookingDoc.exists()) {
+      throw new Error(t.bookingNotFound || 'Booking not found');
+    }
+
+    const bookingData = bookingDoc.data();
+    if (bookingData.companyId !== userCompanyId) {
+      throw new Error(t.notAuthorizedToModify || 'You are not authorized to modify this booking');
+    }
+
+  const parseDate = (value) => {
+    if (!value) return null;
+    const raw = value?.toDate?.() || value;
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return null;
+    parsed.setHours(0, 0, 0, 0);
+    return parsed;
+  };
+
+  const checkIn = parseDate(bookingData.checkIn);
+  const checkOut = parseDate(bookingData.checkOut || bookingData.checkIn);
+  const start = parseDate(startDate);
+  const end = parseDate(endDate);
+  const isAccommodationService = ['villas', 'villa', 'accommodation'].includes(
+    String(selectedService?.category || selectedService?.type || '').toLowerCase()
+  );
+
+  if (start && end && start > end) {
+    showNotificationMessage(t.serviceDatesInvalid || 'End date must be after start date', 'error');
+    return;
+  }
+
+  if (!isAccommodationService && checkIn && checkOut && start && end && (start < checkIn || end > checkOut)) {
+    showNotificationMessage(t.serviceOutsideBooking || 'Service dates must stay within the booking period.', 'error');
+    return;
+  }
+
+    const services = Array.isArray(bookingData.services) ? bookingData.services : [];
+    let didUpdate = false;
+    const updatedServices = services.map(svc => {
+      const matchesId = svc?.id && selectedService?.id && svc.id === selectedService.id;
+      const svcCreatedAt = svc?.createdAt?.toDate?.() || svc?.createdAt;
+      const targetCreatedAt = selectedService?.createdAt?.toDate?.() || selectedService?.createdAt;
+      const matchesFallback = !matchesId &&
+        svc?.name === selectedService?.name &&
+        svc?.price === selectedService?.price &&
+        svc?.quantity === selectedService?.quantity &&
+        (!svcCreatedAt || !targetCreatedAt || Math.abs(new Date(svcCreatedAt).getTime() - new Date(targetCreatedAt).getTime()) < 1000);
+
+      if (!matchesId && !matchesFallback) return svc;
+
+      didUpdate = true;
+      return {
+        ...svc,
+        startDate,
+        endDate,
+        date: startDate
+      };
+    });
+
+    if (!didUpdate) {
+      throw new Error(t.serviceNotFound || 'Service not found in booking');
+    }
+
+  const bookingDateUpdates = isAccommodationService
+    ? { checkIn: startDate, checkOut: endDate }
+    : {};
+  await updateDoc(bookingRef, {
+    services: updatedServices,
+    ...bookingDateUpdates,
+    updatedAt: serverTimestamp()
+  });
+
+  setBookings(prev => prev.map(b => (
+    b.id === booking.id ? { ...b, services: updatedServices, ...bookingDateUpdates } : b
+  )));
+
+    setClientGroups(prev => {
+      const clientId = selectedItem.clientId;
+      if (!prev[clientId]) return prev;
+      const updatedGroup = { ...prev[clientId] };
+  updatedGroup.bookings = updatedGroup.bookings.map(b => (
+    b.id === booking.id ? { ...b, services: updatedServices, ...bookingDateUpdates } : b
+  ));
+      const allServices = [];
+      updatedGroup.bookings.forEach(b => {
+        if (Array.isArray(b.services)) {
+          b.services.forEach(s => allServices.push({ ...s, bookingId: b.id }));
+        }
+      });
+      updatedGroup.services = allServices;
+      return { ...prev, [clientId]: updatedGroup };
+    });
+
+    setSelectedItem(prev => {
+      if (!prev || prev.clientId !== selectedItem.clientId) return prev;
+  const updatedBookings = (prev.bookings || []).map(b => (
+    b.id === booking.id ? { ...b, services: updatedServices, ...bookingDateUpdates } : b
+  ));
+      const updatedServicesList = (prev.services || []).map(svc => {
+        const matches = svc?.id && selectedService?.id
+          ? svc.id === selectedService.id
+          : svc?.name === selectedService?.name && svc?.bookingId === selectedService?.bookingId;
+        if (!matches) return svc;
+        return { ...svc, startDate, endDate, date: startDate };
+      });
+      return {
+        ...prev,
+        bookings: updatedBookings,
+        services: updatedServicesList
+      };
+    });
+
+    setSelectedService(prev => prev ? { ...prev, startDate, endDate, date: startDate } : prev);
+    setIsEditingServiceDates(false);
+    showNotificationMessage(t.serviceDatesUpdatedSuccess || 'Service dates updated successfully');
+  } catch (err) {
+    console.error('Error updating service dates:', err);
+    showNotificationMessage(t.serviceDateUpdateFailed || `Service date update failed: ${err.message}`, 'error');
   }
 };
 
@@ -6238,6 +6497,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                   type="date"
                   value={editBookingDates.checkIn}
                   onChange={(e) => setEditBookingDates({...editBookingDates, checkIn: e.target.value})}
+                  min={new Date().toISOString().split('T')[0]}
                   className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                 />
               </div>
@@ -6247,6 +6507,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                   type="date"
                   value={editBookingDates.checkOut}
                   onChange={(e) => setEditBookingDates({...editBookingDates, checkOut: e.target.value})}
+                  min={editBookingDates.checkIn || new Date().toISOString().split('T')[0]}
                   className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
                 />
               </div>
@@ -6307,6 +6568,65 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                   <span className="font-bold text-indigo-700">{formatShortDate(selectedService.startDate)}</span>
                 ) : (
                   <span className="text-gray-600">{formatShortDate(selectedService.date)}</span>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                {isEditingServiceDates ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{t.startDate || 'Start Date'}</label>
+                        <input
+                          type="date"
+                          value={editServiceDates.startDate}
+                          onChange={(e) => setEditServiceDates(prev => ({ ...prev, startDate: e.target.value }))}
+                          min={new Date().toISOString().split('T')[0]}
+                          className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{t.endDate || 'End Date'}</label>
+                        <input
+                          type="date"
+                          value={editServiceDates.endDate}
+                          onChange={(e) => setEditServiceDates(prev => ({ ...prev, endDate: e.target.value }))}
+                          min={editServiceDates.startDate || new Date().toISOString().split('T')[0]}
+                          className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-md font-medium"
+                        onClick={() => {
+                          const startDate = selectedService.startDate || selectedService.date || '';
+                          const endDate = selectedService.endDate || selectedService.startDate || selectedService.date || '';
+                          setEditServiceDates({ startDate, endDate });
+                          setIsEditingServiceDates(false);
+                        }}
+                      >
+                        {t.cancel || 'Cancel'}
+                      </button>
+                      <button
+                        type="button"
+                        className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium disabled:bg-gray-300"
+                        onClick={handleUpdateServiceDates}
+                        disabled={!editServiceDates.startDate || !editServiceDates.endDate}
+                      >
+                        {t.updateServiceDates || 'Update Dates'}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="w-full py-2 bg-white border border-indigo-200 text-indigo-700 rounded-md font-medium hover:bg-indigo-50"
+                    onClick={() => setIsEditingServiceDates(true)}
+                  >
+                    {t.editDates || 'Edit Dates'}
+                  </button>
                 )}
               </div>
               

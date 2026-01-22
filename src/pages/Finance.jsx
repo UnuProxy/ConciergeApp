@@ -986,7 +986,40 @@ const Finance = () => {
     setExpensesPage(1);
   }, [filteredExpenses.length]);
 
-  const pendingFinance = filteredFinanceRecords.filter(r => (r.status === 'pending') || r.providerCost === null);
+  const normalizePaymentStatus = (value) => String(value || '').toLowerCase();
+  const isPaymentMarkedReceived = (status) => (
+    status === 'paid' ||
+    status === 'partiallypaid' ||
+    status === 'partially_paid' ||
+    status === 'partial'
+  );
+  const hasClientPayment = (source) => {
+    if (!source) return false;
+    const paidAmount = toNumber(source.amountPaid ?? source.paidAmount ?? 0);
+    if (paidAmount > 0) return true;
+    const status = normalizePaymentStatus(source.paymentStatus);
+    return isPaymentMarkedReceived(status);
+  };
+  const hasPaymentReceivedForRecord = (record) => {
+    if (!record?.bookingId) return false;
+    const booking = reservations.find(b => b.id === record.bookingId);
+    if (!booking) return false;
+    const services = Array.isArray(booking.services) ? booking.services : [];
+    const recordKey = normalizeKeyPart(record.serviceKey || record.bookingServiceKey || record.service || '');
+    if (recordKey && services.length > 0) {
+      const matchedService = services.find(service => {
+        const serviceKey = normalizeKeyPart(service.id || service.serviceId || service.type || service.name || service.title || '');
+        return serviceKey && serviceKey === recordKey;
+      });
+      if (matchedService) return hasClientPayment(matchedService);
+    }
+    return hasClientPayment(booking);
+  };
+
+  const pendingFinance = filteredFinanceRecords.filter(r => (
+    ((r.status === 'pending') || r.providerCost === null) &&
+    hasPaymentReceivedForRecord(r)
+  ));
   const totalClientRevenue = filteredFinanceRecords.reduce((sum, r) => sum + toNumber(r.clientAmount || 0), 0);
   
   // Helper function to check if a payment is a collaborator payout
