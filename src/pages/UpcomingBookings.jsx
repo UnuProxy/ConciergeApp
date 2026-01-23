@@ -1917,7 +1917,7 @@ const ShoppingExpenseForm = ({ onAddShopping, onCancel, userCompanyId, t }) => {
 };
 
 // CLIENT CARD COMPONENT
-const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) => {
+const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping, disableServiceActions = false, timeFilter }) => {
   // Get translations from the context
   const language = localStorage.getItem('appLanguage') || 'en';
   
@@ -1961,7 +1961,8 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) =>
       selectBookingDescription: "Choose which booking to add this service to:",
       currentBooking: "CURRENT",
       addingTo: "Adding to",
-      change: "Change"
+      change: "Change",
+      pastBookingReadOnly: "Past bookings are read-only."
     },
     ro: {
       paid: "Plătit",
@@ -2001,7 +2002,8 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) =>
       selectBookingDescription: "Alege la care rezervare vrei să adaugi acest serviciu:",
       currentBooking: "ÎN CURS",
       addingTo: "Adaugă la",
-      change: "Schimbă"
+      change: "Schimbă",
+      pastBookingReadOnly: "Rezervările trecute sunt doar pentru vizualizare."
     }
   };
   
@@ -2019,10 +2021,36 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) =>
 
   const normalizeCardDate = (value) => {
     if (!value) return null;
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return null;
-    parsed.setHours(0, 0, 0, 0);
-    return parsed;
+    if (value instanceof Date) return new Date(value);
+    if (value?.toDate) return new Date(value.toDate());
+    if (value?.seconds) return new Date(value.seconds * 1000);
+    if (typeof value === 'number') return new Date(value);
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      const direct = new Date(trimmed);
+      if (!Number.isNaN(direct.getTime())) {
+        direct.setHours(0, 0, 0, 0);
+        return direct;
+      }
+      const match = trimmed.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+      if (match) {
+        const day = parseInt(match[1], 10);
+        const month = parseInt(match[2], 10) - 1;
+        let year = parseInt(match[3], 10);
+        if (year < 100) year += 2000;
+        const parsed = new Date(year, month, day);
+        if (!Number.isNaN(parsed.getTime())) {
+          parsed.setHours(0, 0, 0, 0);
+          return parsed;
+        }
+      }
+      return null;
+    }
+    const fallback = new Date(value);
+    if (Number.isNaN(fallback.getTime())) return null;
+    fallback.setHours(0, 0, 0, 0);
+    return fallback;
   };
 
   const buildBookingRangeLabel = (bookings = []) => {
@@ -2100,16 +2128,20 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) =>
   };
 
   // Get check-in date from the earliest upcoming booking if it exists
-  const earliestBooking = [...client.bookings].sort((a, b) => 
+  const progressContext = getProgressContext(client.bookings || []);
+  const focusBookings = progressContext.focusBookings.length
+    ? progressContext.focusBookings
+    : (progressContext.headerBooking ? [progressContext.headerBooking] : []);
+  const displayBookings =
+    timeFilter === 'past' || timeFilter === 'custom'
+      ? (client.bookings || [])
+      : (focusBookings.length ? focusBookings : (client.bookings || []));
+  const earliestBooking = [...displayBookings].sort((a, b) => 
     new Date(a.checkIn || 0) - new Date(b.checkIn || 0)
   )[0] || {};
   const villaName = earliestBooking?.accommodationType
     ? safeRender(earliestBooking.accommodationType)
     : '';
-  const progressContext = getProgressContext(client.bookings || []);
-  const focusBookings = progressContext.focusBookings.length
-    ? progressContext.focusBookings
-    : (progressContext.headerBooking ? [progressContext.headerBooking] : []);
   const { total: focusTotal, paid: focusPaid } = sumBookingPayments(focusBookings);
   const progressTotal = focusBookings.length ? focusTotal : toNumber(client.totalValue);
   const progressPaid = focusBookings.length ? focusPaid : toNumber(client.paidAmount);
@@ -2242,6 +2274,20 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) =>
     if (status === 'partiallyPaid') return 'border-amber-400';
     return 'border-slate-300';
   };
+
+  const hideServiceButton = (() => {
+    if (disableServiceActions) return true;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const bookings = Array.isArray(client.bookings) ? client.bookings : [];
+    if (!bookings.length) return false;
+    return bookings.every((booking) => {
+      const checkOut = normalizeCardDate(booking.checkOut || booking.checkIn);
+      if (!checkOut) return false;
+      return checkOut < today;
+    });
+  })();
+  const actionGridCols = hideServiceButton ? 'grid-cols-2' : 'grid-cols-3';
   
   return (
     <div className={`bg-white rounded-lg shadow-sm overflow-hidden border-l-4 w-full max-w-full ${getBorderColorClass(displayStatus)}`}>
@@ -2317,15 +2363,15 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) =>
         )}
         
         {/* Services summary - GROUPED BY BOOKING */}
-        {client.bookings && client.bookings.length > 0 && (
+        {displayBookings && displayBookings.length > 0 && (
           <div className="mt-3 space-y-2">
             <div className="text-xs text-gray-600">{t.servicesAndExtras}</div>
             
             {/* Show services grouped by booking when there are multiple bookings */}
-            {client.bookings.length > 1 ? (
+            {displayBookings.length > 1 ? (
               // Multiple bookings - show each booking's services separately
               <div className="space-y-3">
-                {[...client.bookings]
+                {[...displayBookings]
                   .sort((a, b) => new Date(a.checkIn || 0) - new Date(b.checkIn || 0))
                   .map((booking, bookingIdx) => {
                     const bookingServices = booking.services || [];
@@ -2413,9 +2459,9 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) =>
                     </span>
                   </div>
                 )}
-                {client.services.length > 0 && (
+                {(displayBookings[0]?.services || []).length > 0 && (
                   <div className="flex flex-wrap gap-2 text-xs">
-                    {client.services
+                    {(displayBookings[0]?.services || [])
                       .filter(service => {
                         const serviceName = safeRender(service.name || '');
                         if (!serviceName || !villaName) return true;
@@ -2438,14 +2484,14 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) =>
       </div>
       
       {/* Action buttons - FIXED with direct prop callbacks */}
-      <div className="grid grid-cols-3 border-t bg-gray-50">
+      <div className={`grid ${actionGridCols} border-t bg-gray-50`}>
   <button 
     className="flex flex-col items-center justify-center py-3 text-gray-700 hover:bg-gray-100 transition-colors active:bg-gray-200"
     onClick={(e) => {
       e.preventDefault();
       e.stopPropagation();
   // console.log('Details button clicked for client:', client.clientId); // Removed for production
-      onViewDetails?.(client.clientId);
+      onViewDetails?.(client);
     }}
   >
     <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2454,20 +2500,22 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) =>
     <span className="text-xs font-medium">{t.details}</span>
   </button>
   
-  <button 
-    className="flex flex-col items-center justify-center py-3 text-gray-700 hover:bg-gray-100 transition-colors active:bg-gray-200"
-    onClick={(e) => {
-      e.preventDefault();
-      e.stopPropagation();
+  {!hideServiceButton && (
+    <button 
+      className="flex flex-col items-center justify-center py-3 text-gray-700 hover:bg-gray-100 transition-colors active:bg-gray-200"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
   // console.log('Service button clicked for client:', client.clientName); // Removed for production
-      onOpenService?.(client);
-    }}
-  >
-    <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-    </svg>
-    <span className="text-xs font-medium">{t.service}</span>
-  </button>
+        onOpenService?.(client);
+      }}
+    >
+      <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+      </svg>
+      <span className="text-xs font-medium">{t.service}</span>
+    </button>
+  )}
   
   <button 
     className="flex flex-col items-center justify-center py-3 text-gray-700 hover:bg-gray-100 transition-colors active:bg-gray-200"
@@ -2833,6 +2881,29 @@ const UpcomingBookings = () => {
     if (checkIn <= today && checkOut >= today) return 'active';
     if (checkOut < today) return 'past';
     return null;
+  };
+
+  const isPastBookingList = (bookings = []) => {
+    if (!Array.isArray(bookings) || bookings.length === 0) return false;
+    const today = getTodayStart();
+    return bookings.every((booking) => {
+      const checkOut = normalizeDateValue(booking?.checkOut || booking?.checkIn);
+      if (!checkOut) return false;
+      return checkOut < today;
+    });
+  };
+
+  const getClientDetailsBookingSortInfo = (booking, today = getTodayStart()) => {
+    const checkIn = normalizeDateValue(booking?.checkIn);
+    const checkOut = normalizeDateValue(booking?.checkOut || booking?.checkIn);
+    if (!checkIn || !checkOut) {
+      return { rank: 99, checkIn: new Date(0), checkOut: new Date(0) };
+    }
+    const isToday = checkIn.getTime() === today.getTime();
+    const isActive = checkIn < today && checkOut >= today;
+    const isUpcoming = checkIn > today;
+    const rank = isToday ? 0 : (isActive ? 1 : (isUpcoming ? 2 : 3));
+    return { rank, checkIn, checkOut };
   };
   
   const summaryStats = useMemo(() => {
@@ -3875,14 +3946,22 @@ const closeBottomSheet = () => {
 };
 
 // 3. FIXED: Click handlers (around line 800)
-const viewClientDetails = (clientId) => {
-  // console.log('viewClientDetails called with clientId:', clientId); // Removed for production
-  const client = clientGroups[clientId];
+const viewClientDetails = (clientOrId) => {
+  // console.log('viewClientDetails called with:', clientOrId); // Removed for production
+  const client = typeof clientOrId === 'string' ? clientGroups[clientOrId] : clientOrId;
   // console.log('Found client:', client); // Removed for production
   if (client) {
-    showBottomSheetWithContent('client-details', client);
+    const bookingIds = (client.bookings || []).map((b) => b?.id).filter(Boolean);
+    const paymentHistory = Array.isArray(client.paymentHistory)
+      ? client.paymentHistory.filter((payment) => {
+          if (!bookingIds.length) return true;
+          if (!payment.bookingId) return true;
+          return bookingIds.includes(payment.bookingId);
+        })
+      : client.paymentHistory;
+    showBottomSheetWithContent('client-details', { ...client, paymentHistory });
   } else {
-    console.error('Client not found for ID:', clientId);
+    console.error('Client not found for ID:', clientOrId);
   }
 };
 
@@ -3919,6 +3998,9 @@ const openEditPaymentModal = (client, payment) => {
 const openAddServiceModal = (client) => {
   // console.log('openAddServiceModal called with client:', client); // Removed for production
   if (client) {
+    if (isPastBookingList(client.bookings) || timeFilter === 'past') {
+      return;
+    }
     showBottomSheetWithContent('add-service', client);
   } else {
     console.error('No client provided to openAddServiceModal');
@@ -4191,24 +4273,29 @@ const renderMainContent = (filteredClients) => {
   
   return (
     <div className="space-y-4">
-      {filteredClients.map(client => (
-        <ClientCard 
-          key={client.clientId} 
-          client={client} 
-          onViewDetails={(clientId) => {
-  // console.log('ClientCard onViewDetails called with:', clientId); // Removed for production
-            viewClientDetails(clientId);
-          }}
-          onOpenService={(client) => {
+      {filteredClients.map(client => {
+        const disableServiceActions = timeFilter === 'past' || isPastBookingList(client.bookings);
+        return (
+          <ClientCard 
+            key={client.clientId} 
+            client={client} 
+            timeFilter={timeFilter}
+            disableServiceActions={disableServiceActions}
+            onViewDetails={(clientData) => {
+  // console.log('ClientCard onViewDetails called with:', clientData); // Removed for production
+              viewClientDetails(clientData);
+            }}
+            onOpenService={(client) => {
   // console.log('ClientCard onOpenService called with:', client); // Removed for production
-            openAddServiceModal(client);
-          }}
-          onOpenShopping={(client) => {
+              openAddServiceModal(client);
+            }}
+            onOpenShopping={(client) => {
   // console.log('ClientCard onOpenShopping called with:', client); // Removed for production
-            openAddShoppingModal(client);
-          }}
-        />
-      ))}
+              openAddShoppingModal(client);
+            }}
+          />
+        );
+      })}
     </div>
   );
 };
@@ -4255,30 +4342,36 @@ const renderMainContent = (filteredClients) => {
       <div className="flex-1 overflow-y-auto bg-white" style={{WebkitOverflowScrolling: 'touch'}}>
         
         {/* CLIENT DETAILS */}
-        {bottomSheetContent === 'client-details' && selectedItem && (
-          <div className="p-4 bg-white space-y-4">
-            <div className="text-center border-b pb-4">
-              <h2 className="text-xl font-bold text-gray-900">{safeRender(selectedItem.clientName)}</h2>
-              <p className="text-gray-600">{t.totalValue || 'Total'}: {selectedItem.totalValue.toLocaleString()} €</p>
-              <p className="text-gray-600">{t.amountDue || 'Due'}: {selectedItem.dueAmount.toLocaleString()} €</p>
-              <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusBadgeClass(selectedItem.paymentStatus)}`}>
-                {getPaymentStatusText(selectedItem.paymentStatus)}
+        {bottomSheetContent === 'client-details' && selectedItem && (() => {
+          const disableAddService = timeFilter === 'past' || isPastBookingList(selectedItem.bookings);
+
+          return (
+            <div className="p-4 bg-white space-y-4">
+              <div className="text-center border-b pb-4">
+                <h2 className="text-xl font-bold text-gray-900">{safeRender(selectedItem.clientName)}</h2>
+                <p className="text-gray-600">{t.totalValue || 'Total'}: {selectedItem.totalValue.toLocaleString()} €</p>
+                <p className="text-gray-600">{t.amountDue || 'Due'}: {selectedItem.dueAmount.toLocaleString()} €</p>
+                <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusBadgeClass(selectedItem.paymentStatus)}`}>
+                  {getPaymentStatusText(selectedItem.paymentStatus)}
+                </div>
               </div>
+              
+              {!disableAddService && (
+                <div className="pt-4 border-t">
+                  <button 
+                    className="w-full py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600"
+                    onClick={() => {
+                      closeBottomSheet();
+                      setTimeout(() => openAddServiceModal(selectedItem), 100);
+                    }}
+                  >
+                    {t.addService || 'Add Service'}
+                  </button>
+                </div>
+              )}
             </div>
-            
-            <div className="pt-4 border-t">
-              <button 
-                className="w-full py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600"
-                onClick={() => {
-                  closeBottomSheet();
-                  setTimeout(() => openAddServiceModal(selectedItem), 100);
-                }}
-              >
-                {t.addService || 'Add Service'}
-              </button>
-            </div>
-          </div>
-        )}
+          );
+        })()}
         
         {/* PAYMENT FORM */}
         {(bottomSheetContent === 'quick-payment' || bottomSheetContent === 'edit-payment') && selectedItem && (
@@ -6016,7 +6109,15 @@ async function handleShoppingFormSubmit(shoppingExpense) {
               
               {/* Sort bookings by check-in date (earliest first) for clear differentiation */}
               {[...selectedItem.bookings]
-                .sort((a, b) => new Date(a.checkIn || 0) - new Date(b.checkIn || 0))
+                .sort((a, b) => {
+                  const today = getTodayStart();
+                  const aInfo = getClientDetailsBookingSortInfo(a, today);
+                  const bInfo = getClientDetailsBookingSortInfo(b, today);
+                  if (aInfo.rank !== bInfo.rank) return aInfo.rank - bInfo.rank;
+                  if (aInfo.rank === 1) return bInfo.checkIn.getTime() - aInfo.checkIn.getTime();
+                  if (aInfo.rank === 3) return bInfo.checkOut.getTime() - aInfo.checkOut.getTime();
+                  return aInfo.checkIn.getTime() - bInfo.checkIn.getTime();
+                })
                 .map((booking, idx) => (
                 <div key={booking.id || idx} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
                   {/* Booking Header */}
@@ -6027,7 +6128,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                           <span className="text-lg">🏠</span>
                           <p className="font-bold text-gray-900">{safeRender(booking.accommodationType)}</p>
                         </div>
-                        <p className="text-sm text-indigo-800 font-bold bg-indigo-100 px-2.5 py-1 rounded-md border border-indigo-300 inline-flex items-center gap-1 shadow-sm">
+                        <p className="text-sm text-slate-700 font-semibold bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200 inline-flex items-center gap-1 shadow-sm">
                           📅 {new Date(booking.checkIn).toLocaleDateString(language === 'en' ? 'en-GB' : 'ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' })} → {new Date(booking.checkOut).toLocaleDateString(language === 'en' ? 'en-GB' : 'ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                         </p>
                       </div>
@@ -6040,15 +6141,31 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                     </div>
                     
                   </div>
+                  {(() => {
+                    const rawNotes =
+                      booking?.notes ??
+                      booking?.specialNotes ??
+                      booking?.specialRequests ??
+                      booking?.reservationNotes ??
+                      booking?.additionalNotes ??
+                      booking?.note;
+                    const notesText = safeRender(rawNotes || '').trim();
+                    if (!notesText) return null;
+                    return (
+                      <div className="px-3 pt-2 text-xs text-slate-600">
+                        <span className="font-semibold text-slate-500">{t.notes || 'Notes'}:</span>{' '}
+                        <span className="whitespace-pre-line">{notesText}</span>
+                      </div>
+                    );
+                  })()}
 
                   {/* Services for THIS Booking */}
                   <div className="p-3 space-y-3 bg-white">
-                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                       <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16" />
                       </svg>
                       {t.serviceSchedule || 'Service Schedule'}
-                      <span className="text-[9px] font-normal text-gray-400 normal-case">(sorted by date)</span>
                     </h4>
                     
                     {(!booking.services || booking.services.length === 0) ? (
@@ -6089,36 +6206,30 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                           const isToday = serviceStartDate.getTime() === today.getTime();
                           const isTomorrow = serviceStartDate.getTime() === tomorrow.getTime();
                           const isPast = serviceStartDate < today;
-                          const dateChipClass = isToday
-                            ? 'bg-rose-50 border-rose-200 text-rose-700'
-                            : isTomorrow
-                              ? 'bg-amber-50 border-amber-200 text-amber-700'
-                              : isPast
-                                ? 'bg-slate-100 border-slate-200 text-slate-600'
-                                : 'bg-sky-50 border-sky-200 text-sky-700';
+                          const dateChipClass = 'bg-slate-50 border-slate-200 text-slate-700';
                           
                           // Determine card styling based on urgency - refined premium look
-                          const urgencyBorder = isToday 
-                            ? 'border-l-4 border-l-rose-400 border-rose-100 bg-gradient-to-r from-rose-50/80 to-white' 
-                            : isTomorrow 
-                              ? 'border-l-4 border-l-amber-400 border-amber-100 bg-gradient-to-r from-amber-50/80 to-white' 
+                          const urgencyBorder = isToday
+                            ? 'border-l-2 border-l-slate-400 bg-white'
+                            : isTomorrow
+                              ? 'border-l-2 border-l-slate-300 bg-white'
                               : isPast
-                                ? 'border-l-4 border-l-gray-300 bg-gray-50/50 opacity-75'
-                                : 'border-gray-100 bg-gray-50/50';
+                                ? 'border-l-2 border-l-slate-200 bg-white opacity-80'
+                                : 'border-l-2 border-l-slate-200 bg-white';
 
                           return (
-                            <div key={sIdx} className={`p-3 border rounded-lg hover:bg-white hover:border-blue-200 transition-all group ${urgencyBorder}`}>
+                            <div key={sIdx} className={`p-3 border rounded-lg hover:bg-white hover:border-slate-300 transition-all ${urgencyBorder}`}>
                               {/* Urgency indicator badge */}
                               {(isToday || isTomorrow) && (
-                                <div className={`text-[10px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5 ${isToday ? 'text-rose-600' : 'text-amber-600'}`}>
-                                  <span className={`w-1.5 h-1.5 rounded-full ${isToday ? 'bg-rose-500 animate-pulse' : 'bg-amber-400'}`}></span>
-                                  {isToday ? 'Today' : 'Tomorrow'}
+                                <div className="text-[10px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5 text-slate-500">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                  {isToday ? (t.today || 'Today') : (t.tomorrow || 'Tomorrow')}
                                 </div>
                               )}
                               
                               <div className="flex justify-between items-start mb-2">
                                 <div>
-                                  <p className="font-semibold text-gray-900 text-sm group-hover:text-blue-700 transition-colors">{safeRender(service.name)}</p>
+                                  <p className="font-semibold text-gray-900 text-sm">{safeRender(service.name)}</p>
                                   {/* Service Dates - Show date range if available */}
                                   <div className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-semibold ${dateChipClass}`}>
                                     <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -6155,9 +6266,9 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                                 </div>
                               </div>
 
-                              <div className="flex justify-between items-center text-[10px] border-t border-gray-100 pt-2 mt-2">
-                                <span className="text-gray-500">{t.paid || 'Paid'}: <span className="text-emerald-700 font-bold">{paid.toLocaleString()} €</span></span>
-                                <span className={due <= 0 ? 'text-emerald-700 font-bold' : 'text-rose-600 font-bold'}>
+                              <div className="flex justify-between items-center text-[10px] border-t border-gray-100 pt-2 mt-2 text-slate-500">
+                                <span>{t.paid || 'Paid'}: <span className="text-slate-700 font-semibold">{paid.toLocaleString()} €</span></span>
+                                <span className={due <= 0 ? 'text-slate-500' : 'text-rose-600 font-semibold'}>
                                   {t.amountDue || 'Due'}: {due.toLocaleString()} €
                                 </span>
                               </div>
@@ -6316,6 +6427,11 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                               {safeRender(payment.serviceName)}
                             </p>
                           )}
+                          {payment.notes && (
+                            <p className="text-[10px] text-gray-600 mt-1 italic">
+                              {safeRender(payment.notes)}
+                            </p>
+                          )}
                         </div>
                         <span className="px-2 py-1 bg-white border border-gray-200 text-gray-700 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm">{payment.method}</span>
                       </div>
@@ -6333,15 +6449,21 @@ async function handleShoppingFormSubmit(shoppingExpense) {
 
             {/* Action Buttons */}
             <div className="pt-4 border-t sticky bottom-0 bg-white pb-2">
-              <button 
-                className="w-full py-3 btn-primary rounded-xl font-semibold active:scale-[0.98] transition-all"
-                onClick={() => {
-                  closeBottomSheet();
-                  setTimeout(() => openAddServiceModal(selectedItem), 300);
-                }}
-              >
-                {t.addService || 'Add Service'}
-              </button>
+              {(() => {
+                const disableAddService = timeFilter === 'past' || isPastBookingList(selectedItem.bookings);
+                if (disableAddService) return null;
+                return (
+                  <button 
+                    className="w-full py-3 btn-primary rounded-xl font-semibold active:scale-[0.98] transition-all"
+                    onClick={() => {
+                      closeBottomSheet();
+                      setTimeout(() => openAddServiceModal(selectedItem), 300);
+                    }}
+                  >
+                    {t.addService || 'Add Service'}
+                  </button>
+                );
+              })()}
             </div>
           </div>
         )}
@@ -6352,6 +6474,16 @@ async function handleShoppingFormSubmit(shoppingExpense) {
           const clientDue = Math.max(0, (selectedItem.totalValue || 0) - (selectedItem.paidAmount || 0));
           const maxDue = paymentTargetService ? paymentContext.due : clientDue;
           const isAlreadyFullyPaid = maxDue <= 0;
+          const optionalLabel = t.optional || 'optional';
+          const withOptionalLabel = (label) => {
+            const labelText = String(label || '');
+            if (!optionalLabel || !labelText) return labelText;
+            const lowerLabel = labelText.toLowerCase();
+            const lowerOptional = String(optionalLabel).toLowerCase();
+            return lowerLabel.includes(lowerOptional)
+              ? labelText
+              : `${labelText} (${optionalLabel})`;
+          };
           
           return (
             <div className="p-4 bg-white space-y-4">
@@ -6434,7 +6566,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">{t.receiptNumber || 'Receipt Number'} ({t.optional || 'optional'})</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{withOptionalLabel(t.receiptNumber || 'Receipt Number')}</label>
                     <input
                       type="text"
                       value={paymentData.receiptNumber || ''}
@@ -6445,7 +6577,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">{t.notes || 'Notes'} ({t.optional || 'optional'})</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{withOptionalLabel(t.notes || 'Notes')}</label>
                     <textarea
                       value={paymentData.notes || ''}
                       onChange={(e) => setPaymentData({...paymentData, notes: e.target.value})}
