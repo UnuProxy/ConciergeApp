@@ -2337,6 +2337,11 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) =>
                     const formatDate = (d) => d ? formatShortDate(d) : '';
                     const isToday = checkInDate && checkInDate.toDateString() === new Date().toDateString();
                     const isTomorrow = checkInDate && checkInDate.toDateString() === new Date(Date.now() + 86400000).toDateString();
+                    const bookingLabel = isToday
+                      ? (language === 'ro' ? 'Azi' : 'Today')
+                      : isTomorrow
+                        ? (language === 'ro' ? 'Mâine' : 'Tomorrow')
+                        : `${t.booking || 'Booking'} ${bookingIdx + 1}`;
                     
                     return (
                       <div 
@@ -2358,40 +2363,41 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping }) =>
                                 ? 'bg-blue-200 text-blue-800' 
                                 : 'bg-gray-200 text-gray-700'
                           }`}>
-                            {isToday ? (language === 'ro' ? 'Azi' : 'Today') : 
-                             isTomorrow ? (language === 'ro' ? 'Mâine' : 'Tomorrow') :
-                             formatDate(checkInDate)}
-                          </span>
-                          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 bg-white border border-slate-300 px-2.5 py-1 rounded-md shadow-sm">
-                            <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16" />
-                            </svg>
-                            {formatDate(checkInDate)} → {formatDate(checkOutDate || checkInDate)}
+                            {bookingLabel}
                           </span>
                         </div>
                         
                         {/* Services for this booking - with dates */}
                         <div className="flex flex-wrap gap-1.5">
-                          {bookingServices.map((service, idx) => (
-                            <div
-                              key={`${booking.id}-${service.id || idx}`}
-                              className={`px-2 py-0.5 rounded-full border text-xs ${getServiceTagClasses(service.type || service.category)} flex items-center gap-1`}
-                              title={service.startDate ? `${formatShortDate(service.startDate)}${service.endDate && service.endDate !== service.startDate ? ` → ${formatShortDate(service.endDate)}` : ''}` : ''}
-                            >
-                              <span>{safeRender(service.name)}</span>
-                              {service.startDate && (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-700 bg-white border border-slate-300 px-1.5 py-0.5 rounded-full">
-                                  <svg className="w-2.5 h-2.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16" />
-                                  </svg>
-                                  {formatShortDate(service.startDate)}
-                                  {service.endDate && service.endDate !== service.startDate && (
-                                    <>→{formatShortDate(service.endDate)}</>
-                                  )}
-                                </span>
-                              )}
-                            </div>
-                          ))}
+                          {bookingServices.map((service, idx) => {
+                            const serviceStart = service.startDate || booking.checkIn;
+                            const serviceEnd = service.endDate || booking.checkOut || serviceStart;
+                            const serviceStartLabel = serviceStart ? formatShortDate(serviceStart) : '';
+                            const serviceEndLabel = serviceEnd ? formatShortDate(serviceEnd) : '';
+                            const showEnd = serviceEndLabel && serviceStartLabel && serviceEndLabel !== serviceStartLabel;
+                            const dateTitle = serviceStartLabel
+                              ? `${serviceStartLabel}${showEnd ? ` → ${serviceEndLabel}` : ''}`
+                              : '';
+
+                            return (
+                              <div
+                                key={`${booking.id}-${service.id || idx}`}
+                                className={`px-2 py-0.5 rounded-full border text-xs ${getServiceTagClasses(service.type || service.category)} flex items-center gap-1`}
+                                title={dateTitle}
+                              >
+                                <span>{safeRender(service.name)}</span>
+                                {serviceStartLabel && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-700 bg-white border border-slate-300 px-1.5 py-0.5 rounded-full">
+                                    <svg className="w-2.5 h-2.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16" />
+                                    </svg>
+                                    {serviceStartLabel}
+                                    {showEnd && <>→{serviceEndLabel}</>}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     );
@@ -2786,10 +2792,30 @@ const UpcomingBookings = () => {
     return today;
   };
 
-  const normalizeDateValue = (value) => {
+  const parseDateValue = (value) => {
     if (!value) return null;
-    const date = value instanceof Date ? new Date(value) : new Date(value);
-    if (Number.isNaN(date.getTime())) return null;
+    if (value instanceof Date) return new Date(value);
+    if (value?.toDate) return new Date(value.toDate());
+    if (typeof value === 'number') return new Date(value);
+    if (value?.seconds) return new Date(value.seconds * 1000);
+    if (typeof value !== 'string') return new Date(value);
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const direct = new Date(trimmed);
+    if (!Number.isNaN(direct.getTime())) return direct;
+    const match = trimmed.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+    if (!match) return null;
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1;
+    let year = parseInt(match[3], 10);
+    if (year < 100) year += 2000;
+    const parsed = new Date(year, month, day);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const normalizeDateValue = (value) => {
+    const date = parseDateValue(value);
+    if (!date || Number.isNaN(date.getTime())) return null;
     date.setHours(0, 0, 0, 0);
     return date;
   };
@@ -3301,19 +3327,8 @@ useEffect(() => {
           }
         });
 
-        // Keep only current or future bookings; drop finished stays
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const activeOrUpcomingBookings = bookingsData.filter((booking) => {
-          const checkIn = booking.checkIn ? new Date(booking.checkIn) : null;
-          const checkOut = booking.checkOut ? new Date(booking.checkOut) : checkIn;
-          if (!checkIn) return false;
-          checkIn.setHours(0, 0, 0, 0);
-          if (checkOut) checkOut.setHours(0, 0, 0, 0);
-          return checkOut >= today;
-        });
-        
-        setBookings(activeOrUpcomingBookings);
+        // Keep all bookings so past stays can be displayed in the Past filter.
+        setBookings(bookingsData);
         
         // Fetch client details with company filtering
         const clientDetailsObj = {};
@@ -3348,7 +3363,7 @@ useEffect(() => {
         
         // Group bookings by client
         const groups = {};
-        activeOrUpcomingBookings.forEach(booking => {
+        bookingsData.forEach(booking => {
           const clientId = booking.clientId || 'unknown';
           const clientName =
             clientDetailsObj[clientId]?.name ||
@@ -6012,7 +6027,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                           <span className="text-lg">🏠</span>
                           <p className="font-bold text-gray-900">{safeRender(booking.accommodationType)}</p>
                         </div>
-                        <p className="text-xs text-gray-700 font-semibold bg-blue-50 px-2 py-1 rounded border border-blue-200 inline-block">
+                        <p className="text-sm text-indigo-800 font-bold bg-indigo-100 px-2.5 py-1 rounded-md border border-indigo-300 inline-flex items-center gap-1 shadow-sm">
                           📅 {new Date(booking.checkIn).toLocaleDateString(language === 'en' ? 'en-GB' : 'ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' })} → {new Date(booking.checkOut).toLocaleDateString(language === 'en' ? 'en-GB' : 'ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                         </p>
                       </div>
@@ -6074,6 +6089,13 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                           const isToday = serviceStartDate.getTime() === today.getTime();
                           const isTomorrow = serviceStartDate.getTime() === tomorrow.getTime();
                           const isPast = serviceStartDate < today;
+                          const dateChipClass = isToday
+                            ? 'bg-rose-50 border-rose-200 text-rose-700'
+                            : isTomorrow
+                              ? 'bg-amber-50 border-amber-200 text-amber-700'
+                              : isPast
+                                ? 'bg-slate-100 border-slate-200 text-slate-600'
+                                : 'bg-sky-50 border-sky-200 text-sky-700';
                           
                           // Determine card styling based on urgency - refined premium look
                           const urgencyBorder = isToday 
@@ -6098,28 +6120,28 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                                 <div>
                                   <p className="font-semibold text-gray-900 text-sm group-hover:text-blue-700 transition-colors">{safeRender(service.name)}</p>
                                   {/* Service Dates - Show date range if available */}
-                                  <div className="text-[10px] text-gray-500 flex items-center gap-1 flex-wrap">
-                                    <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <div className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-semibold ${dateChipClass}`}>
+                                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M3 21h18M5 21V5m14 0v16" />
                                     </svg>
                                     {service.startDate && service.endDate ? (
                                       <>
-                                        <span className={`font-medium ${isToday ? 'text-rose-600' : isTomorrow ? 'text-orange-600' : 'text-indigo-600'}`}>{formatShortDate(service.startDate)}</span>
-                                        <span className="text-gray-400">→</span>
-                                        <span className="font-medium text-indigo-600">{formatShortDate(service.endDate)}</span>
+                                        <span>{formatShortDate(service.startDate)}</span>
+                                        <span className="opacity-70">→</span>
+                                        <span>{formatShortDate(service.endDate)}</span>
                                         {(() => {
                                           const start = new Date(service.startDate);
                                           const end = new Date(service.endDate);
                                           const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
                                           return days > 0 && (
-                                            <span className="ml-1 px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded text-[9px] font-bold">
+                                            <span className="ml-1 rounded bg-white/80 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 border border-slate-200">
                                               {days === 1 ? '1 day' : `${days} days`}
                                             </span>
                                           );
                                         })()}
                                       </>
                                     ) : service.startDate ? (
-                                      <span className={`font-medium ${isToday ? 'text-rose-600' : isTomorrow ? 'text-orange-600' : 'text-indigo-600'}`}>{formatShortDate(service.startDate)}</span>
+                                      <span>{formatShortDate(service.startDate)}</span>
                                     ) : (
                                       <span>{formatShortDate(service.date)}</span>
                                     )}
