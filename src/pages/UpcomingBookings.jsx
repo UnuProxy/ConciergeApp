@@ -3726,6 +3726,7 @@ useEffect(() => {
   // Filter clients based on time and search filters
   function getFilteredClients() {
     const today = getTodayStart();
+    const splitUpcoming = timeFilter === 'upcoming';
     
     // Custom date filter function
     const getBookingsForDateRange = (client) => {
@@ -3804,13 +3805,13 @@ useEffect(() => {
       };
     };
 
-    return Object.values(clientGroups)
-      .map(client => {
-        const bookingsForFilter = getBookingsForFilter(client);
-        if (bookingsForFilter.length === 0) return null;
-        const filteredClient = buildFilteredClient(client, bookingsForFilter);
+    const results = [];
 
-        // Search filter
+    Object.values(clientGroups).forEach(client => {
+      const bookingsForFilter = getBookingsForFilter(client);
+      if (bookingsForFilter.length === 0) return;
+
+      const addFilteredClient = (filteredClient) => {
         if (searchQuery) {
           const query = searchQuery.toLowerCase();
           // Check if client name matches
@@ -3823,15 +3824,29 @@ useEffect(() => {
           // Check if any service details match
           const serviceMatch = filteredClient.services.some(service =>
             (service.name && safeRender(service.name).toLowerCase().includes(query)) ||
-            (service.type && service.type.toLowerCase().includes(query))
+            (service.type && safeRender(service.type).toLowerCase().includes(query))
           );
 
-          if (!nameMatch && !bookingMatch && !serviceMatch) return null;
+          if (!nameMatch && !bookingMatch && !serviceMatch) return;
         }
+        results.push(filteredClient);
+      };
 
-        return filteredClient;
-      })
-      .filter(Boolean)
+      if (splitUpcoming) {
+        bookingsForFilter.forEach((booking, bookingIdx) => {
+          const singleClient = buildFilteredClient(client, [booking]);
+          singleClient.clientId = `${client.clientId}-${booking.id || bookingIdx}`;
+          singleClient.baseClientId = client.clientId;
+          singleClient.focusBookingId = booking.id || null;
+          addFilteredClient(singleClient);
+        });
+      } else {
+        const filteredClient = buildFilteredClient(client, bookingsForFilter);
+        addFilteredClient(filteredClient);
+      }
+    });
+
+    return results
       .sort((a, b) => {
         // Sort by selected option
         if (sortOption === 'date') {
