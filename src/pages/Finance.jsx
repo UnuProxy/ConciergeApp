@@ -993,12 +993,23 @@ const Finance = () => {
     status === 'partially_paid' ||
     status === 'partial'
   );
+  const isPaymentFullyPaid = (status, paidAmount, totalAmount) => {
+    if (normalizePaymentStatus(status) === 'paid') return true;
+    const total = toNumber(totalAmount ?? 0);
+    const paid = toNumber(paidAmount ?? 0);
+    if (total > 0 && paid >= total) return true;
+    return false;
+  };
   const hasClientPayment = (source) => {
     if (!source) return false;
     const paidAmount = toNumber(source.amountPaid ?? source.paidAmount ?? 0);
     if (paidAmount > 0) return true;
     const status = normalizePaymentStatus(source.paymentStatus);
     return isPaymentMarkedReceived(status);
+  };
+  const hasClientPaidInFull = (source) => {
+    if (!source) return false;
+    return isPaymentFullyPaid(source.paymentStatus, source.amountPaid ?? source.paidAmount, source.totalValue ?? source.totalAmount);
   };
   const hasPaymentReceivedForRecord = (record) => {
     if (!record?.bookingId) return false;
@@ -1015,12 +1026,35 @@ const Finance = () => {
     }
     return hasClientPayment(booking);
   };
+  const hasPaymentFullyPaidForRecord = (record) => {
+    if (!record?.bookingId) return false;
+    const booking = reservations.find(b => b.id === record.bookingId);
+    if (!booking) return false;
+    const services = Array.isArray(booking.services) ? booking.services : [];
+    const recordKey = normalizeKeyPart(record.serviceKey || record.bookingServiceKey || record.service || '');
+    if (recordKey && services.length > 0) {
+      const matchedService = services.find(service => {
+        const serviceKey = normalizeKeyPart(service.id || service.serviceId || service.type || service.name || service.title || '');
+        return serviceKey && serviceKey === recordKey;
+      });
+      if (matchedService) {
+        return hasClientPaidInFull({
+          paymentStatus: matchedService.paymentStatus,
+          amountPaid: matchedService.amountPaid,
+          totalValue: matchedService.totalValue ?? matchedService.svcTotal,
+          totalAmount: matchedService.totalAmount
+        });
+      }
+    }
+    return hasClientPaidInFull(booking);
+  };
 
   const pendingFinance = filteredFinanceRecords.filter(r => (
     ((r.status === 'pending') || r.providerCost === null) &&
     hasPaymentReceivedForRecord(r)
   ));
   const totalClientRevenue = filteredFinanceRecords.reduce((sum, r) => sum + toNumber(r.clientAmount || 0), 0);
+  const fullyPaidFinanceRecords = filteredFinanceRecords.filter(r => hasPaymentFullyPaidForRecord(r));
   
   // Helper function to check if a payment is a collaborator payout
   const isCollaboratorPayout = (payment) => {
@@ -1038,7 +1072,7 @@ const Finance = () => {
     .reduce((sum, p) => sum + toNumber(p.amount || 0), 0);
   
   // FIXED: Exclude collaborator payouts from provider costs (they're commissions, not service costs)
-  const totalProviderCosts = filteredFinanceRecords
+  const totalProviderCosts = fullyPaidFinanceRecords
     .filter(r => r.serviceKey !== 'collaborator_payout')
     .reduce((sum, r) => sum + toNumber(r.providerCost || 0), 0) + totalLegacyProviderPayments;
   
@@ -1055,11 +1089,14 @@ const Finance = () => {
                         totalCollaboratorPayoutsFromFinance + 
                         totalCollaboratorPayoutsFromLegacy;
   const grossProfit = totalClientRevenue - totalProviderCosts;
+  const realizedClientRevenue = fullyPaidFinanceRecords.reduce((sum, r) => sum + toNumber(r.clientAmount || 0), 0);
+  const realizedGrossProfit = realizedClientRevenue - totalProviderCosts;
   const totalRevenue = grossProfit;
   const netProfit = totalRevenue - totalExpenses;
+  const realizedNetProfit = realizedGrossProfit - totalExpenses;
   const totalIncome = totalClientRevenue;
   const totalPayments = totalProviderCosts;
-  const trueProfit = netProfit;
+  const trueProfit = realizedNetProfit;
 
   const buildMonthlyExportRows = () => {
     const bounds = getMonthBounds(exportMonth);
