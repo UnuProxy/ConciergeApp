@@ -704,6 +704,7 @@ const getServiceThumbnail = (service) => {
           const checkOut = booking.checkOut ? new Date(booking.checkOut) : null;
           const isSelected = selectedBooking?.id === booking.id;
           const accommodationName = safeRender(booking.accommodationType || booking.propertyName || booking.villaName || `Booking ${index + 1}`);
+          const isLocked = String(booking?.status || '').toLowerCase() === 'booked';
           
           // Check if booking is current (today is within dates)
           const today = new Date();
@@ -715,14 +716,18 @@ const getServiceThumbnail = (service) => {
             <button
               key={booking.id}
               onClick={() => {
+                if (isLocked) return;
                 setSelectedBooking(booking);
                 setStep('category');
               }}
               className={`w-full p-4 border-2 rounded-lg text-left transition-all ${
                 isSelected 
                   ? 'border-blue-500 bg-blue-50' 
-                  : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                  : isLocked
+                    ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                    : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
               }`}
+              disabled={isLocked}
             >
               <div className="flex justify-between items-start">
                 <div className="flex-1">
@@ -736,6 +741,11 @@ const getServiceThumbnail = (service) => {
                     {isUpcoming && !isCurrent && (
                       <span className="px-2 py-0.5 text-xs font-bold bg-amber-100 text-amber-700 rounded-full">
                         {t.upcoming || 'UPCOMING'}
+                      </span>
+                    )}
+                    {isLocked && (
+                      <span className="px-2 py-0.5 text-xs font-bold bg-slate-100 text-slate-500 rounded-full">
+                        {t.booked || 'BOOKED'}
                       </span>
                     )}
                   </div>
@@ -2893,6 +2903,16 @@ const UpcomingBookings = () => {
     });
   };
 
+  const isBookingLocked = (booking) => {
+    const status = String(booking?.status || '').toLowerCase();
+    return status === 'booked';
+  };
+
+  const hasUnlockedBooking = (bookings = []) => {
+    if (!Array.isArray(bookings) || bookings.length === 0) return false;
+    return bookings.some((booking) => !isBookingLocked(booking));
+  };
+
   const getClientDetailsBookingSortInfo = (booking, today = getTodayStart()) => {
     const checkIn = normalizeDateValue(booking?.checkIn);
     const checkOut = normalizeDateValue(booking?.checkOut || booking?.checkIn);
@@ -4013,7 +4033,7 @@ const openEditPaymentModal = (client, payment) => {
 const openAddServiceModal = (client) => {
   // console.log('openAddServiceModal called with client:', client); // Removed for production
   if (client) {
-    if (isPastBookingList(client.bookings) || timeFilter === 'past') {
+    if (isPastBookingList(client.bookings) || timeFilter === 'past' || !hasUnlockedBooking(client.bookings)) {
       return;
     }
     showBottomSheetWithContent('add-service', client);
@@ -4289,7 +4309,10 @@ const renderMainContent = (filteredClients) => {
   return (
     <div className="space-y-4">
       {filteredClients.map(client => {
-        const disableServiceActions = timeFilter === 'past' || isPastBookingList(client.bookings);
+        const disableServiceActions =
+          timeFilter === 'past' ||
+          isPastBookingList(client.bookings) ||
+          !hasUnlockedBooking(client.bookings);
         return (
           <ClientCard 
             key={client.clientId} 
@@ -4358,7 +4381,10 @@ const renderMainContent = (filteredClients) => {
         
         {/* CLIENT DETAILS */}
         {bottomSheetContent === 'client-details' && selectedItem && (() => {
-          const disableAddService = timeFilter === 'past' || isPastBookingList(selectedItem.bookings);
+          const disableAddService =
+            timeFilter === 'past' ||
+            isPastBookingList(selectedItem.bookings) ||
+            !hasUnlockedBooking(selectedItem.bookings);
 
           return (
             <div className="p-4 bg-white space-y-4">
@@ -6470,7 +6496,10 @@ async function handleShoppingFormSubmit(shoppingExpense) {
             {/* Action Buttons */}
             <div className="pt-4 border-t sticky bottom-0 bg-white pb-2">
               {(() => {
-                const disableAddService = timeFilter === 'past' || isPastBookingList(selectedItem.bookings);
+                const disableAddService =
+                  timeFilter === 'past' ||
+                  isPastBookingList(selectedItem.bookings) ||
+                  !hasUnlockedBooking(selectedItem.bookings);
                 if (disableAddService) return null;
                 return (
                   <button 
