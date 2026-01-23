@@ -6152,9 +6152,14 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                     const notesText = safeRender(rawNotes || '').trim();
                     if (!notesText) return null;
                     return (
-                      <div className="px-3 pt-2 text-xs text-slate-600">
-                        <span className="font-semibold text-slate-500">{t.notes || 'Notes'}:</span>{' '}
-                        <span className="whitespace-pre-line">{notesText}</span>
+                      <div className="px-3 pt-2">
+                        <div className="inline-flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
+                          <span className="mt-0.5 text-amber-500">📝</span>
+                          <span className="leading-relaxed">
+                            <span className="font-semibold">{t.notes || 'Notes'}:</span>{' '}
+                            <span className="whitespace-pre-line">{notesText}</span>
+                          </span>
+                        </div>
                       </div>
                     );
                   })()}
