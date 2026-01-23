@@ -6378,7 +6378,7 @@ const getUserName = async (userId) => {
                               });
                               setReservationFromOffer(updatedItems);
                             }}
-                            className={`bg-gray-100 border-none rounded-md text-xs cursor-pointer ${isMobile ? 'w-full py-2.5 px-3' : 'py-2 px-3'}`}
+                            className={`bg-white border border-gray-300 text-gray-700 rounded-lg text-xs font-semibold cursor-pointer shadow-sm hover:bg-gray-50 ${isMobile ? 'w-full py-2.5 px-3' : 'py-2 px-3'}`}
                           >
                             {t.selectAll}
                           </button>
@@ -6403,7 +6403,7 @@ const getUserName = async (userId) => {
                               
                               setReservationFromOffer(updatedItems);
                             }}
-                            className={`bg-amber-100 text-amber-800 border-none rounded-md text-xs cursor-pointer ${isMobile ? 'w-full py-2.5 px-3' : 'py-2 px-3'}`}
+                            className={`bg-amber-500 text-white border border-amber-500 rounded-lg text-xs font-semibold cursor-pointer shadow-sm hover:bg-amber-600 ${isMobile ? 'w-full py-2.5 px-3' : 'py-2 px-3'}`}
                           >
                             {t.markAllAsDepositPaid} (50%)
                           </button>
@@ -6426,7 +6426,7 @@ const getUserName = async (userId) => {
                               
                               setReservationFromOffer(updatedItems);
                             }}
-                            className={`bg-emerald-50 text-emerald-700 border-none rounded-md text-xs cursor-pointer ${isMobile ? 'w-full py-2.5 px-3' : 'py-2 px-3'}`}
+                            className={`bg-emerald-500 text-white border border-emerald-500 rounded-lg text-xs font-semibold cursor-pointer shadow-sm hover:bg-emerald-600 ${isMobile ? 'w-full py-2.5 px-3' : 'py-2 px-3'}`}
                           >
                             {t.markAllAsFullyPaid}
                           </button>
