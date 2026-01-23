@@ -21,6 +21,7 @@ const OffersOverview = ({ offers = [], loading, language, onRefresh }) => {
         client: 'Client',
         value: 'Value',
         items: 'Items',
+        more: 'more',
         created: 'Created',
         status: 'Status',
         action: 'Action Required',
@@ -56,6 +57,7 @@ const OffersOverview = ({ offers = [], loading, language, onRefresh }) => {
         client: 'Client',
         value: 'Valoare',
         items: 'Servicii',
+        more: 'altele',
         created: 'Creată',
         status: 'Status',
         action: 'Necesită Acțiune',
@@ -79,6 +81,50 @@ const OffersOverview = ({ offers = [], loading, language, onRefresh }) => {
 
   const t = translations[language] || translations.en;
   const locale = language === 'ro' ? 'ro-RO' : 'en-US';
+
+  const formatCategoryLabel = (value) => {
+    if (!value) return '';
+    const label = String(value).replace(/[_-]+/g, ' ').trim();
+    if (!label) return '';
+    return label.replace(/\b\w/g, (char) => char.toUpperCase());
+  };
+
+  const getLocalizedValue = (value) => {
+    if (!value) return '';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object') {
+      return value[language] || value.en || value.ro || Object.values(value).find((v) => typeof v === 'string') || '';
+    }
+    return String(value);
+  };
+
+  const getItemTotal = (item) => {
+    const price = parseFloat(item?.price ?? item?.amount ?? item?.total ?? 0) || 0;
+    const quantity = parseInt(item?.quantity ?? 1, 10) || 1;
+    return price * quantity;
+  };
+
+  const getOfferItemName = (item) => {
+    if (!item) return '';
+    const rawName = item.name || item.serviceName || item.title || item.type;
+    return getLocalizedValue(rawName) || formatCategoryLabel(item.category);
+  };
+
+  const getOfferServiceSummary = (offer) => {
+    const items = Array.isArray(offer?.items) ? offer.items : [];
+    if (!items.length) {
+      return { text: t.labels.items, title: '' };
+    }
+    const primaryItem = items.reduce((best, current) => (
+      getItemTotal(current) > getItemTotal(best) ? current : best
+    ), items[0]);
+    const primaryName = getOfferItemName(primaryItem);
+    const remaining = items.length - 1;
+    const baseLabel = primaryName || `${items.length} ${t.labels.items}`;
+    const text = remaining > 0 ? `${baseLabel} +${remaining} ${t.labels.more}` : baseLabel;
+    const title = items.map(getOfferItemName).filter(Boolean).join(', ');
+    return { text, title };
+  };
 
   // Calculate days since creation
   const getDaysAgo = (createdAt) => {
@@ -235,6 +281,7 @@ const OffersOverview = ({ offers = [], loading, language, onRefresh }) => {
           sortedOffers.map((offer) => {
             const actionStatus = getActionStatus(offer);
             const daysAgo = getDaysAgo(offer.createdAt);
+            const serviceSummary = getOfferServiceSummary(offer);
             
             // Safe date handling
             let createdDate;
@@ -296,7 +343,7 @@ const OffersOverview = ({ offers = [], loading, language, onRefresh }) => {
                         <svg className="w-4 h-4 mr-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                         </svg>
-                        <span>{offer.items?.length || 0} {t.labels.items}</span>
+                        <span title={serviceSummary.title}>{serviceSummary.text}</span>
                       </div>
                       <div className="flex items-center">
                         <svg className="w-4 h-4 mr-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

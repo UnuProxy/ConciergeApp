@@ -63,6 +63,7 @@ export const translations = {
       pay: "Pay",
       service: "Service",
       shop: "Shop",
+      pastBookingReadOnly: "Past bookings are read-only. Create a new offer to add services.",
       
       // Bottom Sheet Titles
       clientDetails: "Client Details",
@@ -245,6 +246,7 @@ export const translations = {
       pay: "Plătește",
       service: "Serviciu",
       shop: "Cumpărături",
+      pastBookingReadOnly: "Rezervările trecute sunt doar pentru vizualizare. Creează o ofertă nouă pentru a adăuga servicii.",
       
       // Bottom Sheet Titles
       clientDetails: "Detalii Client",

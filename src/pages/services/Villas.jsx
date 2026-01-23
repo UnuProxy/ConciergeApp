@@ -1112,14 +1112,21 @@ const clearBrochure = () => {
                         {language === 'ro' ? 'Tarife sezoniere' : 'Seasonal rates'}
                       </div>
                       <div className="flex flex-wrap gap-1">
-                        {visibleRates.map((pc) => (
-                          <span
-                            key={pc.id || pc.month}
-                            className="chip text-[11px]"
-                          >
-                            {resolveMonthLabel(pc.month || pc._monthKey || pc.label) || pc.month || pc._monthKey}: €{pc.price} / {formatType(pc)}
-                          </span>
-                        ))}
+                        {visibleRates.map((pc) => {
+                          const resolvedLabel = resolveMonthLabel(pc.month || pc._monthKey || pc.label);
+                          const fallbackLabel = getLoc(pc.month) || getLoc(pc._monthKey) || getLoc(pc.label);
+                          const monthLabel = resolvedLabel || fallbackLabel || '';
+                          const labelPrefix = monthLabel ? `${monthLabel}: ` : '';
+
+                          return (
+                            <span
+                              key={pc.id || pc.month}
+                              className="chip text-[11px]"
+                            >
+                              {labelPrefix}€{pc.price} / {formatType(pc)}
+                            </span>
+                          );
+                        })}
                         {showToggle && (
                           <button
                             type="button"
