@@ -1051,7 +1051,7 @@ const Finance = () => {
 
   const pendingFinance = filteredFinanceRecords.filter(r => (
     ((r.status === 'pending') || r.providerCost === null) &&
-    hasPaymentReceivedForRecord(r)
+    hasPaymentFullyPaidForRecord(r)
   ));
   const totalClientRevenue = filteredFinanceRecords.reduce((sum, r) => sum + toNumber(r.clientAmount || 0), 0);
   const fullyPaidFinanceRecords = filteredFinanceRecords.filter(r => hasPaymentFullyPaidForRecord(r));
