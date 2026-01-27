@@ -2570,7 +2570,7 @@ const handleSelectClient = async (client) => {
     
     if (window.confirm(t.confirmDelete)) {
       try {
-        if (selectedClient.companyId !== companyInfo.id) {
+        if (selectedClient.companyId && selectedClient.companyId !== companyInfo.id) {
           throw new Error("Not authorized to delete this client");
         }
         
@@ -2629,36 +2629,52 @@ const handleSelectClient = async (client) => {
           
           // If booking has a collaborator, clean up their payout records only if no other bookings remain
           if (bookingData.collaboratorId) {
-            const collaboratorBookingsQuery = query(
-              collection(db, "reservations"),
-              where("companyId", "==", companyInfo.id),
-              where("collaboratorId", "==", bookingData.collaboratorId)
-            );
-            const collaboratorBookingsSnapshot = await getDocs(collaboratorBookingsQuery);
-            const hasOtherBookings = collaboratorBookingsSnapshot.docs.some(docSnap => docSnap.id !== bookingDoc.id);
-
-            if (!hasOtherBookings) {
-              const collaboratorPayoutsQuery = query(
-                collection(db, "financeRecords"),
-                where("companyId", "==", companyInfo.id),
-                where("collaboratorId", "==", bookingData.collaboratorId),
-                where("serviceKey", "==", "collaborator_payout")
-              );
-              const collaboratorPayoutsSnapshot = await getDocs(collaboratorPayoutsQuery);
-              const deleteCollaboratorPayoutsPromises = collaboratorPayoutsSnapshot.docs
-                .filter(cpDoc => cpDoc.data()?.companyId === companyInfo.id)
-                .map(cpDoc => deleteDoc(cpDoc.ref));
-              await Promise.all(deleteCollaboratorPayoutsPromises);
-              
-              // Reset collaborator payment data
+            try {
               const collaboratorRef = doc(db, "collaborators", bookingData.collaboratorId);
               const collaboratorDoc = await getDoc(collaboratorRef);
-              if (collaboratorDoc.exists()) {
-                await updateDoc(collaboratorRef, {
+              if (!collaboratorDoc.exists()) {
+                return null;
+              }
+
+              const collaboratorData = collaboratorDoc.data() || {};
+              if (collaboratorData.companyId && collaboratorData.companyId !== companyInfo.id) {
+                return null;
+              }
+
+              const collaboratorBookingsQuery = query(
+                collection(db, "reservations"),
+                where("companyId", "==", companyInfo.id),
+                where("collaboratorId", "==", bookingData.collaboratorId)
+              );
+              const collaboratorBookingsSnapshot = await getDocs(collaboratorBookingsQuery);
+              const hasOtherBookings = collaboratorBookingsSnapshot.docs.some(docSnap => docSnap.id !== bookingDoc.id);
+
+              if (!hasOtherBookings) {
+                const collaboratorPayoutsQuery = query(
+                  collection(db, "financeRecords"),
+                  where("companyId", "==", companyInfo.id),
+                  where("collaboratorId", "==", bookingData.collaboratorId),
+                  where("serviceKey", "==", "collaborator_payout")
+                );
+                const collaboratorPayoutsSnapshot = await getDocs(collaboratorPayoutsQuery);
+                const deleteCollaboratorPayoutsPromises = collaboratorPayoutsSnapshot.docs
+                  .filter(cpDoc => cpDoc.data()?.companyId === companyInfo.id)
+                  .map(cpDoc => deleteDoc(cpDoc.ref));
+                await Promise.all(deleteCollaboratorPayoutsPromises);
+                
+                const collaboratorUpdate = {
                   payments: [],
                   paidTotal: 0,
                   scheduledTotal: 0
-                });
+                };
+                if (!collaboratorData.companyId) {
+                  collaboratorUpdate.companyId = companyInfo.id;
+                }
+                await updateDoc(collaboratorRef, collaboratorUpdate);
+              }
+            } catch (collabErr) {
+              if (collabErr?.code !== "permission-denied") {
+                console.error("Collaborator cleanup skipped:", collabErr);
               }
             }
           }

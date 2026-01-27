@@ -2,7 +2,7 @@ const CACHE_NAME = 'elite-concierge-v2';
 const CORE_ASSETS = [
   '/',
   '/manifest.json',
-  '/assets/Luxury_app.png'
+  '/concierge-icon.png'
 ];
 
 // Install event - cache critical shell files

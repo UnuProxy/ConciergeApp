@@ -7,6 +7,7 @@ import {
   getDocs,
   doc,
   getDoc,
+  setDoc,
   updateDoc,
   arrayUnion,
   serverTimestamp,
@@ -3323,28 +3324,60 @@ useEffect(() => {
         // Prefer users/{uid} first (allowed by rules)
         let companyId = null;
         let role = null;
+        const userEmail = user.email?.toLowerCase() || null;
 
         const userDocSnap = await getDoc(doc(db, 'users', user.uid));
-        if (userDocSnap.exists()) {
-          const userData = userDocSnap.data();
-          companyId = userData.companyId || null;
-          role = userData.role || null;
-        }
+        const userData = userDocSnap.exists() ? userDocSnap.data() : null;
+        companyId = userData?.companyId || null;
+        role = userData?.role || null;
 
-        // Fallback to authorized_users by lowercase email
-        if (!companyId || !role) {
+        // Fallback/sync to authorized_users by lowercase email
+        if (userEmail) {
           const authorizedUsersRef = collection(db, 'authorized_users');
           const authorizedQuery = query(
             authorizedUsersRef,
-            where('email', '==', user.email.toLowerCase())
+            where('email', '==', userEmail)
           );
           
           const authorizedSnapshot = await getDocs(authorizedQuery);
           
           if (!authorizedSnapshot.empty) {
             const authorizedUserData = authorizedSnapshot.docs[0].data();
-            companyId = companyId || authorizedUserData.companyId || null;
-            role = role || authorizedUserData.role || null;
+            const authorizedCompanyId = authorizedUserData.companyId || null;
+            const authorizedRole = authorizedUserData.role || null;
+            const shouldOverrideCompany = authorizedCompanyId && companyId && companyId !== authorizedCompanyId;
+            const shouldOverrideRole = authorizedRole && role && role !== authorizedRole;
+
+            if (!companyId || shouldOverrideCompany) {
+              companyId = authorizedCompanyId || companyId;
+            }
+            if (!role || shouldOverrideRole) {
+              role = authorizedRole || role;
+            }
+
+            const needsUserSync = authorizedCompanyId && authorizedRole && (
+              !userDocSnap.exists() ||
+              userData?.companyId !== authorizedCompanyId ||
+              userData?.role !== authorizedRole ||
+              (userEmail && userData?.email?.toLowerCase?.() !== userEmail)
+            );
+
+            if (needsUserSync) {
+              try {
+                await setDoc(
+                  doc(db, 'users', user.uid),
+                  {
+                    email: userEmail,
+                    companyId: authorizedCompanyId,
+                    companyName: authorizedUserData.companyName || authorizedCompanyId,
+                    role: authorizedRole
+                  },
+                  { merge: true }
+                );
+              } catch (writeErr) {
+                console.error('Failed to sync users doc from authorized_users:', writeErr);
+              }
+            }
           }
         }
         
@@ -4739,8 +4772,14 @@ const renderMainContent = (filteredClients) => {
       return true;
     } catch (err) {
       console.error('Error deleting booking:', err);
-      showNotificationMessage(`${t.error}: ${err.message}`, 'error');
-      throw err;
+      const isPermissionError =
+        err?.code === 'permission-denied' ||
+        (typeof err?.message === 'string' && err.message.toLowerCase().includes('permission'));
+      const message = isPermissionError
+        ? (t.permissionDenied || 'You do not have permission to delete this booking.')
+        : `${t.error}: ${err.message}`;
+      showNotificationMessage(message, 'error');
+      return false;
     }
   };
   

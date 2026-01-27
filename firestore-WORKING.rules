@@ -44,6 +44,19 @@ service cloud.firestore {
       return isAuthed() && matchesCompany(companyId);
     }
 
+    function canReadCompanyData(companyId) {
+      return matchesCompany(companyId) || (isAdminOf(userCompanyId()) && companyId == null);
+    }
+
+    function canUpdateCompanyData(companyId) {
+      return canUpdateForCompany(companyId) ||
+        (isAdminOf(userCompanyId()) && companyId == null && request.resource.data.companyId == userCompanyId());
+    }
+
+    function canDeleteCompanyData(companyId) {
+      return canDeleteForCompany(companyId) || (isAdminOf(userCompanyId()) && companyId == null);
+    }
+
     // ========================================================================
     // SYSTEM COLLECTIONS
     // ========================================================================
@@ -138,54 +151,54 @@ service cloud.firestore {
 
     match /clients/{id} {
       // List queries MUST filter by companyId in your code: where("companyId", "==", userCompanyId)
-      allow read: if matchesCompany(resource.data.companyId);
+      allow read: if canReadCompanyData(resource.data.companyId);
       allow create: if canCreateForCompany(request.resource.data.companyId);
-      allow update: if canUpdateForCompany(resource.data.companyId);
-      allow delete: if canDeleteForCompany(resource.data.companyId);
+      allow update: if canUpdateCompanyData(resource.data.companyId);
+      allow delete: if canDeleteCompanyData(resource.data.companyId);
     }
 
     match /reservations/{id} {
       // List queries MUST filter by companyId in your code: where("companyId", "==", userCompanyId)
-      allow read: if matchesCompany(resource.data.companyId);
+      allow read: if canReadCompanyData(resource.data.companyId);
       allow create: if canCreateForCompany(request.resource.data.companyId);
-      allow update: if canUpdateForCompany(resource.data.companyId);
-      allow delete: if canDeleteForCompany(resource.data.companyId);
+      allow update: if canUpdateCompanyData(resource.data.companyId);
+      allow delete: if canDeleteCompanyData(resource.data.companyId);
     }
 
     match /collaborators/{id} {
-      allow read: if matchesCompany(resource.data.companyId);
+      allow read: if canReadCompanyData(resource.data.companyId);
       allow create: if canCreateForCompany(request.resource.data.companyId);
-      allow update: if canUpdateForCompany(resource.data.companyId);
-      allow delete: if canDeleteForCompany(resource.data.companyId);
+      allow update: if canUpdateCompanyData(resource.data.companyId);
+      allow delete: if canDeleteCompanyData(resource.data.companyId);
     }
 
     match /offers/{id} {
-      allow read: if matchesCompany(resource.data.companyId);
+      allow read: if canReadCompanyData(resource.data.companyId);
       allow create: if canCreateForCompany(request.resource.data.companyId);
-      allow update: if canUpdateForCompany(resource.data.companyId);
-      allow delete: if canDeleteForCompany(resource.data.companyId);
+      allow update: if canUpdateCompanyData(resource.data.companyId);
+      allow delete: if canDeleteCompanyData(resource.data.companyId);
     }
 
     match /expenses/{id} {
-      allow read: if matchesCompany(resource.data.companyId);
+      allow read: if canReadCompanyData(resource.data.companyId);
       allow create: if canCreateForCompany(request.resource.data.companyId);
-      allow update: if canUpdateForCompany(resource.data.companyId);
-      allow delete: if canDeleteForCompany(resource.data.companyId);
+      allow update: if canUpdateCompanyData(resource.data.companyId);
+      allow delete: if canDeleteCompanyData(resource.data.companyId);
     }
 
     match /categoryPayments/{id} {
-      allow read: if matchesCompany(resource.data.companyId);
+      allow read: if canReadCompanyData(resource.data.companyId);
       allow create: if canCreateForCompany(request.resource.data.companyId);
-      allow update: if canUpdateForCompany(resource.data.companyId);
-      allow delete: if canDeleteForCompany(resource.data.companyId);
+      allow update: if canUpdateCompanyData(resource.data.companyId);
+      allow delete: if canDeleteCompanyData(resource.data.companyId);
     }
 
     // Finance records: provider payouts & profit
     match /financeRecords/{id} {
-      allow read: if matchesCompany(resource.data.companyId);
+      allow read: if canReadCompanyData(resource.data.companyId);
       allow create: if canCreateForCompany(request.resource.data.companyId);
-      allow update: if canUpdateForCompany(resource.data.companyId);
-      allow delete: if canDeleteForCompany(resource.data.companyId);
+      allow update: if canUpdateCompanyData(resource.data.companyId);
+      allow delete: if canDeleteCompanyData(resource.data.companyId);
     }
   }
 }
