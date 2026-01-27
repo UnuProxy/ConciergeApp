@@ -31,12 +31,16 @@ service cloud.firestore {
       return isAuthed() && companyId != null && userCompanyId() == companyId;
     }
 
+    function isAdminRole(role) {
+      return role in ["admin", "administrator", "owner", "manager", "superadmin"];
+    }
+
     function isAdmin() {
-      return isAuthed() && userRole() == "admin";
+      return isAuthed() && isAdminRole(userRole());
     }
 
     function isAdminOf(companyId) {
-      return matchesCompany(companyId) && userRole() == "admin";
+      return matchesCompany(companyId) && isAdminRole(userRole());
     }
 
     // For private company data: MUST match company, even for admins
