@@ -152,9 +152,11 @@ function Villas() {
   const [photoNotice, setPhotoNotice] = useState('');
 const [brochureFile, setBrochureFile] = useState(null);
 const [brochureUrl, setBrochureUrl] = useState('');
+const [brochureRemoved, setBrochureRemoved] = useState(false);
 const clearBrochure = () => {
   setBrochureFile(null);
   setBrochureUrl('');
+  setBrochureRemoved(true);
 };
   const [searchTerm, setSearchTerm] = useState('');
   const [priceFilter, setPriceFilter] = useState({ min: '', max: '' });
@@ -414,7 +416,7 @@ const clearBrochure = () => {
   };
 
   const handleAmenitySuggestionClick = (amenity) => {
-    const fieldName = `amenities_${language}`;
+    const fieldName = `amenities_${formLanguage}`;
     setFormData(prev => {
       const currentValue = prev[fieldName] || '';
       const existingAmenities = currentValue.split(',').map(item => item.trim()).filter(Boolean);
@@ -482,6 +484,7 @@ const clearBrochure = () => {
     setPhotoNotice('');
     setBrochureFile(null);
     setBrochureUrl('');
+    setBrochureRemoved(false);
   };
 
   const handlePhotoChange = async (e) => {
@@ -519,8 +522,8 @@ const clearBrochure = () => {
 
   const uploadPhotos = async () => {
     if (photoFiles.length === 0) return [];
+    const auth = getAuth();
     try {
-      const auth = getAuth();
       if (!auth.currentUser) {
         await signInAnonymously(auth);
   // console.log('Signed in anonymously for photo upload'); // Removed for production
@@ -528,8 +531,18 @@ const clearBrochure = () => {
     } catch (error) {
       console.error('Auth error:', error);
     }
+    if (!auth.currentUser) {
+      setPhotoNotice(
+        language === 'ro'
+          ? 'Nu ești autentificat pentru încărcarea pozelor.'
+          : 'You are not authenticated to upload photos.'
+      );
+      throw new Error('AUTH_REQUIRED');
+    }
     setIsUploading(true);
     const photoUrls = [];
+    const failedUploads = [];
+    const failedReasons = [];
     for (let i = 0; i < photoFiles.length; i++) {
       const file = photoFiles[i];
       const filePath = buildStoragePath(file);
@@ -557,10 +570,26 @@ const clearBrochure = () => {
         });
       } catch (error) {
         console.error('Error uploading photo:', error);
+        failedUploads.push(file?.name || 'photo');
+        if (error?.code) failedReasons.push(error.code);
       }
     }
     setIsUploading(false);
     setUploadProgress(0);
+    if (failedUploads.length > 0) {
+      const failedList = failedUploads.slice(0, 3).join(', ');
+      const hasPermissionError = failedReasons.includes('storage/unauthorized');
+      setPhotoNotice(
+        language === 'ro'
+          ? hasPermissionError
+            ? 'Nu ai permisiune să încarci poze. Reautentifică-te sau verifică permisiunile.'
+            : `Unele poze nu s-au încărcat. Încearcă din nou: ${failedList}`
+          : hasPermissionError
+            ? 'You do not have permission to upload photos. Please re-login or check permissions.'
+            : `Some photos failed to upload. Please try again: ${failedList}`
+      );
+      throw new Error('PHOTO_UPLOAD_FAILED');
+    }
     return photoUrls;
   };
   
@@ -664,6 +693,7 @@ const clearBrochure = () => {
 
       resetForm();
       setIsAddingVilla(false);
+      setBrochureRemoved(false);
       fetchVillas();
     } catch (error) {
       console.error('Error adding villa: ', error);
@@ -683,12 +713,25 @@ const clearBrochure = () => {
     try {
       const newPhotoUrls = await uploadPhotos();
       const brochureDownload = await uploadBrochure();
+      if (brochureRemoved && currentVilla?.brochureUrl) {
+        const brochurePath = extractPathFromUrl(currentVilla.brochureUrl);
+        if (brochurePath) {
+          try {
+            await deleteObject(ref(storage, brochurePath));
+          } catch (error) {
+            console.error('Error deleting brochure from storage:', error);
+          }
+        }
+      }
       // Place newly uploaded photos first so cover updates when editing
       const updatedPhotos = newPhotoUrls.length ? [...newPhotoUrls, ...existingPhotos] : [...existingPhotos];
+      const resolvedBrochureUrl = brochureRemoved
+        ? ''
+        : (brochureDownload || brochureUrl || currentVilla.brochureUrl || '');
       const villaData = {
         ...prepareFormDataForSave(),
         photos: updatedPhotos,
-        brochureUrl: brochureDownload || currentVilla.brochureUrl || brochureUrl || '',
+        brochureUrl: resolvedBrochureUrl,
         companyId: userCompanyId,
         updatedAt: new Date()
       };
@@ -701,6 +744,7 @@ const clearBrochure = () => {
       resetForm();
       setIsEditingVilla(false);
       setCurrentVilla(null);
+      setBrochureRemoved(false);
       fetchVillas();
     } catch (error) {
       console.error('Error updating villa: ', error);
@@ -788,6 +832,7 @@ const clearBrochure = () => {
       owner_confidential: !!villa.owner?.confidential,
     });
     setBrochureUrl(villa.brochureUrl || '');
+    setBrochureRemoved(false);
     if (Array.isArray(villa.priceConfigurations) && villa.priceConfigurations.length > 0) {
       setPriceConfigs(villa.priceConfigurations.map(config => ({
         id: config.id || Date.now(),
@@ -1218,8 +1263,8 @@ const clearBrochure = () => {
         )}
       </div>
       {isAddingVilla && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-start sm:items-center justify-center z-50 overflow-y-auto p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto shadow-xl">
             <h2 className="text-xl font-bold mb-4">{t.addVilla}</h2>
             <form onSubmit={handleAddVilla} className="space-y-4">
               <div className="flex gap-2 mb-2">
@@ -1413,7 +1458,10 @@ const clearBrochure = () => {
                 <input
                   type="file"
                   accept="application/pdf"
-                  onChange={(e) => setBrochureFile(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    setBrochureFile(e.target.files?.[0] || null);
+                    setBrochureRemoved(false);
+                  }}
                   className="mt-1"
                 />
                 {(brochureUrl || formData.brochureUrl) && (
@@ -1453,7 +1501,10 @@ const clearBrochure = () => {
                 <input
                   type="url"
                   value={brochureUrl}
-                  onChange={(e) => setBrochureUrl(e.target.value)}
+                  onChange={(e) => {
+                    setBrochureUrl(e.target.value);
+                    setBrochureRemoved(false);
+                  }}
                   className="w-full border rounded px-3 py-2"
                   placeholder="https://..."
                 />
@@ -1494,8 +1545,8 @@ const clearBrochure = () => {
       )}
 
       {isEditingVilla && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-start sm:items-center justify-center z-50 overflow-y-auto p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[85vh] sm:max-h-[90vh] overflow-y-auto shadow-xl">
             <h2 className="text-xl font-bold mb-4">{t.edit}</h2>
             <form onSubmit={handleUpdateVilla} className="space-y-4">
               <div className="flex gap-2 mb-2">
@@ -1683,7 +1734,10 @@ const clearBrochure = () => {
                 <input
                   type="file"
                   accept="application/pdf"
-                  onChange={(e) => setBrochureFile(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    setBrochureFile(e.target.files?.[0] || null);
+                    setBrochureRemoved(false);
+                  }}
                   className="mt-1"
                 />
                 {(brochureUrl || formData.brochureUrl) && (
@@ -1723,7 +1777,10 @@ const clearBrochure = () => {
                 <input
                   type="url"
                   value={brochureUrl}
-                  onChange={(e) => setBrochureUrl(e.target.value)}
+                  onChange={(e) => {
+                    setBrochureUrl(e.target.value);
+                    setBrochureRemoved(false);
+                  }}
                   className="w-full border rounded px-3 py-2"
                   placeholder="https://..."
                 />

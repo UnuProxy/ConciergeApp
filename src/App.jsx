@@ -32,6 +32,7 @@ import UserManagement from './pages/users/UserManagement'
 import PropertiesForSale from './pages/services/properties/PropertiesForSale';
 import AddProperty from './pages/services/properties/AddProperty';
 import PropertyDetail from './pages/services/properties/PropertyDetail';
+import PropertyShare from './pages/services/properties/PropertyShare';
 
 // NEW: Import splash screen components
 import './styles/splashAnimations.css'
@@ -148,6 +149,8 @@ function App() {
                     </PrivateRoute>
                   }
                 />
+
+                <Route path="/share/property/:token" element={<PropertyShare />} />
                 
                 <Route
                   path="/reservations"

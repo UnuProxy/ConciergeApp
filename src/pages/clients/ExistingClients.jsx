@@ -13,7 +13,10 @@ import {
   deleteDoc,
   serverTimestamp 
 } from 'firebase/firestore';
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { useDatabase } from "../../context/DatabaseContext";
+import { storage } from '../../firebase/config';
+import { isAdminRole } from '../../utils/roleUtils';
 import { jsPDF } from "jspdf";
 import 'jspdf-autotable';
 import { drawServiceIcon } from '../../utils/pdfIconUtils';
@@ -138,6 +141,44 @@ const EXCLUDED_CORE_SERVICE_IDS = new Set(['core-villa-rentals', 'core-yachts', 
 const CORE_CONCIERGE_SERVICES_FILTERED = CORE_CONCIERGE_SERVICES.filter(
   (service) => !EXCLUDED_CORE_SERVICE_IDS.has(service.id)
 );
+const CORE_SERVICES_COLLECTION = 'concierge_core_services';
+
+const mergeCoreServices = (overrides = {}) => {
+  const merged = CORE_CONCIERGE_SERVICES_FILTERED.map((base) => {
+    const override = overrides[base.id];
+    if (!override) return base;
+    return {
+      ...base,
+      ...override,
+      id: base.id,
+      serviceId: base.id,
+      category: base.category || 'concierge-core',
+      name: override.name ?? base.name,
+      description: override.description ?? base.description,
+      price: override.price ?? base.price,
+      unit: override.unit ?? base.unit,
+      imageUrl: override.imageUrl ?? base.imageUrl
+    };
+  });
+
+  const extras = Object.values(overrides).filter((override) => {
+    const serviceId = override.serviceId || override.id;
+    return !CORE_CONCIERGE_SERVICES.find((service) => service.id === serviceId);
+  });
+  extras.forEach((override) => {
+    const serviceId = override.serviceId || override.id;
+    merged.push({
+      ...override,
+      id: serviceId,
+      serviceId,
+      category: 'concierge-core',
+      price: override.price ?? 0,
+      unit: override.unit || 'service'
+    });
+  });
+
+  return merged;
+};
 
 const formatSeasonalMonthLabel = (monthKey, language, t) => {
   try {
@@ -310,6 +351,10 @@ const translations = {
     chefs: 'Chefs',
     excursions: 'Excursions & Activities',
     discount: 'Discount',
+    customPriceLabel: 'Custom price',
+    customPriceNote: "Doesn't change brochure PDF",
+    resetPrice: 'Reset',
+    standardPrice: 'Standard price',
     discountAmount: 'Discount Amount',
     discountType: 'Discount Type',
     percentage: 'Percentage',
@@ -358,6 +403,19 @@ const translations = {
     price: 'Price',
     unit: 'Unit',
     selectAccommodation: 'Select Accommodation',
+    priceOnRequest: 'Price on request',
+    coreServiceEditorTitle: 'Edit Core Service',
+    coreServiceNameEn: 'Name (EN)',
+    coreServiceNameRo: 'Name (RO)',
+    coreServiceDescriptionEn: 'Description (EN)',
+    coreServiceDescriptionRo: 'Description (RO)',
+    coreServicePrice: 'Default price',
+    coreServiceUnit: 'Unit',
+    coreServiceImage: 'Image',
+    coreServiceImageUrl: 'Image URL',
+    coreServiceUpload: 'Upload image',
+    coreServiceRemoveImage: 'Remove image',
+    coreServicePriceHint: 'Leave empty for price on request',
     selectTransport: 'Select Transport',
     adults: 'Adults',
     children: 'Children',
@@ -525,6 +583,10 @@ const translations = {
     chefs: 'Bucatari',
     excursions: 'Excursii și Activități',
     discount: 'Reducere',
+    customPriceLabel: 'Preț personalizat',
+    customPriceNote: 'Nu modifică broșura PDF',
+    resetPrice: 'Resetează',
+    standardPrice: 'Preț standard',
     discountAmount: 'Valoare Reducere',
     discountType: 'Tip Reducere',
     percentage: 'Procentuală',
@@ -573,6 +635,19 @@ const translations = {
     price: 'Preț',
     unit: 'Unitate',
     selectAccommodation: 'Selectează Cazare',
+    priceOnRequest: 'Preț la cerere',
+    coreServiceEditorTitle: 'Editează serviciu principal',
+    coreServiceNameEn: 'Nume (EN)',
+    coreServiceNameRo: 'Nume (RO)',
+    coreServiceDescriptionEn: 'Descriere (EN)',
+    coreServiceDescriptionRo: 'Descriere (RO)',
+    coreServicePrice: 'Preț implicit',
+    coreServiceUnit: 'Unitate',
+    coreServiceImage: 'Imagine',
+    coreServiceImageUrl: 'URL imagine',
+    coreServiceUpload: 'Încarcă imagine',
+    coreServiceRemoveImage: 'Șterge imagine',
+    coreServicePriceHint: 'Lasă gol pentru preț la cerere',
     selectTransport: 'Selectează Transport',
     adults: 'Adulți',
     children: 'Copii',
@@ -744,7 +819,7 @@ const extractImageUrl = (data) => {
   const getMinDate = (value) => (value && value > todayISO ? value : todayISO);
   
   // Use the database context
-  const { currentUser, companyInfo, loading: contextLoading, error: contextError } = useDatabase();
+  const { currentUser, companyInfo, userRole, loading: contextLoading, error: contextError } = useDatabase();
   
   // Client states
   const [clients, setClients] = useState([]);
@@ -789,6 +864,15 @@ const extractImageUrl = (data) => {
   const [availableServices, setAvailableServices] = useState({});
   const [loadingServices, setLoadingServices] = useState(false);
   const [teamMembers, setTeamMembers] = useState([]);
+  const [coreServiceOverrides, setCoreServiceOverrides] = useState({});
+  const [coreServiceEditorOpen, setCoreServiceEditorOpen] = useState(false);
+  const [coreServiceDraft, setCoreServiceDraft] = useState(null);
+  const [coreServiceImageFile, setCoreServiceImageFile] = useState(null);
+  const [coreServiceUploadProgress, setCoreServiceUploadProgress] = useState(0);
+  const [coreServiceSaving, setCoreServiceSaving] = useState(false);
+  const [coreServiceError, setCoreServiceError] = useState('');
+  const normalizedRole = (userRole || currentUser?.role || companyInfo?.role || '').toString().trim().toLowerCase();
+  const isAdmin = normalizedRole ? isAdminRole(normalizedRole) : true;
   const [loadingTeamMembers, setLoadingTeamMembers] = useState(false);
   const [teamMembersError, setTeamMembersError] = useState(null);
   const [offerNotice, setOfferNotice] = useState('');
@@ -1127,13 +1211,28 @@ useEffect(() => {
       
       try {
         const services = {};
+        let coreOverrides = {};
+
+        try {
+          const coreRef = collection(db, CORE_SERVICES_COLLECTION);
+          const coreQuery = query(coreRef, where('companyId', '==', companyInfo.id));
+          const coreSnapshot = await getDocs(coreQuery);
+          coreSnapshot.forEach(docSnap => {
+            const data = docSnap.data();
+            const serviceId = data.serviceId || docSnap.id;
+            coreOverrides[serviceId] = { ...data, docId: docSnap.id };
+          });
+        } catch (coreErr) {
+          console.error('Error fetching core service overrides:', coreErr);
+        }
+        setCoreServiceOverrides(coreOverrides);
         
         // Fetch all service types based on serviceCategories
         for (const category of serviceCategories) {
           try {
             // Provide built-in concierge options without needing Firestore records
             if (category.staticServices) {
-              services[category.id] = category.staticServices;
+              services[category.id] = mergeCoreServices(coreOverrides);
               continue;
             }
             
@@ -1935,7 +2034,7 @@ setAvailableServices(services);
             if (item.discountValue) {
               total += calculateItemPrice(item);
             } else {
-              total += ((item.originalPrice || item.price) * item.quantity);
+              total += (getItemBasePrice(item) * item.quantity);
             }
           }
         });
@@ -1950,7 +2049,7 @@ setAvailableServices(services);
     return items.reduce((sum, item) => {
       if (!item.included) return sum;
       if (item.discountValue) return sum + calculateItemPrice(item);
-      return sum + ((item.price || 0) * (item.quantity || 0));
+      return sum + (getItemBasePrice(item) * (item.quantity || 0));
     }, 0);
   };
 
@@ -2229,7 +2328,7 @@ const fetchCompanyAdminForPdf = async (companyId) => {
           }
           
           // Calculate item total for payment tracking
-          const itemPrice = parseFloat(item.price || 0);
+          const itemPrice = getItemBasePrice(item);
           const itemQty = parseInt(item.quantity || 1);
           const itemTotal = itemPrice * itemQty;
           
@@ -2531,11 +2630,154 @@ const handleSelectClient = async (client) => {
     // Clear selection after applying
     setSelectedItems([]);
   };
+
+  const sanitizeFileName = (name = 'file') => name.toLowerCase().replace(/[^a-z0-9._-]/g, '_');
+
+  const openCoreServiceEditor = (service) => {
+    if (!service) return;
+    const nameValue = typeof service.name === 'object' ? service.name : { en: service.name || '' };
+    const descValue = typeof service.description === 'object' ? service.description : { en: service.description || '' };
+    const fallbackName = typeof service.name === 'string' ? service.name : (service.name?.en || '');
+    setCoreServiceDraft({
+      serviceId: service.id,
+      fallbackName,
+      name_en: nameValue?.en || fallbackName || '',
+      name_ro: nameValue?.ro || '',
+      description_en: descValue?.en || '',
+      description_ro: descValue?.ro || '',
+      price: service.price ?? '',
+      unit: service.unit || 'service',
+      imageUrl: service.imageUrl || '',
+      imagePath: service.imagePath || ''
+    });
+    setCoreServiceImageFile(null);
+    setCoreServiceUploadProgress(0);
+    setCoreServiceError('');
+    setCoreServiceEditorOpen(true);
+  };
+
+  const closeCoreServiceEditor = () => {
+    setCoreServiceEditorOpen(false);
+    setCoreServiceDraft(null);
+    setCoreServiceImageFile(null);
+    setCoreServiceUploadProgress(0);
+    setCoreServiceError('');
+  };
+
+  const uploadCoreServiceImage = (file, serviceId) => new Promise((resolve, reject) => {
+    if (!file || !companyInfo?.id || !serviceId) {
+      resolve({ url: '', path: '' });
+      return;
+    }
+    const safeName = sanitizeFileName(file.name || 'image');
+    const path = `concierge-core/${companyInfo.id}/${serviceId}/${Date.now()}_${safeName}`;
+    const storageRef = ref(storage, path);
+    const uploadTask = uploadBytesResumable(storageRef, file);
+    uploadTask.on('state_changed', (snapshot) => {
+      const progress = snapshot.totalBytes ? (snapshot.bytesTransferred / snapshot.totalBytes) * 100 : 0;
+      setCoreServiceUploadProgress(Math.round(progress));
+    }, reject, async () => {
+      const url = await getDownloadURL(uploadTask.snapshot.ref);
+      resolve({ url, path });
+    });
+  });
+
+  const handleSaveCoreService = async () => {
+    if (!coreServiceDraft || !companyInfo?.id) return;
+    setCoreServiceSaving(true);
+    setCoreServiceError('');
+    try {
+      const serviceId = coreServiceDraft.serviceId;
+      const nameEn = (coreServiceDraft.name_en || coreServiceDraft.fallbackName || '').trim();
+      const nameRo = (coreServiceDraft.name_ro || '').trim();
+      const descriptionEn = (coreServiceDraft.description_en || '').trim();
+      const descriptionRo = (coreServiceDraft.description_ro || '').trim();
+
+      let imageUrl = (coreServiceDraft.imageUrl || '').trim();
+      let imagePath = coreServiceDraft.imagePath || '';
+
+      if (coreServiceImageFile) {
+        const uploaded = await uploadCoreServiceImage(coreServiceImageFile, serviceId);
+        if (uploaded?.url) {
+          if (imagePath && imagePath !== uploaded.path) {
+            try {
+              await deleteObject(ref(storage, imagePath));
+            } catch (err) {
+              console.error('Failed to delete old core service image:', err);
+            }
+          }
+          imageUrl = uploaded.url;
+          imagePath = uploaded.path;
+        }
+      } else if (!imageUrl && imagePath) {
+        try {
+          await deleteObject(ref(storage, imagePath));
+        } catch (err) {
+          console.error('Failed to delete core service image:', err);
+        }
+        imagePath = '';
+      }
+
+      const payload = {
+        companyId: companyInfo.id,
+        serviceId,
+        name: { en: nameEn || serviceId, ...(nameRo ? { ro: nameRo } : {}) },
+        description: {
+          ...(descriptionEn ? { en: descriptionEn } : {}),
+          ...(descriptionRo ? { ro: descriptionRo } : {})
+        },
+        price: toNumericPrice(coreServiceDraft.price),
+        unit: coreServiceDraft.unit || 'service',
+        imageUrl: imageUrl || '',
+        imagePath: imagePath || '',
+        updatedAt: new Date()
+      };
+
+      const existing = coreServiceOverrides[serviceId];
+      let docId = existing?.docId || null;
+
+      if (docId) {
+        await updateDoc(doc(db, CORE_SERVICES_COLLECTION, docId), payload);
+      } else {
+        const docRef = await addDoc(collection(db, CORE_SERVICES_COLLECTION), {
+          ...payload,
+          createdAt: new Date()
+        });
+        docId = docRef.id;
+      }
+
+      const updatedOverrides = {
+        ...coreServiceOverrides,
+        [serviceId]: { ...payload, docId }
+      };
+      setCoreServiceOverrides(updatedOverrides);
+      setAvailableServices(prev => ({
+        ...prev,
+        'concierge-core': mergeCoreServices(updatedOverrides)
+      }));
+      closeCoreServiceEditor();
+    } catch (err) {
+      console.error('Failed to save core service:', err);
+      setCoreServiceError(err.message || 'Failed to save');
+    } finally {
+      setCoreServiceSaving(false);
+    }
+  };
   
+  const getItemStandardPrice = (item) => toNumericPrice(item?.originalPrice ?? item?.price ?? 0);
+
+  const getItemBasePrice = (item) => {
+    const customPrice = item?.customPrice;
+    if (customPrice !== undefined && customPrice !== null && customPrice !== '') {
+      return toNumericPrice(customPrice);
+    }
+    return getItemStandardPrice(item);
+  };
+
   // Calculate price for an individual item after its discount
-  // IMPORTANT: Always use originalPrice (not price) to avoid double-discounting
+  // IMPORTANT: Use customPrice when set, otherwise fall back to originalPrice to avoid double-discounting
   const calculateItemPrice = (item) => {
-    const basePrice = item.originalPrice || item.price;
+    const basePrice = getItemBasePrice(item);
     if (!item.discountValue) return basePrice * item.quantity;
     
     const itemTotal = basePrice * item.quantity;
@@ -2888,6 +3130,10 @@ const handleSelectClient = async (client) => {
 
     // For core concierge services, require manual price/details entry
     if (service.category === 'concierge-core') {
+      const presetPrice = toNumericPrice(service.price);
+      if (presetPrice > 0) {
+        // If preset price exists, allow direct add
+      } else {
       const nameText = typeof service.name === 'object' ? getLocalizedText(service.name, language) : service.name;
       setCustomService({
         name: nameText || '',
@@ -2903,6 +3149,7 @@ const handleSelectClient = async (client) => {
         setCurrentView('offer');
       }
       return;
+      }
     }
     
     const selectedMonthKey = selectedSeasonMonths[service.id] || 'daily';
@@ -3323,6 +3570,26 @@ const generateOfferPdf = async (offer) => {
     // Instead of using a traditional table, we'll create a visual display of services
     let currentY = 110; // Starting Y position for services
 
+    const addImageContain = (imageData, x, y, boxW, boxH) => {
+      try {
+        const props = doc.getImageProperties(imageData);
+        const imgW = props?.width || boxW;
+        const imgH = props?.height || boxH;
+        if (!imgW || !imgH) {
+          doc.addImage(imageData, 'JPEG', x, y, boxW, boxH, undefined, 'FAST');
+          return;
+        }
+        const scale = Math.min(boxW / imgW, boxH / imgH);
+        const drawW = imgW * scale;
+        const drawH = imgH * scale;
+        const offsetX = x + (boxW - drawW) / 2;
+        const offsetY = y + (boxH - drawH) / 2;
+        doc.addImage(imageData, 'JPEG', offsetX, offsetY, drawW, drawH, undefined, 'FAST');
+      } catch (err) {
+        doc.addImage(imageData, 'JPEG', x, y, boxW, boxH, undefined, 'FAST');
+      }
+    };
+
     // Process the services for the PDF
     for (let i = 0; i < offer.items.length; i++) {
       const item = offer.items[i];
@@ -3367,7 +3634,7 @@ const generateOfferPdf = async (offer) => {
       let imageDisplayed = false;
       if (item.imageUrl && imageCache[item.imageUrl]) {
         try {
-          doc.addImage(imageCache[item.imageUrl], 'JPEG', 25, currentY + 5, 50, 35, undefined, 'FAST');
+          addImageContain(imageCache[item.imageUrl], 25, currentY + 5, 50, 35);
           if (item.category === 'villas' && item.propertyLink) {
             doc.link(25, currentY + 5, 50, 35, { url: item.propertyLink });
           }
@@ -4184,6 +4451,10 @@ const getUserName = async (userId) => {
         );
         
       default:
+        {
+          const priceValue = toNumericPrice(service.price);
+          const showPrice = priceValue > 0;
+          const isCoreService = service.category === 'concierge-core';
         return (
           <div key={service.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm h-full flex flex-col">
             {renderImage(service, "h-32")}
@@ -4202,21 +4473,39 @@ const getUserName = async (userId) => {
               )}
               <div className="flex items-center justify-between mt-auto">
                 <div>
-                  <span className="text-indigo-600 font-semibold">
-                    € {service.price}
-                  </span>
-                  <span className="text-gray-500 text-xs ml-1">/{service.unit || 'day'}</span>
+                  {showPrice ? (
+                    <>
+                      <span className="text-indigo-600 font-semibold">
+                        € {priceValue}
+                      </span>
+                      <span className="text-gray-500 text-xs ml-1">/{service.unit || 'day'}</span>
+                    </>
+                  ) : (
+                    <span className="text-gray-500 text-sm">{t.priceOnRequest || 'Price on request'}</span>
+                  )}
                 </div>
-                <button 
-                  onClick={() => handleAddToOffer(service)}
-                  className="bg-indigo-600 text-white text-xs font-medium py-2 px-3 rounded-md hover:bg-indigo-700 transition-colors"
-                >
-                  {t.addToOffer}
-                </button>
+                <div className="flex items-center gap-2">
+                  {isCoreService && companyInfo && (
+                    <button
+                      type="button"
+                      onClick={() => openCoreServiceEditor(service)}
+                      className="text-xs py-2 px-3 rounded-md border border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                    >
+                      {t.edit || 'Edit'}
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => handleAddToOffer(service)}
+                    className="bg-indigo-600 text-white text-xs font-medium py-2 px-3 rounded-md hover:bg-indigo-700 transition-colors"
+                  >
+                    {t.addToOffer}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         );
+        }
     }
   };
 
@@ -5118,6 +5407,137 @@ const getUserName = async (userId) => {
         </div>
       )}
 
+      {coreServiceEditorOpen && coreServiceDraft && (
+        <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-xl shadow-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">{t.coreServiceEditorTitle || 'Edit Core Service'}</h3>
+              <button
+                type="button"
+                onClick={closeCoreServiceEditor}
+                className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center justify-center"
+              >
+                ✕
+              </button>
+            </div>
+            {coreServiceError && (
+              <div className="mb-3 text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded p-2">
+                {coreServiceError}
+              </div>
+            )}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{t.coreServiceNameEn || 'Name (EN)'}</label>
+                <input
+                  type="text"
+                  value={coreServiceDraft.name_en}
+                  onChange={(e) => setCoreServiceDraft(prev => ({ ...prev, name_en: e.target.value }))}
+                  className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{t.coreServiceNameRo || 'Name (RO)'}</label>
+                <input
+                  type="text"
+                  value={coreServiceDraft.name_ro}
+                  onChange={(e) => setCoreServiceDraft(prev => ({ ...prev, name_ro: e.target.value }))}
+                  className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{t.coreServiceDescriptionEn || 'Description (EN)'}</label>
+                <textarea
+                  value={coreServiceDraft.description_en}
+                  onChange={(e) => setCoreServiceDraft(prev => ({ ...prev, description_en: e.target.value }))}
+                  className="w-full p-2.5 border border-gray-300 rounded-md text-sm min-h-20"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{t.coreServiceDescriptionRo || 'Description (RO)'}</label>
+                <textarea
+                  value={coreServiceDraft.description_ro}
+                  onChange={(e) => setCoreServiceDraft(prev => ({ ...prev, description_ro: e.target.value }))}
+                  className="w-full p-2.5 border border-gray-300 rounded-md text-sm min-h-20"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t.coreServicePrice || 'Default price'}</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={coreServiceDraft.price}
+                    onChange={(e) => setCoreServiceDraft(prev => ({ ...prev, price: e.target.value }))}
+                    className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
+                    placeholder="0"
+                  />
+                  <p className="text-[11px] text-gray-500 mt-1">{t.coreServicePriceHint || 'Leave empty for price on request'}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t.coreServiceUnit || 'Unit'}</label>
+                  <input
+                    type="text"
+                    value={coreServiceDraft.unit}
+                    onChange={(e) => setCoreServiceDraft(prev => ({ ...prev, unit: e.target.value }))}
+                    className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
+                    placeholder="service"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{t.coreServiceImage || 'Image'}</label>
+                <div className="space-y-2">
+                  <input
+                    type="url"
+                    value={coreServiceDraft.imageUrl}
+                    onChange={(e) => setCoreServiceDraft(prev => ({ ...prev, imageUrl: e.target.value }))}
+                    className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
+                    placeholder={t.coreServiceImageUrl || 'Image URL'}
+                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setCoreServiceImageFile(e.target.files?.[0] || null)}
+                    />
+                    {(coreServiceDraft.imageUrl || coreServiceDraft.imagePath) && (
+                      <button
+                        type="button"
+                        onClick={() => setCoreServiceDraft(prev => ({ ...prev, imageUrl: '', imagePath: '' }))}
+                        className="text-xs text-rose-600 underline"
+                      >
+                        {t.coreServiceRemoveImage || 'Remove image'}
+                      </button>
+                    )}
+                  </div>
+                  {coreServiceUploadProgress > 0 && coreServiceUploadProgress < 100 && (
+                    <div className="text-xs text-gray-500">Uploading... {coreServiceUploadProgress}%</div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                type="button"
+                onClick={closeCoreServiceEditor}
+                className="px-4 py-2 text-sm rounded-md border border-gray-300 text-gray-700"
+              >
+                {t.cancel || 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCoreService}
+                disabled={coreServiceSaving}
+                className="px-4 py-2 text-sm rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-300"
+              >
+                {coreServiceSaving ? (t.saving || 'Saving...') : (t.save || 'Save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mobile Cart View */}
       {isMobile && currentView === 'cart' && (
         <div className="flex-1 flex flex-col overflow-hidden">
@@ -5191,10 +5611,10 @@ const getUserName = async (userId) => {
                       </div>
                       <div className="text-right">
                         <div className="text-lg font-bold text-gray-900">
-                          € {(item.price * item.quantity).toFixed(2)}
+                          € {(getItemBasePrice(item) * item.quantity).toFixed(2)}
                         </div>
                         <div className="text-xs text-gray-500">
-                          € {item.price.toFixed(2)} each
+                          € {getItemBasePrice(item).toFixed(2)} each
                         </div>
                       </div>
                     </div>
@@ -5204,6 +5624,64 @@ const getUserName = async (userId) => {
 
 {/* Fixed Custom Discount Section - Mobile Version */}
 <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+  <div className="flex items-center justify-between mb-2">
+    <span className="text-sm font-medium text-gray-700">{t.customPriceLabel}:</span>
+    <button
+      type="button"
+      onClick={() => {
+        setOfferItems(prev => prev.map(i =>
+          i.id === item.id ? { ...i, customPrice: undefined } : i
+        ));
+      }}
+      className="text-xs text-gray-600 underline"
+    >
+      {t.resetPrice}
+    </button>
+  </div>
+  <div className="flex gap-2 items-center mb-2">
+    <span className="text-sm text-gray-700 font-medium">€</span>
+    <input
+      type="text"
+      inputMode="decimal"
+      pattern="[0-9]*\\.?[0-9]*"
+      value={item.customPrice ?? ''}
+      placeholder={getItemStandardPrice(item).toFixed(2)}
+      onChange={(e) => {
+        let value = e.target.value;
+        if (value === '') {
+          setOfferItems(prev => prev.map(i =>
+            i.id === item.id ? { ...i, customPrice: undefined } : i
+          ));
+          return;
+        }
+        value = value.replace(/[^0-9.]/g, '');
+        const parts = value.split('.');
+        if (parts.length > 2) {
+          value = parts[0] + '.' + parts.slice(1).join('');
+        }
+        const parsed = parseFloat(value);
+        setOfferItems(prev => prev.map(i =>
+          i.id === item.id ? { ...i, customPrice: Number.isNaN(parsed) ? undefined : parsed } : i
+        ));
+      }}
+      onBlur={(e) => {
+        if (e.target.value === '') {
+          setOfferItems(prev => prev.map(i =>
+            i.id === item.id ? { ...i, customPrice: undefined } : i
+          ));
+        }
+      }}
+      className="flex-1 p-3 text-lg border border-gray-300 rounded text-center bg-white"
+      style={{
+        WebkitAppearance: 'none',
+        MozAppearance: 'textfield'
+      }}
+    />
+  </div>
+  <div className="text-xs text-gray-500 mb-3">
+    {t.standardPrice}: €{getItemStandardPrice(item).toFixed(2)} · {t.customPriceNote}
+  </div>
+
   <div className="flex items-center justify-between mb-2">
     <span className="text-sm font-medium text-gray-700">Custom Discount:</span>
     <div className="flex gap-1">
@@ -5277,8 +5755,7 @@ const getUserName = async (userId) => {
             i.id === item.id ? { 
               ...i, 
               discountValue: 0,
-              hasCustomDiscount: false,
-              price: i.originalPrice
+              hasCustomDiscount: false
             } : i
           ));
           return;
@@ -5379,7 +5856,7 @@ const getUserName = async (userId) => {
   {item.hasCustomDiscount && item.discountValue > 0 && (
     <div className="mt-2 flex items-center justify-between text-sm">
       <span className="text-gray-500 line-through">
-        Original: € {(item.originalPrice * item.quantity).toFixed(2)}
+        Original: € {(getItemBasePrice(item) * item.quantity).toFixed(2)}
       </span>
       <span className="font-bold text-emerald-600">
         After discount: €{calculateItemPrice(item).toFixed(2)}
@@ -5401,7 +5878,7 @@ const getUserName = async (userId) => {
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total:</span>
                   <span className="text-indigo-600">
-                  € {offerItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)}
+                  € {offerItems.reduce((total, item) => total + (getItemBasePrice(item) * item.quantity), 0).toFixed(2)}
                 </span>
                 </div>
               </div>
@@ -5783,7 +6260,7 @@ const getUserName = async (userId) => {
                             </div>
                             
                             {/* Price and Actions Row */}
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
   <div>
     <div className="text-lg font-bold text-indigo-600">
       {priceIsAvailable
@@ -5802,12 +6279,38 @@ const getUserName = async (userId) => {
     )}
   </div>
   
-  <button 
-    onClick={() => handleAddToOffer(service, true)}
-    className={`bg-indigo-600 hover:bg-indigo-700 text-white ${isMobile ? 'text-xs py-2 px-3' : 'text-sm py-2 px-4'} rounded-lg transition-colors font-medium`}
-  >
-    {t.addToOffer}
-  </button>
+  <div className="flex flex-col sm:flex-col items-stretch sm:items-end gap-2">
+    {service.category === 'concierge-core' && companyInfo && (
+      <button
+        type="button"
+        onClick={() => openCoreServiceEditor(service)}
+        className={`inline-flex items-center justify-center gap-1.5 border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 ${isMobile ? 'w-full text-xs py-2 px-3' : 'text-xs py-2 px-3'} rounded-lg transition-colors font-semibold shadow-sm`}
+        aria-label={t.edit || 'Edit'}
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 20h9" />
+          <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+        </svg>
+        {t.edit || 'Edit'}
+      </button>
+    )}
+    <button 
+      onClick={() => handleAddToOffer(service, true)}
+      className={`bg-indigo-600 hover:bg-indigo-700 text-white ${isMobile ? 'w-full text-xs py-2 px-3' : 'text-xs py-2 px-3'} rounded-lg transition-colors font-semibold shadow-sm`}
+    >
+      {t.addToOffer}
+    </button>
+  </div>
 </div>
                           </div>
                         </div>
@@ -5892,12 +6395,69 @@ const getUserName = async (userId) => {
                             </button>
                           </div>
                           <div className="text-sm font-medium text-gray-900">
-                            €{(item.price * item.quantity).toFixed(2)}
+                            €{(getItemBasePrice(item) * item.quantity).toFixed(2)}
                           </div>
                         </div>
 
                         {/* Custom Discount Section - DESKTOP VERSION */}
                         <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+  <div className="flex items-center justify-between mb-2">
+    <span className="text-xs font-medium text-gray-700">{t.customPriceLabel}:</span>
+    <button
+      type="button"
+      onClick={() => {
+        setOfferItems(prev => prev.map(i =>
+          i.id === item.id ? { ...i, customPrice: undefined } : i
+        ));
+      }}
+      className="text-xs text-gray-600 underline"
+    >
+      {t.resetPrice}
+    </button>
+  </div>
+  <div className="flex gap-2 items-center mb-2">
+    <span className="text-xs text-gray-700 font-medium">€</span>
+    <input
+      type="text"
+      inputMode="decimal"
+      pattern="[0-9]*\\.?[0-9]*"
+      value={item.customPrice ?? ''}
+      placeholder={getItemStandardPrice(item).toFixed(2)}
+      onChange={(e) => {
+        let value = e.target.value.replace(/[^0-9.]/g, '');
+        if (value === '') {
+          setOfferItems(prev => prev.map(i =>
+            i.id === item.id ? { ...i, customPrice: undefined } : i
+          ));
+          return;
+        }
+        const parts = value.split('.');
+        if (parts.length > 2) {
+          value = parts[0] + '.' + parts.slice(1).join('');
+        }
+        const parsed = parseFloat(value);
+        setOfferItems(prev => prev.map(i =>
+          i.id === item.id ? { ...i, customPrice: Number.isNaN(parsed) ? undefined : parsed } : i
+        ));
+      }}
+      onBlur={(e) => {
+        if (e.target.value === '') {
+          setOfferItems(prev => prev.map(i =>
+            i.id === item.id ? { ...i, customPrice: undefined } : i
+          ));
+        }
+      }}
+      className="flex-1 p-1.5 text-xs border border-gray-300 rounded text-center"
+      style={{
+        WebkitAppearance: 'none',
+        MozAppearance: 'textfield'
+      }}
+    />
+  </div>
+  <div className="text-[11px] text-gray-500 mb-2">
+    {t.standardPrice}: €{getItemStandardPrice(item).toFixed(2)} · {t.customPriceNote}
+  </div>
+
   <div className="flex items-center justify-between mb-2">
     <span className="text-xs font-medium text-gray-700">Discount:</span>
     <div className="flex gap-1">
@@ -5987,7 +6547,7 @@ const getUserName = async (userId) => {
   {item.hasCustomDiscount && item.discountValue > 0 && (
     <div className="mt-2 flex items-center justify-between text-xs">
       <span className="text-gray-500 line-through">
-        Original: €{(item.originalPrice * item.quantity).toFixed(2)}
+        Original: €{(getItemBasePrice(item) * item.quantity).toFixed(2)}
       </span>
       <span className="font-bold text-emerald-600">
         After: € {calculateItemPrice(item).toFixed(2)}
@@ -5998,7 +6558,7 @@ const getUserName = async (userId) => {
                         
                         {/* Price breakdown */}
                         <div className="text-xs text-gray-500 mt-2">
-                          € {(item.originalPrice || item.price).toFixed(2)} × {item.quantity} = €{calculateItemPrice(item).toFixed(2)}
+                          € {getItemBasePrice(item).toFixed(2)} × {item.quantity} = €{calculateItemPrice(item).toFixed(2)}
                         </div>
                       </div>
                     ))}
@@ -6102,11 +6662,11 @@ const getUserName = async (userId) => {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span>{t.subtotal}:</span>
-                        <span>€{offerItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)}</span>
+                        <span>€{offerItems.reduce((total, item) => total + (getItemBasePrice(item) * item.quantity), 0).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between font-semibold text-lg border-t pt-2">
                         <span>{t.total}:</span>
-                        <span>€{offerItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)}</span>
+                        <span>€{offerItems.reduce((total, item) => total + (getItemBasePrice(item) * item.quantity), 0).toFixed(2)}</span>
                       </div>
                     </div>
                   </div>
@@ -6128,7 +6688,7 @@ const getUserName = async (userId) => {
                 {offerItems.length} {offerItems.length === 1 ? 'item' : 'items'} in cart
               </span>
               <span className="font-semibold text-lg text-indigo-600">
-                €{offerItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)}
+                €{offerItems.reduce((total, item) => total + (getItemBasePrice(item) * item.quantity), 0).toFixed(2)}
               </span>
             </div>
           </div>
@@ -6144,7 +6704,7 @@ const getUserName = async (userId) => {
           
           {!isMobile && (
             <div className="text-sm text-gray-600">
-              {offerItems.length} {offerItems.length === 1 ? 'item' : 'items'} • €{offerItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)}
+              {offerItems.length} {offerItems.length === 1 ? 'item' : 'items'} • €{offerItems.reduce((total, item) => total + (getItemBasePrice(item) * item.quantity), 0).toFixed(2)}
             </div>
           )}
           
@@ -6547,21 +7107,21 @@ const getUserName = async (userId) => {
                                         {typeof item.name === 'object' ? getLocalizedText(item.name, language) : item.name}
                                       </div>
                                       <div className="text-xs text-gray-500 flex flex-wrap gap-2 ml-6">
-                                        <span>€ {(item.originalPrice || item.price).toFixed(2)} {item.unit ? `/${item.unit}` : ''}</span>
+                                        <span>€ {getItemBasePrice(item).toFixed(2)} {item.unit ? `/${item.unit}` : ''}</span>
                                         <span>× {item.quantity}</span>
                                         {item.discountValue ? (
                                           <>
-                                            <span>= € {((item.originalPrice || item.price) * item.quantity).toFixed(2)}</span>
+                                            <span>= € {(getItemBasePrice(item) * item.quantity).toFixed(2)}</span>
                                             <span className="text-rose-600">
                                               - € {item.discountType === 'percentage' 
-                                                ? (((item.originalPrice || item.price) * item.quantity) * (item.discountValue / 100)).toFixed(2)
+                                                ? ((getItemBasePrice(item) * item.quantity) * (item.discountValue / 100)).toFixed(2)
                                                 : item.discountValue.toFixed(2)}
                                               {item.discountType === 'percentage' ? ` (${item.discountValue}%)` : ''}
                                             </span>
                                             <span className="font-medium text-emerald-600">= € {calculateItemPrice(item).toFixed(2)}</span>
                                           </>
                                         ) : (
-                                          <span>= € {(item.price * item.quantity).toFixed(2)}</span>
+                                          <span>= € {(getItemBasePrice(item) * item.quantity).toFixed(2)}</span>
                                         )}
                                       </div>
                                     </div>
@@ -7507,11 +8067,11 @@ const getUserName = async (userId) => {
                                           {item.discountValue > 0 ? (
                                             <span className="text-rose-600">
                                               € {(item.discountType === 'percentage' 
-                                                ? ((item.originalPrice || item.price) * item.quantity) * (1 - item.discountValue/100) 
-                                                : ((item.originalPrice || item.price) * item.quantity) - item.discountValue).toFixed(2)}
+                                                ? (getItemBasePrice(item) * item.quantity) * (1 - item.discountValue/100) 
+                                                : (getItemBasePrice(item) * item.quantity) - item.discountValue).toFixed(2)}
                                             </span>
                                           ) : (
-                                            `€${((item.originalPrice || item.price) * item.quantity).toFixed(2)}`
+                                            `€${(getItemBasePrice(item) * item.quantity).toFixed(2)}`
                                           )}
                                         </span>
                                       </li>
