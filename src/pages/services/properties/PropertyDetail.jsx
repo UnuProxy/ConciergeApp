@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useDatabase } from '../../../context/DatabaseContext';
 import { isAdminRole } from '../../../utils/roleUtils';
 import { 
-  doc, getDoc, deleteDoc, updateDoc,
+  doc, getDoc, deleteDoc, updateDoc, addDoc,
   collection, query, where, getDocs 
 } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
@@ -20,6 +20,9 @@ function PropertyDetail() {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [showOwnerInfo, setShowOwnerInfo] = useState(false);
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareNotice, setShareNotice] = useState('');
+  const [shareLink, setShareLink] = useState('');
   
   // Direct language handling
   const [language, setLanguage] = useState(() => {
@@ -120,6 +123,72 @@ function PropertyDetail() {
   
   // Current translations
   const t = translations[language];
+
+  const buildSharePayload = (propertyData) => ({
+    public: true,
+    propertyId: propertyData.id,
+    companyId: db.companyId || null,
+    title: propertyData.title || '',
+    location: propertyData.location || '',
+    type: propertyData.type || '',
+    price: propertyData.price || 0,
+    currency: 'EUR',
+    size: propertyData.size || 0,
+    status: propertyData.status || '',
+    description: propertyData.description || '',
+    images: Array.isArray(propertyData.images) ? propertyData.images : [],
+    amenities: Array.isArray(propertyData.amenities) ? propertyData.amenities : [],
+    bedrooms: propertyData.bedrooms || null,
+    bathrooms: propertyData.bathrooms || null,
+    yearBuilt: propertyData.yearBuilt || null,
+    zoning: propertyData.zoning || '',
+    buildableArea: propertyData.buildableArea || null,
+    terrain: propertyData.terrain || '',
+    updatedAt: new Date()
+  });
+
+  const handleShareProperty = async () => {
+    if (!property || !db?.firestore || !db?.companyId) return;
+    setShareLoading(true);
+    setShareNotice('');
+    setShareLink('');
+    const showNotice = (message) => {
+      setShareNotice(message);
+      setTimeout(() => setShareNotice(''), 4000);
+    };
+    try {
+      const sharesRef = collection(db.firestore, 'property_shares');
+      const existingQuery = query(
+        sharesRef,
+        where('propertyId', '==', property.id),
+        where('companyId', '==', db.companyId),
+        where('public', '==', true)
+      );
+      const snapshot = await getDocs(existingQuery);
+      let shareId = '';
+      const payload = buildSharePayload(property);
+      if (!snapshot.empty) {
+        shareId = snapshot.docs[0].id;
+        await updateDoc(doc(db.firestore, 'property_shares', shareId), payload);
+      } else {
+        const docRef = await addDoc(sharesRef, { ...payload, createdAt: new Date() });
+        shareId = docRef.id;
+      }
+      const shareUrl = `${window.location.origin}/share/property/${shareId}`;
+      setShareLink(shareUrl);
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        showNotice(language === 'ro' ? 'Link copiat' : 'Link copied');
+      } catch {
+        showNotice(shareUrl);
+      }
+    } catch (err) {
+      console.error('Error creating share link:', err);
+      showNotice(language === 'ro' ? 'Nu s-a putut crea linkul' : 'Could not create share link');
+    } finally {
+      setShareLoading(false);
+    }
+  };
   
   useEffect(() => {
     const fetchProperty = async () => {
@@ -693,70 +762,27 @@ function PropertyDetail() {
               
               <button
                 className="w-full btn-soft"
-                onClick={() => {
-                  const win = window.open('', '_blank');
-                  if (!win) {
-                    alert(language === 'ro'
-                      ? 'Permite ferestre pop-up pentru a partaja proprietatea.'
-                      : 'Allow pop-ups to share the property.');
-                    return;
-                  }
-
-                  const mainImage = property.images && property.images.length > 0 ? property.images[0] : null;
-                  const currencyPrice = property.price ? `${property.price.toLocaleString()} €` : '';
-                  const amenityList = (property.amenities || []).join(', ');
-
-                  const html = `
-                    <html>
-                      <head>
-                        <meta charset="utf-8" />
-                        <title>${property.title}</title>
-                        <style>
-                          body { font-family: Arial, sans-serif; background:#f8fafc; margin:0; padding:0; color:#0f172a; }
-                          .wrap { max-width: 960px; margin: 24px auto; background:white; border-radius:16px; padding:24px; box-shadow:0 10px 30px rgba(15,23,42,0.08); }
-                          .hero { width:100%; border-radius:12px; overflow:hidden; margin-bottom:20px; }
-                          .hero img { width:100%; height:360px; object-fit:cover; display:block; }
-                          .title { font-size:28px; font-weight:700; margin:0 0 8px 0; }
-                          .meta { color:#475569; margin-bottom:16px; }
-                          .price { font-size:24px; font-weight:700; color:#1d4ed8; margin-bottom:16px; }
-                          .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:12px; margin-bottom:16px; }
-                          .card { background:#f1f5f9; border-radius:10px; padding:12px; }
-                          .card h4 { margin:0 0 6px 0; font-size:14px; color:#475569; text-transform:uppercase; letter-spacing:0.04em; }
-                          .card div { font-size:16px; font-weight:600; }
-                          .section-title { font-size:18px; font-weight:700; margin:18px 0 8px 0; }
-                          .description { line-height:1.6; color:#334155; }
-                        </style>
-                      </head>
-                      <body>
-                        <div class="wrap">
-                          ${mainImage ? `<div class="hero"><img src="${mainImage}" alt="${property.title}"></div>` : ''}
-                          <h1 class="title">${property.title}</h1>
-                          <div class="meta">${property.location || ''}</div>
-                          <div class="price">${currencyPrice}</div>
-                          <div class="grid">
-                            <div class="card"><h4>${t.propertyType}</h4><div>${property.type}</div></div>
-                            <div class="card"><h4>${t.totalSize}</h4><div>${property.size || property.buildableArea || ''} m²</div></div>
-                            ${property.bedrooms ? `<div class="card"><h4>${t.bedrooms}</h4><div>${property.bedrooms}</div></div>` : ''}
-                            ${property.bathrooms ? `<div class="card"><h4>${t.bathrooms}</h4><div>${property.bathrooms}</div></div>` : ''}
-                            ${property.yearBuilt ? `<div class="card"><h4>${t.yearBuilt}</h4><div>${property.yearBuilt}</div></div>` : ''}
-                          </div>
-                          ${property.description ? `<div class="section-title">${t.description}</div><div class="description">${property.description}</div>` : ''}
-                          ${amenityList ? `<div class="section-title">${t.amenities}</div><div class="description">${amenityList}</div>` : ''}
-                          <div class="section-title">${language === 'ro' ? 'Link complet' : 'Full link'}</div>
-                          <div class="description"><a href="${window.location.href}" target="_blank">${window.location.href}</a></div>
-                        </div>
-                      </body>
-                    </html>
-                  `;
-                  win.document.write(html);
-                  win.document.close();
-                }}
+                onClick={handleShareProperty}
+                disabled={shareLoading}
               >
                 <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                 </svg>
-                {t.shareProperty}
+                {shareLoading ? (language === 'ro' ? 'Se generează...' : 'Generating...') : t.shareProperty}
               </button>
+              {shareNotice && (
+                <div className="mt-2 text-xs text-emerald-600">{shareNotice}</div>
+              )}
+              {shareLink && (
+                <a
+                  href={shareLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex text-xs font-semibold text-teal-700 underline"
+                >
+                  {language === 'ro' ? 'Deschide linkul' : 'Open link'}
+                </a>
+              )}
             </div>
           </div>
         </div>

@@ -168,6 +168,16 @@ service cloud.firestore {
     }
 
     // ========================================================================
+    // CORE CONCIERGE SERVICE OVERRIDES (company-private)
+    // ========================================================================
+    match /concierge_core_services/{id} {
+      allow read: if canReadCompanyData(resource.data.companyId);
+      allow create: if canCreateForCompany(request.resource.data.companyId);
+      allow update: if canUpdateCompanyData(resource.data.companyId);
+      allow delete: if canDeleteCompanyData(resource.data.companyId);
+    }
+
+    // ========================================================================
     // COMPANY-PRIVATE DATA: Each company can ONLY access their own
     // (clients, reservations/bookings, offers, expenses, finances)
     // ========================================================================
@@ -211,6 +221,14 @@ service cloud.firestore {
 
     match /categoryPayments/{id} {
       allow read: if canReadCompanyData(resource.data.companyId);
+      allow create: if canCreateForCompany(request.resource.data.companyId);
+      allow update: if canUpdateCompanyData(resource.data.companyId);
+      allow delete: if canDeleteCompanyData(resource.data.companyId);
+    }
+
+    // Public property share links (read-only for public)
+    match /property_shares/{id} {
+      allow read: if resource.data.public == true;
       allow create: if canCreateForCompany(request.resource.data.companyId);
       allow update: if canUpdateCompanyData(resource.data.companyId);
       allow delete: if canDeleteCompanyData(resource.data.companyId);

@@ -379,6 +379,20 @@ const Finance = () => {
   };
   const resolveServiceClientAmount = (serviceItem) => {
     if (!serviceItem) return null;
+    const quantity = getServiceQuantity(serviceItem);
+    const hasCustomPrice = serviceItem?.customPrice !== undefined && serviceItem?.customPrice !== null && serviceItem?.customPrice !== '';
+    const basePrice = toNumber(
+      hasCustomPrice
+        ? serviceItem.customPrice
+        : (serviceItem?.originalPrice ?? serviceItem?.price ?? 0)
+    );
+    const discountValue = toNumber(serviceItem?.discountValue ?? 0);
+
+    // If a custom price or discount is set, always compute from base price.
+    if ((hasCustomPrice || discountValue) && basePrice > 0) {
+      return calculateDiscountedTotal(serviceItem, basePrice, quantity);
+    }
+
     const explicitTotal = toNumberOrNull(
       serviceItem?.totalValue ??
       serviceItem?.total ??
@@ -389,9 +403,8 @@ const Finance = () => {
       null
     );
     if (explicitTotal !== null) return explicitTotal;
-    const quantity = getServiceQuantity(serviceItem);
-    const basePrice = toNumber(serviceItem?.originalPrice ?? serviceItem?.price ?? 0);
-    return calculateDiscountedTotal(serviceItem, basePrice, quantity);
+    if (basePrice > 0) return basePrice * quantity;
+    return null;
   };
 
   const getMonthBounds = (monthStr) => {

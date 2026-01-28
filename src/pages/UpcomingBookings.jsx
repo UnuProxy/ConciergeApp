@@ -237,12 +237,53 @@ const toNumber = (value) => {
   return Number.isNaN(parsed) ? 0 : parsed;
 };
 
+const hasCustomPrice = (service) =>
+  service?.customPrice !== undefined && service?.customPrice !== null && service?.customPrice !== '';
+
+const getServiceBasePrice = (service) => {
+  if (!service) return 0;
+  const raw = hasCustomPrice(service)
+    ? service.customPrice
+    : (service.originalPrice ?? service.price ?? 0);
+  return toNumber(raw);
+};
+
+const calculateDiscountedTotal = (service) => {
+  const quantity = toNumber(service?.quantity) || 1;
+  const basePrice = getServiceBasePrice(service);
+  const subtotal = basePrice * quantity;
+  const discountValue = toNumber(service?.discountValue ?? 0);
+  if (!discountValue) return subtotal;
+  if (service?.discountType === 'percentage') {
+    return Math.max(subtotal - (subtotal * (discountValue / 100)), 0);
+  }
+  return Math.max(subtotal - discountValue, 0);
+};
+
+const getServiceTotal = (service) => {
+  if (!service) return 0;
+  const discountValue = toNumber(service?.discountValue ?? 0);
+  const hasOverride = hasCustomPrice(service) || discountValue > 0;
+  const explicitTotal = toNumber(
+    service?.totalValue ??
+    service?.total ??
+    service?.clientAmount ??
+    service?.clientPrice ??
+    service?.amount ??
+    0
+  );
+  if (hasOverride) {
+    const computed = calculateDiscountedTotal(service);
+    if (computed > 0) return computed;
+    return explicitTotal > 0 ? explicitTotal : 0;
+  }
+  if (explicitTotal > 0) return explicitTotal;
+  return calculateDiscountedTotal(service);
+};
+
 // Compute per-service payment summary based on recorded payments
 const getServicePaymentInfo = (service, payments = [], safeRenderFn = (v) => v) => {
-  const explicitTotal = toNumber(service?.totalValue);
-  const unitPrice = toNumber(service?.price);
-  const quantity = toNumber(service?.quantity) || 1;
-  const total = explicitTotal > 0 ? explicitTotal : (unitPrice * quantity);
+  const total = getServiceTotal(service);
   
   // ONLY use the stored amountPaid - this is set correctly when service is added or paid
   // DO NOT use name matching - multiple services can have the same name!
@@ -647,7 +688,7 @@ const getServiceThumbnail = (service) => {
   };
 
   const handleSubmit = () => {
-    const totalPrice = serviceData.price * serviceData.quantity;
+    const totalPrice = getServiceTotal(serviceData);
     
     // EXPLICIT CALCULATION: If unpaid, amountPaid MUST be 0. No exceptions.
     let amountPaid = 0;
@@ -1155,7 +1196,7 @@ const renderServicesList = () => (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t.totalAmount || 'Total Amount'}</label>
             <div className="w-full p-3 bg-blue-50 border border-blue-200 rounded-md font-medium text-blue-700">
-            {(serviceData.price * serviceData.quantity || 0).toLocaleString()} €
+            {(getServiceTotal(serviceData) || 0).toLocaleString()} €
             </div>
           </div>
         
@@ -1172,7 +1213,7 @@ const renderServicesList = () => (
                 setServiceData({
                   ...serviceData, 
                   paymentStatus: status,
-                  amountPaid: status === 'paid' ? (serviceData.price * serviceData.quantity) : 0
+                  amountPaid: status === 'paid' ? getServiceTotal(serviceData) : 0
                 });
               }}
               className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
@@ -1224,7 +1265,7 @@ const renderServicesList = () => (
               </div>
               {serviceData.price > 0 && (
                 <p className="text-xs text-gray-500 mt-1">
-                  {t.remaining || 'Remaining'}: {Math.max(0, (serviceData.price * serviceData.quantity) - (parseFloat(serviceData.amountPaid) || 0)).toFixed(2)} €
+                  {t.remaining || 'Remaining'}: {Math.max(0, getServiceTotal(serviceData) - (parseFloat(serviceData.amountPaid) || 0)).toFixed(2)} €
                 </p>
               )}
               {serviceData.price <= 0 && (
@@ -1478,7 +1519,7 @@ const renderServicesList = () => (
               {t.totalAmount || 'Total Amount'}
             </label>
             <div className="w-full p-2 border border-gray-200 bg-gray-50 rounded-md font-medium text-gray-900">
-              {(serviceData.price * serviceData.quantity).toLocaleString()} €
+              {(getServiceTotal(serviceData) || 0).toLocaleString()} €
             </div>
           </div>
         </div>
@@ -2616,7 +2657,7 @@ const UpcomingBookings = () => {
         services.forEach((service, svcIdx) => {
           const serviceId = service.id;
           const serviceAmountPaid = parseFloat(service.amountPaid || 0);
-          const serviceTotal = parseFloat(service.price || 0) * parseInt(service.quantity || 1);
+          const serviceTotal = getServiceTotal(service);
           
           if (serviceAmountPaid > 0 && serviceId) {
             // Check if there's a matching payment in history
@@ -2645,7 +2686,7 @@ const UpcomingBookings = () => {
         
         // 1. CALCULATE TOTAL FROM SERVICES (The only source of truth for price)
         let totalValue = services.reduce((sum, s) => {
-          return sum + (parseFloat(s.price || 0) * parseInt(s.quantity || 1));
+          return sum + getServiceTotal(s);
         }, 0);
         
         // 2. CALCULATE PAID FROM CLEANED HISTORY (The only source of truth for money received)
@@ -2656,7 +2697,7 @@ const UpcomingBookings = () => {
         
         const servicesWithExplicitPayments = services.map(s => {
           const sId = s.id || null;
-          const sTotal = (parseFloat(s.price || 0) * parseInt(s.quantity || 1));
+          const sTotal = getServiceTotal(s);
           
           let sPaid = 0;
           
@@ -3532,13 +3573,7 @@ useEffect(() => {
           
           const paymentHistory = Array.isArray(booking.paymentHistory) ? booking.paymentHistory : [];
 
-          const getServiceTotalValue = (svc) => {
-            const explicit = toNumber(svc?.totalValue);
-            if (explicit > 0) return explicit;
-            const price = toNumber(svc?.price);
-            const qty = toNumber(svc?.quantity) || 1;
-            return price * qty;
-          };
+          const getServiceTotalValue = (svc) => getServiceTotal(svc);
 
           // 1. CALCULATE TOTAL VALUE (Sum of all services)
           const serviceTotalForBooking = bookingServices.reduce((sum, svc) => {
@@ -4848,7 +4883,7 @@ const renderMainContent = (filteredClients) => {
       // 3. Recalculate totals and use Rocket Science Allocation for remaining services
       let newTotal = 0;
       services.forEach(s => {
-        newTotal += (parseFloat(s.price || 0) * parseInt(s.quantity || 1));
+        newTotal += getServiceTotal(s);
       });
       
       const newPaidAmount = paymentHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
@@ -4857,7 +4892,7 @@ const renderMainContent = (filteredClients) => {
       let remainingPaymentsForAllocation = [...paymentHistory];
       const servicesWithExplicitPayments = services.map(s => {
         const sId = s.id || null;
-        const sTotal = (parseFloat(s.price || 0) * parseInt(s.quantity || 1));
+        const sTotal = getServiceTotal(s);
         
         let sPaid = 0;
         remainingPaymentsForAllocation = remainingPaymentsForAllocation.filter(p => {
@@ -5078,7 +5113,7 @@ const renderMainContent = (filteredClients) => {
         receiptAttachment: sanitizedReceipt,
         id: 'shopping_' + Date.now(),
         createdAt: currentDate,
-        totalValue: parseFloat(shoppingExpense.price || 0) * parseInt(shoppingExpense.quantity || 1),
+        totalValue: getServiceTotal(shoppingExpense),
         paymentStatus: shoppingExpense.paymentStatus || 'unpaid',
         amountPaid: parseFloat(shoppingExpense.amountPaid || 0)
       };
@@ -5105,7 +5140,7 @@ const renderMainContent = (filteredClients) => {
       }
 
       // 3. STRICT RECALCULATION FROM ARRAYS
-      const newTotal = services.reduce((sum, s) => sum + (parseFloat(s.price || 0) * parseInt(s.quantity || 1)), 0);
+      const newTotal = services.reduce((sum, s) => sum + getServiceTotal(s), 0);
       const newPaidAmount = paymentHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
       
       let newPaymentStatus = 'notPaid';
@@ -5317,7 +5352,7 @@ const renderMainContent = (filteredClients) => {
         createdAt: currentDate,
         companyId: userCompanyId,
         status: serviceData.status || 'confirmed',
-        totalValue: parseFloat(serviceData.price) * parseInt(serviceData.quantity),
+        totalValue: getServiceTotal(serviceData),
         paymentStatus: serviceData.paymentStatus || 'unpaid',
         amountPaid: parseFloat(serviceData.amountPaid || 0)
       };
@@ -5344,7 +5379,7 @@ const renderMainContent = (filteredClients) => {
       }
 
       // 3. STRICT RECALCULATION FROM ARRAYS (Source of Truth)
-      const newTotal = services.reduce((sum, s) => sum + (parseFloat(s.price || 0) * parseInt(s.quantity || 1)), 0);
+      const newTotal = services.reduce((sum, s) => sum + getServiceTotal(s), 0);
       const newPaidAmount = paymentHistory.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
       
       let newPaymentStatus = 'notPaid';
@@ -5563,7 +5598,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
     
     // SAFETY CHECK: If paying for a specific service, verify it's not already fully paid
     if (targetService) {
-      const serviceTotal = (parseFloat(targetService.price || 0) * parseInt(targetService.quantity || 1));
+      const serviceTotal = getServiceTotal(targetService);
       const servicePaid = parseFloat(targetService.amountPaid || 0);
       const serviceDue = Math.max(0, serviceTotal - servicePaid);
       
@@ -5645,7 +5680,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
       // STRICT ID + BOOKING matching - NO name matching (services can share names!)
       const servicesWithExplicitPayments = services.map(s => {
         const sId = s.id || null;
-        const sTotal = (parseFloat(s.price || 0) * parseInt(s.quantity || 1));
+        const sTotal = getServiceTotal(s);
         
         let sPaid = 0;
         remainingPayments = remainingPayments.filter(p => {
@@ -6775,7 +6810,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
           <div className="p-4 bg-white space-y-4">
             <div className="text-center border-b pb-4">
               <h2 className="text-lg font-semibold text-gray-900">{safeRender(selectedService.name)}</h2>
-              <p className="text-xl font-bold text-gray-900">{((selectedService.price || 0) * (selectedService.quantity || 1)).toLocaleString()} €</p>
+              <p className="text-xl font-bold text-gray-900">{(getServiceTotal(selectedService) || 0).toLocaleString()} €</p>
             </div>
             
             <div className="space-y-3">
@@ -6869,7 +6904,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                 )}
               </div>
               
-              <p className="text-sm"><span className="text-gray-500">{t.quantity || 'Quantity'}:</span> <span className="text-gray-900">{selectedService.quantity} × {(selectedService.price || 0).toLocaleString()} €</span></p>
+              <p className="text-sm"><span className="text-gray-500">{t.quantity || 'Quantity'}:</span> <span className="text-gray-900">{selectedService.quantity} × {(getServiceBasePrice(selectedService) || 0).toLocaleString()} €</span></p>
               {selectedService.notes && (
                 <div className="p-3 bg-gray-50 rounded text-sm text-gray-700">
                   <span className="font-medium">{t.notes || 'Notes'}:</span> {safeRender(selectedService.notes)}

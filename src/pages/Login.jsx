@@ -8,6 +8,8 @@ const Login = () => {
   const [error, setError] = useState('');
   const [showError, setShowError] = useState(false);
   const [configWarning, setConfigWarning] = useState('');
+  const [inAppBrowser, setInAppBrowser] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const { loginWithGoogle, currentUser } = useAuth();
   const navigate = useNavigate();
 
@@ -26,6 +28,14 @@ const Login = () => {
       setConfigWarning(`Firebase configuration incomplete. Missing: ${missing.join(', ')}. Please create a .env.local file with your Firebase credentials.`);
       console.error('Missing Firebase environment variables:', missing);
     }
+  }, []);
+
+  // Detect in-app browsers (WhatsApp, Instagram, Facebook, etc.)
+  useEffect(() => {
+    const ua = (navigator.userAgent || navigator.vendor || window.opera || '').toLowerCase();
+    const markers = ['whatsapp', 'instagram', 'fbav', 'fban', 'fb_iab', 'line', 'micromessenger', 'twitter'];
+    const isInApp = markers.some((marker) => ua.includes(marker));
+    setInAppBrowser(isInApp);
   }, []);
 
   // Redirect if already logged in
@@ -79,6 +89,18 @@ const Login = () => {
     }
   }
 
+  async function handleCopyLink() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2500);
+    } catch (err) {
+      console.error('Failed to copy link:', err);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2500);
+    }
+  }
+
   return (
     <div style={styles.container}>
       {/* Background Elements */}
@@ -110,6 +132,31 @@ const Login = () => {
             Access your luxury concierge dashboard
           </p>
         </div>
+
+        {/* In-App Browser Warning */}
+        {inAppBrowser && (
+          <div style={{
+            ...styles.errorMessage,
+            ...styles.errorVisible,
+            background: 'rgba(59, 130, 246, 0.12)',
+            border: '1px solid rgba(59, 130, 246, 0.35)',
+            color: '#93c5fd'
+          }}>
+            <div style={styles.errorIcon}>🔒</div>
+            <div style={styles.warningContent}>
+              <div style={styles.warningTitle}>Open in Safari to sign in</div>
+              <div style={styles.warningBody}>
+                This page is opened inside an in‑app browser (e.g., WhatsApp). Google sign‑in won’t work here.
+                Tap the menu (⋯) and choose “Open in Browser,” then continue in Safari.
+              </div>
+              <div style={styles.warningActions}>
+                <button type="button" onClick={handleCopyLink} style={styles.smallButton}>
+                  {linkCopied ? 'Link copied' : 'Copy link'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Configuration Warning */}
         {configWarning && (
@@ -346,6 +393,34 @@ const styles = {
     color: '#fca5a5',
     fontSize: '0.875rem',
     transition: 'all 0.3s ease'
+  },
+  warningContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+    textAlign: 'left'
+  },
+  warningTitle: {
+    fontWeight: 600,
+    fontSize: '0.95rem',
+    color: '#bfdbfe'
+  },
+  warningBody: {
+    fontSize: '0.85rem',
+    color: '#cbd5f5',
+    lineHeight: 1.4
+  },
+  warningActions: {
+    marginTop: '4px'
+  },
+  smallButton: {
+    background: 'rgba(59, 130, 246, 0.2)',
+    border: '1px solid rgba(59, 130, 246, 0.4)',
+    color: '#bfdbfe',
+    borderRadius: '10px',
+    padding: '6px 10px',
+    fontSize: '0.75rem',
+    cursor: 'pointer'
   },
 
   errorVisible: {
