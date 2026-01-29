@@ -855,7 +855,7 @@ const extractImageUrl = (data) => {
   const [selectedSeasonMonths, setSelectedSeasonMonths] = useState({});
   
   // Offer states
-  const [selectedCategory, setSelectedCategory] = useState('villas');
+  const [selectedCategory, setSelectedCategory] = useState('concierge-core');
   const [offerItems, setOfferItems] = useState([]);
   const [offerNotes, setOfferNotes] = useState('');
   const [offersHistory, setOffersHistory] = useState([]);
@@ -1047,6 +1047,10 @@ const extractImageUrl = (data) => {
     { id: 'boats', name: t.boats, icon: '🛥️', collection: 'boats' },
     { id: 'cars', name: t.cars, icon: '🚗', collection: 'cars' }
   ], [t]);
+
+  const getCategoryCount = (categoryId) => {
+    return availableServices[categoryId]?.length || 0;
+  };
   
   // Check for mobile screen size
   useEffect(() => {
@@ -5912,7 +5916,7 @@ const getUserName = async (userId) => {
                       <span className="text-lg">{category.icon}</span>
                       <span className="text-xs text-center font-medium leading-tight">{category.name}</span>
                       <span className="text-xs text-gray-500">
-                        {availableServices[category.id]?.length || 0}
+                        {getCategoryCount(category.id)}
                       </span>
                     </button>
                   ))}
@@ -5929,23 +5933,55 @@ const getUserName = async (userId) => {
               
               <div className="flex-1 overflow-y-auto">
                 {serviceCategories.map(category => (
-                  <button
-                    key={category.id}
-                    onClick={() => setSelectedCategory(category.id)}
-                    className={`w-full flex items-center gap-3 p-4 text-left border-b border-gray-200 transition-colors ${
-                      selectedCategory === category.id 
-                        ? 'bg-indigo-50 border-l-4 border-l-indigo-600 text-indigo-700' 
-                        : 'hover:bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    <span className="text-xl">{category.icon}</span>
-                    <div>
-                      <div className="font-medium text-sm">{category.name}</div>
-                      <div className="text-xs text-gray-500">
-                        {availableServices[category.id]?.length || 0} services
+                  <div key={category.id} className="border-b border-gray-200">
+                    <button
+                      onClick={() => setSelectedCategory(category.id)}
+                      className={`w-full flex items-center gap-3 p-4 text-left transition-colors ${
+                        selectedCategory === category.id 
+                          ? 'bg-indigo-50 border-l-4 border-l-indigo-600 text-indigo-700' 
+                          : 'hover:bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      <span className="text-xl">{category.icon}</span>
+                      <div>
+                        <div className="font-medium text-sm">{category.name}</div>
+                        <div className="text-xs text-gray-500">
+                          {getCategoryCount(category.id)} services
+                        </div>
                       </div>
-                    </div>
-                  </button>
+                    </button>
+                    {category.id === 'concierge-core' && selectedCategory === 'concierge-core' && (
+                      <div className="pb-3 pl-12 pr-3">
+                        {(availableServices['concierge-core'] || []).length === 0 ? (
+                          <div className="text-xs text-gray-400">No core services loaded</div>
+                        ) : (
+                          <div className="space-y-1">
+                            {(availableServices['concierge-core'] || []).map(service => {
+                              const nameText = typeof service.name === 'object'
+                                ? getLocalizedText(service.name, language)
+                                : service.name;
+                              return (
+                                <button
+                                  key={service.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedCategory('concierge-core');
+                                    if (isAdmin) openCoreServiceEditor(service);
+                                  }}
+                                  className="w-full flex items-center justify-between gap-2 rounded-md px-2 py-1 text-xs text-gray-600 hover:text-indigo-700 hover:bg-indigo-50"
+                                >
+                                  <span className="truncate">{nameText || 'Service'}</span>
+                                  {isAdmin && (
+                                    <span className="text-[10px] uppercase tracking-wide text-indigo-500">Edit</span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
@@ -5974,7 +6010,7 @@ const getUserName = async (userId) => {
                 </div>
                 
                 {/* Price Filter */}
-                {['villas', 'boats', 'cars'].includes(selectedCategory) && (
+                {['villas', 'boats', 'cars', 'concierge-core'].includes(selectedCategory) && (
                   <div className="relative">
                     <button 
                       onClick={() => setShowPriceFilter(!showPriceFilter)}
@@ -6118,7 +6154,7 @@ const getUserName = async (userId) => {
                             
                             {/* Category Badge */}
                             <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-medium text-gray-700">
-                              {serviceCategories.find(c => c.id === selectedCategory)?.name}
+                              {serviceCategories.find(c => c.id === service.category)?.name || serviceCategories.find(c => c.id === selectedCategory)?.name}
                             </div>
                           </div>
                           

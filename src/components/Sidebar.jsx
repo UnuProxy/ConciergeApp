@@ -42,6 +42,7 @@ function Sidebar({ open, setOpen }) {
       existingClients: 'Clienți Existenți',
       collaborators: 'Colaboratori',
       services: 'Servicii',
+      coreConcierge: 'Servicii Concierge',
       rentalVillas: 'Proprietăți de Închiriat',
       boats: 'Bărci',
       cars: 'Mașini',
@@ -65,6 +66,7 @@ function Sidebar({ open, setOpen }) {
       existingClients: 'Existing Clients',
       collaborators: 'Collaborators',
       services: 'Services',
+      coreConcierge: 'Core Concierge',
       rentalVillas: 'Rental Properties',
       boats: 'Boats',
       cars: 'Cars',
@@ -262,6 +264,12 @@ function Sidebar({ open, setOpen }) {
                 to="/services/properties-for-sale"
                 label={t.propertiesForSale}
                 active={location.pathname === '/services/properties-for-sale'}
+                onClick={handleLinkClick}
+              />
+              <SidebarLink
+                to="/services/core-concierge"
+                label={t.coreConcierge}
+                active={location.pathname === '/services/core-concierge'}
                 onClick={handleLinkClick}
               />
             </div>
