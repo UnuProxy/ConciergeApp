@@ -19,6 +19,7 @@ import Boats from './pages/services/Boats'
 import Cars from './pages/services/Cars'
 import Security from './pages/services/Security'
 import Chef from './pages/services/Chef'
+import CoreConcierge from './pages/services/CoreConcierge';
 // Reservations & Finance
 import UpcomingBookings from './pages/UpcomingBookings'
 import Finance from './pages/Finance'
@@ -134,6 +135,7 @@ function App() {
                       >
                         <Routes>
                           <Route path="villas" element={<Villas />} />
+                          <Route path="core-concierge" element={<CoreConcierge />} />
                           <Route path="boats" element={<Boats />} />
                           <Route path="cars" element={<Cars />} />
                           <Route path="security" element={<Security />} />
