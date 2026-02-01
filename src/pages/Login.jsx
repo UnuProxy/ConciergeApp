@@ -1,8 +1,8 @@
 // src/pages/Login.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { isInAppBrowser } from '../firebase/config';
+import { isInAppBrowser, isMobile } from '../firebase/config';
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
@@ -13,6 +13,15 @@ const Login = () => {
   const [linkCopied, setLinkCopied] = useState(false);
   const { loginWithGoogle, currentUser, authReady, error: authError } = useAuth();
   const navigate = useNavigate();
+  const showDebugPanel = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    if (import.meta.env.DEV) return true;
+    try {
+      return new URLSearchParams(window.location.search).get('debug') === '1';
+    } catch {
+      return false;
+    }
+  }, []);
 
   // Check Firebase configuration on mount
   useEffect(() => {
@@ -238,6 +247,17 @@ const Login = () => {
             <span>Enterprise Security</span>
           </div>
         </div>
+
+        {showDebugPanel && (
+          <div style={styles.debugPanel}>
+            <div style={styles.debugTitle}>Auth Debug</div>
+            <div style={styles.debugLine}><strong>userAgent:</strong> {navigator.userAgent}</div>
+            <div style={styles.debugLine}><strong>isMobile:</strong> {String(isMobile())}</div>
+            <div style={styles.debugLine}><strong>isInAppBrowser:</strong> {String(inAppBrowser)}</div>
+            <div style={styles.debugLine}><strong>authReady:</strong> {String(authReady)}</div>
+            <div style={styles.debugLine}><strong>lastError:</strong> {authError || error || 'none'}</div>
+          </div>
+        )}
       </div>
 
       {/* Version */}
@@ -264,6 +284,26 @@ const styles = {
     `,
     fontFamily: "'Manrope', sans-serif",
     overflow: 'hidden'
+  },
+  debugPanel: {
+    marginTop: '20px',
+    textAlign: 'left',
+    background: 'rgba(15, 23, 42, 0.6)',
+    border: '1px solid rgba(148, 163, 184, 0.25)',
+    borderRadius: '12px',
+    padding: '12px',
+    color: '#e2e8f0',
+    fontSize: '0.75rem',
+    lineHeight: 1.4,
+    wordBreak: 'break-word'
+  },
+  debugTitle: {
+    fontWeight: 600,
+    marginBottom: '6px',
+    color: '#f8fafc'
+  },
+  debugLine: {
+    marginBottom: '4px'
   },
 
   geometricPattern: {
