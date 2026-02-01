@@ -9,6 +9,6 @@ export function getTranslationValue(key, translations, language) {
       return entry[language] || entry.en || Object.values(entry)[0];
     }
   
-    // Otherwise, assume it's already a string
+    
     return entry;
   }
