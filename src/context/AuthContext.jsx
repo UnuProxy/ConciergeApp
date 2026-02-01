@@ -176,7 +176,6 @@ export function AuthProvider({ children }) {
   async function isAuthorizedUser(email, uid = null) {
     try {
       const normalizedEmail = email?.toLowerCase();
-  // console.log(`Checking if ${normalizedEmail} is authorized...`); // Removed for production
 
       // First check authorized_users collection
       const authorizedUsersRef = collection(db, 'authorized_users');
@@ -185,7 +184,6 @@ export function AuthProvider({ children }) {
 
       if (!snapshot.empty) {
         const userData = snapshot.docs[0].data();
-  // console.log(`User ${email} found in authorized_users for company ${userData.companyId} with role ${userData.role}`); // Removed for production
         return {
           authorized: true,
           companyId: userData.companyId,
@@ -195,14 +193,12 @@ export function AuthProvider({ children }) {
 
       // If not in authorized_users, check users collection if uid is provided
       if (uid) {
-  // console.log(`User not in authorized_users, checking users collection with uid: ${uid}`); // Removed for production
         const userDocRef = doc(db, 'users', uid);
         const userDocSnap = await getDoc(userDocRef);
 
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data();
           if (userData.email?.toLowerCase() === normalizedEmail) {
-  // console.log(`User ${email} found in users collection for company ${userData.companyId} with role ${userData.role}`); // Removed for production
             return {
               authorized: true,
               companyId: userData.companyId,
@@ -212,7 +208,6 @@ export function AuthProvider({ children }) {
         }
       }
 
-  // console.log(`User ${normalizedEmail} is not authorized`); // Removed for production
       return { authorized: false };
     } catch (error) {
       console.error("Error checking user authorization:", error);
@@ -228,7 +223,14 @@ export function AuthProvider({ children }) {
       return { didRedirect, user: result?.user || null };
     } catch (error) {
       console.error("Login error:", error);
-      setError(error.message);
+      
+      // Handle unauthorized domain error specifically
+      if (error.code === 'auth/unauthorized-domain' || error.code === 'auth/unauthorized-continue-uri') {
+        const currentDomain = window.location.hostname;
+        setError(`Domain "${currentDomain}" is not authorized. Please add this domain to Firebase Console > Authentication > Settings > Authorized domains.`);
+      } else {
+        setError(error.message);
+      }
       throw error;
     }
   }
@@ -353,11 +355,12 @@ export function AuthProvider({ children }) {
         if (!isMounted) return;
         try {
           if (user) {
-  // console.log("User authenticated:", user.email); // Removed for production
             const { authorized, companyId, role } = await isAuthorizedUser(user.email, user.uid);
 
             if (!authorized) {
-              setError("You do not have permission to access this application.");
+              const errorMsg = `Access denied: ${user.email} is not authorized. Please contact your administrator.`;
+              console.error('Authorization failed:', errorMsg);
+              setError(errorMsg);
               await signOut(auth);
               setCurrentUser(null);
               setUserCompany(null);
@@ -415,10 +418,7 @@ export function AuthProvider({ children }) {
               setUserCompany(null);
             }
 
-            // Log the current role for debugging
-  // console.log("Current user role in Navbar:", userRole); // Removed for production
           } else {
-  // console.log("No user authenticated"); // Removed for production
             setCurrentUser(null);
             setUserCompany(null);
             setUserRole(null);

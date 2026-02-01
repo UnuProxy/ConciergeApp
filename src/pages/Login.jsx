@@ -15,7 +15,7 @@ const Login = () => {
   const navigate = useNavigate();
   const showDebugPanel = useMemo(() => {
     if (typeof window === 'undefined') return false;
-    if (import.meta.env.DEV) return true;
+    // Only show debug panel when explicitly requested with ?debug=1
     try {
       return new URLSearchParams(window.location.search).get('debug') === '1';
     } catch {
@@ -57,7 +57,13 @@ const Login = () => {
   useEffect(() => {
     if (error) {
       setShowError(true);
-      const timer = setTimeout(() => setShowError(false), 5000);
+      // If error contains "not authorized" or "Access denied", keep it visible
+      if (error.includes('not authorized') || error.includes('Access denied')) {
+        // Don't auto-hide authorization errors
+        return;
+      }
+      // Auto-hide other errors after 8 seconds
+      const timer = setTimeout(() => setShowError(false), 8000);
       return () => clearTimeout(timer);
     }
   }, [error]);
@@ -92,6 +98,11 @@ const Login = () => {
       // Handle popup blocked
       else if (error.code === 'auth/popup-blocked') {
         setError(`${error.code}: Popup was blocked by your browser. Please allow popups for this site and try again.`);
+      }
+      // Handle unauthorized domain
+      else if (error.code === 'auth/unauthorized-domain' || error.code === 'auth/unauthorized-continue-uri') {
+        const currentDomain = window.location.hostname;
+        setError(`${error.code}: The domain "${currentDomain}" is not authorized for OAuth. Please contact your administrator to add this domain to Firebase Console.`);
       }
       else {
         const code = error?.code ? `${error.code}: ` : '';
@@ -250,12 +261,17 @@ const Login = () => {
 
         {showDebugPanel && (
           <div style={styles.debugPanel}>
-            <div style={styles.debugTitle}>Auth Debug</div>
-            <div style={styles.debugLine}><strong>userAgent:</strong> {navigator.userAgent}</div>
-            <div style={styles.debugLine}><strong>isMobile:</strong> {String(isMobile())}</div>
-            <div style={styles.debugLine}><strong>isInAppBrowser:</strong> {String(inAppBrowser)}</div>
-            <div style={styles.debugLine}><strong>authReady:</strong> {String(authReady)}</div>
-            <div style={styles.debugLine}><strong>lastError:</strong> {authError || error || 'none'}</div>
+            <div style={styles.debugTitle}>Debug Info</div>
+            <div style={styles.debugLine}><strong>Auth Ready:</strong> {String(authReady)}</div>
+            <div style={styles.debugLine}><strong>Current User:</strong> {currentUser ? currentUser.email : 'null'}</div>
+            <div style={styles.debugLine}><strong>Is Mobile:</strong> {String(isMobile())}</div>
+            <div style={styles.debugLine}><strong>In-App Browser:</strong> {String(inAppBrowser)}</div>
+            <div style={styles.debugLine}><strong>Will Use Redirect:</strong> {String(isInAppBrowser())}</div>
+            {(authError || error) && (
+              <div style={{...styles.debugLine, color: '#fca5a5', marginTop: '8px'}}>
+                <strong>Error:</strong> {authError || error}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -288,7 +304,7 @@ const styles = {
   debugPanel: {
     marginTop: '20px',
     textAlign: 'left',
-    background: 'rgba(15, 23, 42, 0.6)',
+    background: 'rgba(15, 23, 42, 0.8)',
     border: '1px solid rgba(148, 163, 184, 0.25)',
     borderRadius: '12px',
     padding: '12px',
@@ -356,6 +372,8 @@ const styles = {
     padding: '48px',
     width: '100%',
     maxWidth: '420px',
+    maxHeight: '90vh',
+    overflowY: 'auto',
     textAlign: 'center',
     boxShadow: `
       0 32px 64px rgba(0, 0, 0, 0.3),
