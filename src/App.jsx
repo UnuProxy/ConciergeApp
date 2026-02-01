@@ -2,6 +2,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { AuthProvider } from './context/AuthContext'
+import AuthGate from './components/AuthGate'
 import { DatabaseProvider } from './context/DatabaseContext'
 import { CompanyProvider } from './context/CompanyContext' // Import CompanyProvider
 import { TranslationProvider } from './components/TranslationProvider'
@@ -82,144 +83,146 @@ function App() {
   // EXISTING: Your main app with all routes
   return (
     <AuthProvider>
-      {/* Add CompanyProvider here - needs to come after AuthProvider */}
-      <CompanyProvider>
-        <DatabaseProvider>
-          <TranslationProvider defaultLanguage="en">
-            <Router>
-              <Routes>
-                {/* Public */}
-                <Route path="/login" element={<Login />} />
-                <Route path="/select-company" element={<SelectCompany />} />
-                
-                {/* Protected */}
-                <Route
-                  path="/"
-                  element={
-                    <PrivateRoute>
-                      <ProtectedLayout
-                        sidebarOpen={sidebarOpen}
-                        setSidebarOpen={setSidebarOpen}
-                      >
-                        <Dashboard />
-                      </ProtectedLayout>
-                    </PrivateRoute>
-                  }
-                />
-                
-                <Route
-                  path="/clients/*"
-                  element={
-                    <PrivateRoute>
-                      <ProtectedLayout
-                        sidebarOpen={sidebarOpen}
-                        setSidebarOpen={setSidebarOpen}
-                      >
-                        <Routes>
-                          <Route path="add" element={<AddClient />} />
-                          <Route path="existing" element={<ExistingClients />} />
-                          <Route path="collaborators" element={<Collaborators />} />
-                        </Routes>
-                      </ProtectedLayout>
-                    </PrivateRoute>
-                  }
-                />
-                
-                <Route
-                  path="/services/*"
-                  element={
-                    <PrivateRoute>
-                      <ProtectedLayout
-                        sidebarOpen={sidebarOpen}
-                        setSidebarOpen={setSidebarOpen}
-                      >
-                        <Routes>
-                          <Route path="villas" element={<Villas />} />
-                          <Route path="core-concierge" element={<CoreConcierge />} />
-                          <Route path="boats" element={<Boats />} />
-                          <Route path="cars" element={<Cars />} />
-                          <Route path="security" element={<Security />} />
-                          <Route path="chef" element={<Chef />} />
-                          
-                          {/* Add these new routes */}
-                          <Route path="properties-for-sale" element={<PropertiesForSale />} />
-                          <Route path="properties-for-sale/add" element={<AddProperty />} />
-                          <Route path="properties-for-sale/:id" element={<PropertyDetail />} />
-                          <Route path="properties-for-sale/edit/:id" element={<AddProperty />} />
-                        </Routes>
-                      </ProtectedLayout>
-                    </PrivateRoute>
-                  }
-                />
-
-                <Route path="/share/property/:token" element={<PropertyShare />} />
-                
-                <Route
-                  path="/reservations"
-                  element={
-                    <PrivateRoute>
-                      <ProtectedLayout
-                        sidebarOpen={sidebarOpen}
-                        setSidebarOpen={setSidebarOpen}
-                      >
-                        <UpcomingBookings />
-                      </ProtectedLayout>
-                    </PrivateRoute>
-                  }
-                />
-                
-                <Route
-                  path="/finance"
-                  element={
-                    <PrivateRoute>
-                      <RoleProtectedRoute requiredRole="admin">
+      <AuthGate>
+        {/* Add CompanyProvider here - needs to come after AuthProvider */}
+        <CompanyProvider>
+          <DatabaseProvider>
+            <TranslationProvider defaultLanguage="en">
+              <Router>
+                <Routes>
+                  {/* Public */}
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/select-company" element={<SelectCompany />} />
+                  
+                  {/* Protected */}
+                  <Route
+                    path="/"
+                    element={
+                      <PrivateRoute>
                         <ProtectedLayout
                           sidebarOpen={sidebarOpen}
                           setSidebarOpen={setSidebarOpen}
                         >
-                          <Finance />
+                          <Dashboard />
                         </ProtectedLayout>
-                      </RoleProtectedRoute>
-                    </PrivateRoute>
-                  }
-                />
-                
-                <Route
-                  path="/settings"
-                  element={
-                    <PrivateRoute>
-                      <ProtectedLayout
-                        sidebarOpen={sidebarOpen}
-                        setSidebarOpen={setSidebarOpen}
-                      >
-                        <Settings />
-                      </ProtectedLayout>
-                    </PrivateRoute>
-                  }
-                />
-                
-                {/* User Management Routes */}
-                <Route
-                  path="/users/manage"
-                  element={
-                    <PrivateRoute>
-                      <ProtectedLayout
-                        sidebarOpen={sidebarOpen}
-                        setSidebarOpen={setSidebarOpen}
-                      >
-                        <UserManagement />
-                      </ProtectedLayout>
-                    </PrivateRoute>
-                  }
-                />
-                
-                {/* Catch‑all → dashboard */}
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Router>
-          </TranslationProvider>
-        </DatabaseProvider>
-      </CompanyProvider>
+                      </PrivateRoute>
+                    }
+                  />
+                  
+                  <Route
+                    path="/clients/*"
+                    element={
+                      <PrivateRoute>
+                        <ProtectedLayout
+                          sidebarOpen={sidebarOpen}
+                          setSidebarOpen={setSidebarOpen}
+                        >
+                          <Routes>
+                            <Route path="add" element={<AddClient />} />
+                            <Route path="existing" element={<ExistingClients />} />
+                            <Route path="collaborators" element={<Collaborators />} />
+                          </Routes>
+                        </ProtectedLayout>
+                      </PrivateRoute>
+                    }
+                  />
+                  
+                  <Route
+                    path="/services/*"
+                    element={
+                      <PrivateRoute>
+                        <ProtectedLayout
+                          sidebarOpen={sidebarOpen}
+                          setSidebarOpen={setSidebarOpen}
+                        >
+                          <Routes>
+                            <Route path="villas" element={<Villas />} />
+                            <Route path="core-concierge" element={<CoreConcierge />} />
+                            <Route path="boats" element={<Boats />} />
+                            <Route path="cars" element={<Cars />} />
+                            <Route path="security" element={<Security />} />
+                            <Route path="chef" element={<Chef />} />
+                            
+                            {/* Add these new routes */}
+                            <Route path="properties-for-sale" element={<PropertiesForSale />} />
+                            <Route path="properties-for-sale/add" element={<AddProperty />} />
+                            <Route path="properties-for-sale/:id" element={<PropertyDetail />} />
+                            <Route path="properties-for-sale/edit/:id" element={<AddProperty />} />
+                          </Routes>
+                        </ProtectedLayout>
+                      </PrivateRoute>
+                    }
+                  />
+
+                  <Route path="/share/property/:token" element={<PropertyShare />} />
+                  
+                  <Route
+                    path="/reservations"
+                    element={
+                      <PrivateRoute>
+                        <ProtectedLayout
+                          sidebarOpen={sidebarOpen}
+                          setSidebarOpen={setSidebarOpen}
+                        >
+                          <UpcomingBookings />
+                        </ProtectedLayout>
+                      </PrivateRoute>
+                    }
+                  />
+                  
+                  <Route
+                    path="/finance"
+                    element={
+                      <PrivateRoute>
+                        <RoleProtectedRoute requiredRole="admin">
+                          <ProtectedLayout
+                            sidebarOpen={sidebarOpen}
+                            setSidebarOpen={setSidebarOpen}
+                          >
+                            <Finance />
+                          </ProtectedLayout>
+                        </RoleProtectedRoute>
+                      </PrivateRoute>
+                    }
+                  />
+                  
+                  <Route
+                    path="/settings"
+                    element={
+                      <PrivateRoute>
+                        <ProtectedLayout
+                          sidebarOpen={sidebarOpen}
+                          setSidebarOpen={setSidebarOpen}
+                        >
+                          <Settings />
+                        </ProtectedLayout>
+                      </PrivateRoute>
+                    }
+                  />
+                  
+                  {/* User Management Routes */}
+                  <Route
+                    path="/users/manage"
+                    element={
+                      <PrivateRoute>
+                        <ProtectedLayout
+                          sidebarOpen={sidebarOpen}
+                          setSidebarOpen={setSidebarOpen}
+                        >
+                          <UserManagement />
+                        </ProtectedLayout>
+                      </PrivateRoute>
+                    }
+                  />
+                  
+                  {/* Catch‑all → dashboard */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Router>
+            </TranslationProvider>
+          </DatabaseProvider>
+        </CompanyProvider>
+      </AuthGate>
     </AuthProvider>
   )
 }

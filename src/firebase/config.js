@@ -1,6 +1,14 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import {
+  getAuth,
+  setPersistence,
+  browserLocalPersistence,
+  GoogleAuthProvider,
+  signInWithRedirect,
+  signInWithPopup,
+  getRedirectResult
+} from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
 // Configurația Firebase folosind variabile de mediu
@@ -36,4 +44,49 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
+
+export function isInAppBrowser() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  return /FBAN|FBAV|Instagram|Line|WhatsApp|wv/i.test(ua);
+}
+
+export function isMobile() {
+  if (typeof navigator === 'undefined') return false;
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '');
+}
+
+export function shouldUseRedirect() {
+  return isMobile() || isInAppBrowser();
+}
+
+export async function initAuth() {
+  await setPersistence(auth, browserLocalPersistence);
+  try {
+    return await getRedirectResult(auth);
+  } catch (e) {
+    console.error('getRedirectResult error:', e?.code, e?.message);
+    return null;
+  }
+}
+
+export async function googleSignIn() {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+
+  if (shouldUseRedirect()) {
+    await signInWithRedirect(auth, provider);
+    return { didRedirect: true };
+  }
+
+  try {
+    const result = await signInWithPopup(auth, provider);
+    return { didRedirect: false, result };
+  } catch (e) {
+    console.warn('Popup failed, falling back to redirect:', e?.code);
+    await signInWithRedirect(auth, provider);
+    return { didRedirect: true };
+  }
+}
+
 export default app;
