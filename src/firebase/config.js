@@ -4,6 +4,8 @@ import {
   getAuth,
   setPersistence,
   browserLocalPersistence,
+  browserSessionPersistence,
+  indexedDBLocalPersistence,
   GoogleAuthProvider,
   signInWithRedirect,
   signInWithPopup,
@@ -57,13 +59,31 @@ export function isMobile() {
 }
 
 export function shouldUseRedirect() {
-  return isMobile() || isInAppBrowser();
+  // Only use redirect for in-app browsers (WhatsApp, Instagram, etc.)
+  // Regular mobile Safari can handle popups fine
+  return isInAppBrowser();
 }
 
 export async function initAuth() {
-  await setPersistence(auth, browserLocalPersistence);
+  // Set persistence with fallback options
   try {
-    return await getRedirectResult(auth);
+    // Try indexedDB first (works better on iOS Safari), then fall back to localStorage
+    try {
+      await setPersistence(auth, indexedDBLocalPersistence);
+    } catch {
+      try {
+        await setPersistence(auth, browserLocalPersistence);
+      } catch {
+        await setPersistence(auth, browserSessionPersistence);
+      }
+    }
+  } catch (e) {
+    console.error('Failed to set persistence:', e);
+  }
+  
+  try {
+    const result = await getRedirectResult(auth);
+    return result;
   } catch (e) {
     console.error('getRedirectResult error:', e?.code, e?.message);
     return null;
@@ -74,7 +94,9 @@ export async function googleSignIn() {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
 
-  if (shouldUseRedirect()) {
+  const useRedirect = shouldUseRedirect();
+
+  if (useRedirect) {
     await signInWithRedirect(auth, provider);
     return { didRedirect: true };
   }
