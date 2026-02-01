@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { isInAppBrowser } from '../firebase/config';
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
@@ -10,7 +11,7 @@ const Login = () => {
   const [configWarning, setConfigWarning] = useState('');
   const [inAppBrowser, setInAppBrowser] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
-  const { loginWithGoogle, currentUser } = useAuth();
+  const { loginWithGoogle, currentUser, authReady, error: authError } = useAuth();
   const navigate = useNavigate();
 
   // Check Firebase configuration on mount
@@ -32,18 +33,16 @@ const Login = () => {
 
   // Detect in-app browsers (WhatsApp, Instagram, Facebook, etc.)
   useEffect(() => {
-    const ua = (navigator.userAgent || navigator.vendor || window.opera || '').toLowerCase();
-    const markers = ['whatsapp', 'instagram', 'fbav', 'fban', 'fb_iab', 'line', 'micromessenger', 'twitter'];
-    const isInApp = markers.some((marker) => ua.includes(marker));
-    setInAppBrowser(isInApp);
+    setInAppBrowser(isInAppBrowser());
   }, []);
 
   // Redirect if already logged in
   useEffect(() => {
+    if (!authReady) return;
     if (currentUser) {
       navigate('/', { replace: true });
     }
-  }, [currentUser, navigate]);
+  }, [authReady, currentUser, navigate]);
 
   // Show error with animation
   useEffect(() => {
@@ -54,38 +53,52 @@ const Login = () => {
     }
   }, [error]);
 
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+    }
+  }, [authError]);
+
   async function handleGoogleSignIn() {
     try {
       setError('');
       setLoading(true);
-      
-      const { newUser } = await loginWithGoogle();
-      
-      // Since we're auto-assigning users to their company based on email,
-      // we don't need the company selection screen anymore
-      // Just redirect to dashboard
-      navigate('/', { replace: true });
-      
+
+      const { didRedirect } = await loginWithGoogle();
+      if (!didRedirect && currentUser) {
+        navigate('/', { replace: true });
+      }
     } catch (error) {
       console.error('Login error:', error);
       
       // Handle popup cancellation
       if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-        setError('Sign-in was cancelled. Please try again.');
+        setError(`${error.code}: Sign-in was cancelled. Please try again.`);
       }
       // Special handling for unauthorized users
       else if (error.message.includes('Unauthorized email')) {
-        setError('Access denied. Your email is not authorized to use this application.');
+        const code = error?.code ? `${error.code}: ` : '';
+        setError(`${code}Access denied. Your email is not authorized to use this application.`);
       }
       // Handle popup blocked
       else if (error.code === 'auth/popup-blocked') {
-        setError('Popup was blocked by your browser. Please allow popups for this site and try again.');
+        setError(`${error.code}: Popup was blocked by your browser. Please allow popups for this site and try again.`);
       }
       else {
-        setError('Failed to log in: ' + error.message);
+        const code = error?.code ? `${error.code}: ` : '';
+        const message = error?.message || 'Failed to log in.';
+        setError(`${code}${message}`);
       }
     } finally {
       setLoading(false);
+    }
+  }
+
+  function handleOpenInBrowser() {
+    try {
+      window.open(window.location.href, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      console.error('Failed to open in browser:', err);
     }
   }
 
@@ -150,6 +163,9 @@ const Login = () => {
                 Tap the menu (⋯) and choose “Open in Browser,” then continue in Safari.
               </div>
               <div style={styles.warningActions}>
+                <button type="button" onClick={handleOpenInBrowser} style={styles.smallButton}>
+                  Open in browser
+                </button>
                 <button type="button" onClick={handleCopyLink} style={styles.smallButton}>
                   {linkCopied ? 'Link copied' : 'Copy link'}
                 </button>
@@ -411,7 +427,10 @@ const styles = {
     lineHeight: 1.4
   },
   warningActions: {
-    marginTop: '4px'
+    marginTop: '4px',
+    display: 'flex',
+    gap: '8px',
+    flexWrap: 'wrap'
   },
   smallButton: {
     background: 'rgba(59, 130, 246, 0.2)',

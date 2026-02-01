@@ -1,10 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import {
-  onAuthStateChanged,
-  signInWithPopup,
-  GoogleAuthProvider,
-  signOut
-} from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import {
   doc,
   getDoc,
@@ -15,7 +10,7 @@ import {
   query,
   where
 } from 'firebase/firestore';
-import { auth, db } from '../firebase/config';
+import { auth, db, initAuth, googleSignIn } from '../firebase/config';
 
 // Create context
 const AuthContext = createContext();
@@ -31,6 +26,7 @@ export function AuthProvider({ children }) {
   const [userCompany, setUserCompany] = useState(null);
   const [userRole, setUserRole] = useState(null); // Initialize as null, not placeholder
   const [loading, setLoading] = useState(true);
+  const [authReady, setAuthReady] = useState(false);
   const [error, setError] = useState(null);
   
   // Function to check and update existing users' roles
@@ -228,67 +224,8 @@ export function AuthProvider({ children }) {
   async function loginWithGoogle() {
     try {
       setError(null);
-      
-      const provider = new GoogleAuthProvider();
-      // Force account selection and prevent auto-select
-      provider.setCustomParameters({
-        prompt: 'select_account'
-      });
-      
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      
-  // console.log("Google authentication successful for:", user.email); // Removed for production
-
-      // Check if this email is authorized (check both authorized_users and users collections)
-      const { authorized, companyId, role } = await isAuthorizedUser(user.email, user.uid);
-
-      if (!authorized) {
-        // User is not authorized
-        setError("You do not have permission to access this application.");
-        await signOut(auth);
-        throw new Error("Unauthorized email address.");
-      }
-      
-      // Check if this user already exists in our database
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      
-      if (!userDoc.exists()) {
-  // console.log("New user - company assignment"); // Removed for production
-        
-        // Automatically assign the user to their authorized company
-        await setDoc(doc(db, 'users', user.uid), {
-          email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-          companyId: companyId,
-          role: role,
-          createdAt: serverTimestamp()
-        });
-        
-        // Update local state with role
-        setUserCompany(companyId);
-        setUserRole(role);
-  // console.log(`Set userRole state to: ${role}`); // Removed for production
-        
-        // No need for company selection, already assigned
-        return { newUser: false, user };
-      }
-
-      // Existing user - make sure local state reflects the latest mapping
-      const existingData = userDoc.data();
-      const resolvedRole = role || existingData.role;
-      const resolvedCompanyId = companyId || existingData.companyId;
-
-      if (resolvedRole) {
-        setUserRole(resolvedRole);
-      }
-      if (resolvedCompanyId) {
-        setUserCompany(resolvedCompanyId);
-      }
-      
-  // console.log("Existing user found"); // Removed for production
-      return { newUser: false, user };
+      const { didRedirect, result } = await googleSignIn();
+      return { didRedirect, user: result?.user || null };
     } catch (error) {
       console.error("Login error:", error);
       setError(error.message);
@@ -402,37 +339,87 @@ export function AuthProvider({ children }) {
   // Listen for auth state changes
   useEffect(() => {
   // console.log("Setting up auth state listener"); // Removed for production
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-  // console.log("User authenticated:", user.email); // Removed for production
-        let safePhotoURL = user.photoURL || '';
-        if (safePhotoURL.includes('googleusercontent.com')) {
-          safePhotoURL = safePhotoURL.replace(/=s\d+-c/, '=s96-c');
-        }
-        setCurrentUser({
-          ...user,
-          photoURL: safePhotoURL
-        });
-        const userData = await fetchUserCompanyData(user.uid);
-        
-        // If user exists in Firestore but no company assigned, they still need to select one
-        if (!userData || !userData.companyId) {
-  // console.log("User has no company assigned"); // Removed for production
-          setUserCompany(null);
-        }
-        
-        // Log the current role for debugging
-  // console.log("Current user role in Navbar:", userRole); // Removed for production
-      } else {
-  // console.log("No user authenticated"); // Removed for production
-        setCurrentUser(null);
-        setUserCompany(null);
-        setUserRole(null);
-      }
-      setLoading(false);
-    });
+    let unsubscribe = null;
+    let isMounted = true;
 
-    return unsubscribe;
+    (async () => {
+      try {
+        await initAuth();
+      } catch (error) {
+        console.error("Auth init error:", error);
+      }
+
+      unsubscribe = onAuthStateChanged(auth, async (user) => {
+        if (!isMounted) return;
+        try {
+          if (user) {
+  // console.log("User authenticated:", user.email); // Removed for production
+            const { authorized, companyId, role } = await isAuthorizedUser(user.email, user.uid);
+
+            if (!authorized) {
+              setError("You do not have permission to access this application.");
+              await signOut(auth);
+              setCurrentUser(null);
+              setUserCompany(null);
+              setUserRole(null);
+              return;
+            }
+
+            setError(null);
+            let safePhotoURL = user.photoURL || '';
+            if (safePhotoURL.includes('googleusercontent.com')) {
+              safePhotoURL = safePhotoURL.replace(/=s\\d+-c/, '=s96-c');
+            }
+            setCurrentUser({
+              ...user,
+              photoURL: safePhotoURL
+            });
+
+            const userDocRef = doc(db, 'users', user.uid);
+            const userDoc = await getDoc(userDocRef);
+
+            if (!userDoc.exists()) {
+              await setDoc(userDocRef, {
+                email: user.email,
+                displayName: user.displayName,
+                photoURL: user.photoURL,
+                companyId: companyId,
+                role: role,
+                createdAt: serverTimestamp()
+              });
+            }
+
+            const userData = await fetchUserCompanyData(user.uid);
+
+            // If user exists in Firestore but no company assigned, they still need to select one
+            if (!userData || !userData.companyId) {
+  // console.log("User has no company assigned"); // Removed for production
+              setUserCompany(null);
+            }
+
+            // Log the current role for debugging
+  // console.log("Current user role in Navbar:", userRole); // Removed for production
+          } else {
+  // console.log("No user authenticated"); // Removed for production
+            setCurrentUser(null);
+            setUserCompany(null);
+            setUserRole(null);
+          }
+        } catch (error) {
+          console.error("Error handling auth state:", error);
+          const message = error?.code ? `${error.code}: ${error.message}` : error?.message;
+          setError(message || "Failed to load authentication state.");
+        } finally {
+          setLoading(false);
+          setAuthReady(true);
+        }
+      });
+    })();
+
+    return () => {
+      isMounted = false;
+      unsubscribe?.();
+    };
   }, []);
 
   // Context values to provide
@@ -440,6 +427,8 @@ export function AuthProvider({ children }) {
     currentUser,
     userCompany,
     userRole,
+    authReady,
+    loading,
     loginWithGoogle,
     assignUserToCompany,
     getAvailableCompanies,
@@ -449,7 +438,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 }

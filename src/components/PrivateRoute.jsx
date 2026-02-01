@@ -3,8 +3,12 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function PrivateRoute({ children }) {
-  const { currentUser, userCompany } = useAuth();
+  const { currentUser, userCompany, authReady } = useAuth();
   const location = useLocation();
+
+  if (!authReady) {
+    return null;
+  }
 
   // If not logged in, redirect to login
   if (!currentUser) {
