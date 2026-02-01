@@ -42,13 +42,11 @@ export const CompanyProvider = ({ children }) => {
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         let resolvedRole = null;
         let resolvedCompanyId = null;
-        let resolvedCompanyName = null;
 
         if (userDoc.exists()) {
           const userData = userDoc.data();
           resolvedRole = userData.role || null;
           resolvedCompanyId = userData.companyId || null;
-          resolvedCompanyName = userData.companyName || null;
   // console.log('User data from users collection:', userData); // Removed for production
         }
 
@@ -63,7 +61,6 @@ export const CompanyProvider = ({ children }) => {
             const authData = authSnapshot.docs[0].data();
             resolvedRole = resolvedRole || authData.role || null;
             resolvedCompanyId = resolvedCompanyId || authData.companyId || null;
-            resolvedCompanyName = resolvedCompanyName || authData.companyName || null;
   // console.log('Found in authorized_users:', authData); // Removed for production
 
             // If user doc missing, create it so rules can allow future reads
@@ -72,7 +69,6 @@ export const CompanyProvider = ({ children }) => {
                 await setDoc(doc(db, 'users', user.uid), {
                   email: normalizedEmail,
                   companyId: resolvedCompanyId,
-                  companyName: resolvedCompanyName || resolvedCompanyId,
                   role: resolvedRole || 'agent'
                 }, { merge: true });
   // console.log('Created users doc from authorized_users fallback'); // Removed for production
@@ -104,10 +100,10 @@ export const CompanyProvider = ({ children }) => {
           } catch (companyError) {
             if (companyError?.code === 'permission-denied') {
   // console.warn('Permission denied reading company doc, falling back to authorized_users data'); // Removed for production
-              if (resolvedCompanyName || resolvedCompanyId) {
+              if (resolvedCompanyId) {
                 const fallbackCompany = {
                   id: preferredCompanyId,
-                  name: resolvedCompanyName || preferredCompanyId
+                  name: preferredCompanyId
                 };
                 setCompanies([fallbackCompany]);
                 setCurrentCompany(fallbackCompany);

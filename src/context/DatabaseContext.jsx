@@ -38,7 +38,6 @@ export const DatabaseProvider = ({ children }) => {
           const userDocRef = doc(db, "users", user.uid);
           const userSnapshot = await getDoc(userDocRef);
           let userData = userSnapshot.exists() ? userSnapshot.data() : null;
-          let fallbackCompanyName = userData?.companyName || null;
 
           // Fallback to authorized_users if no user doc or missing required fields
           if (!userData?.companyId || !userData?.role) {
@@ -51,10 +50,8 @@ export const DatabaseProvider = ({ children }) => {
               userData = {
                 ...userData,
                 companyId: userData?.companyId || fallbackData.companyId,
-                role: userData?.role || fallbackData.role,
-                companyName: userData?.companyName || fallbackData.companyName
+                role: userData?.role || fallbackData.role
               };
-              fallbackCompanyName = fallbackCompanyName || fallbackData.companyName || null;
   // console.log("User found via authorized_users:", emailSnapshot.docs[0].id); // Removed for production
 
               // If user doc missing, create/merge it so future reads succeed
@@ -63,7 +60,6 @@ export const DatabaseProvider = ({ children }) => {
                   await setDoc(doc(db, "users", user.uid), {
                     email: user.email.toLowerCase(),
                     companyId: userData.companyId,
-                    companyName: userData.companyName || userData.companyId,
                     role: userData.role || "agent"
                   }, { merge: true });
   // console.log("Created users doc from authorized_users fallback"); // Removed for production
@@ -102,7 +98,7 @@ export const DatabaseProvider = ({ children }) => {
                 if (companyId) {
                   setCompanyInfo({
                     id: companyId,
-                    name: fallbackCompanyName || companyId
+                    name: companyId
                   });
                 }
               } else {
