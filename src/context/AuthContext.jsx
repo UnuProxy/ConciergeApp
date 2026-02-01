@@ -377,22 +377,40 @@ export function AuthProvider({ children }) {
 
             const userDocRef = doc(db, 'users', user.uid);
             const userDoc = await getDoc(userDocRef);
+            const userDocData = userDoc.exists() ? userDoc.data() : null;
+            const needsCompany = !userDocData?.companyId && !!companyId;
+            const needsRole = !userDocData?.role && !!role;
+            const companyMismatch = !!companyId && userDocData?.companyId && userDocData.companyId !== companyId;
+            const roleMismatch = !!role && userDocData?.role && userDocData.role !== role;
+            const isNewUserDoc = !userDoc.exists();
 
-            if (!userDoc.exists()) {
-              await setDoc(userDocRef, {
+            if (isNewUserDoc || needsCompany || needsRole || companyMismatch || roleMismatch) {
+              const userPayload = {
                 email: user.email,
                 displayName: user.displayName,
                 photoURL: user.photoURL,
-                companyId: companyId,
-                role: role,
-                createdAt: serverTimestamp()
-              });
+                ...(companyId ? { companyId } : {}),
+                ...(role ? { role } : {})
+              };
+
+              if (isNewUserDoc) {
+                userPayload.createdAt = serverTimestamp();
+              }
+
+              await setDoc(userDocRef, userPayload, { merge: true });
+            }
+
+            if (companyId) {
+              setUserCompany(companyId);
+            }
+            if (role) {
+              setUserRole(role);
             }
 
             const userData = await fetchUserCompanyData(user.uid);
 
-            // If user exists in Firestore but no company assigned, they still need to select one
-            if (!userData || !userData.companyId) {
+            // If user exists in Firestore but no company assigned
+            if ((!userData || !userData.companyId) && !companyId) {
   // console.log("User has no company assigned"); // Removed for production
               setUserCompany(null);
             }
