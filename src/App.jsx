@@ -26,7 +26,6 @@ import UpcomingBookings from './pages/UpcomingBookings'
 import Finance from './pages/Finance'
 // Auth
 import Login from './pages/Login'
-import SelectCompany from './pages/SelectCompany'
 import PrivateRoute from './components/PrivateRoute'
 import RoleProtectedRoute from './components/RoleProtectedRoute'
 // User Management
@@ -92,7 +91,6 @@ function App() {
                 <Routes>
                   {/* Public */}
                   <Route path="/login" element={<Login />} />
-                  <Route path="/select-company" element={<SelectCompany />} />
                   
                   {/* Protected */}
                   <Route

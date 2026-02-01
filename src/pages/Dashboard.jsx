@@ -10,6 +10,7 @@ import {
   orderBy,
   limit
 } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
 import { db, auth } from '../firebase/config';
 import { useLanguage } from '../utils/languageHelper';
 import OffersOverview from '../components/OffersOverview';
@@ -818,12 +819,15 @@ function Dashboard() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
         <div className="max-w-md text-center bg-white rounded-2xl shadow p-6 border border-gray-200">
           <h2 className="text-xl font-semibold text-gray-800 mb-2">{t.labels.commandCenter}</h2>
-          <p className="text-gray-600 mb-4">No company selected or access missing.</p>
+          <p className="text-gray-600 mb-4">Company access is missing for this account.</p>
           <button
-            onClick={() => navigate('/select-company')}
+            onClick={async () => {
+              await signOut(auth);
+              navigate('/login', { replace: true });
+            }}
             className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
           >
-            Go to company selection
+            Sign out
           </button>
         </div>
       </div>
