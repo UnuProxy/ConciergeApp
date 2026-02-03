@@ -5950,37 +5950,6 @@ const getUserName = async (userId) => {
                         </div>
                       </div>
                     </button>
-                    {category.id === 'concierge-core' && selectedCategory === 'concierge-core' && (
-                      <div className="pb-3 pl-12 pr-3">
-                        {(availableServices['concierge-core'] || []).length === 0 ? (
-                          <div className="text-xs text-gray-400">No core services loaded</div>
-                        ) : (
-                          <div className="space-y-1">
-                            {(availableServices['concierge-core'] || []).map(service => {
-                              const nameText = typeof service.name === 'object'
-                                ? getLocalizedText(service.name, language)
-                                : service.name;
-                              return (
-                                <button
-                                  key={service.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedCategory('concierge-core');
-                                    if (isAdmin) openCoreServiceEditor(service);
-                                  }}
-                                  className="w-full flex items-center justify-between gap-2 rounded-md px-2 py-1 text-xs text-gray-600 hover:text-indigo-700 hover:bg-indigo-50"
-                                >
-                                  <span className="truncate">{nameText || 'Service'}</span>
-                                  {isAdmin && (
-                                    <span className="text-[10px] uppercase tracking-wide text-indigo-500">Edit</span>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
