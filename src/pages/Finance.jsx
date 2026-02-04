@@ -1927,45 +1927,6 @@ const Finance = () => {
         )}
       </div>
 
-      {/* Profit by service */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">{t.profitByService}</h3>
-          <div className="text-sm text-gray-500">{serviceBreakdown.length} {t.transactions}</div>
-        </div>
-        {serviceBreakdown.length === 0 ? (
-          <div className="text-center text-gray-500 py-6">{t.noTransactions}</div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {serviceBreakdown.map((item, index) => (
-              <div key={index} className="border border-gray-100 rounded-xl p-4 bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold capitalize text-gray-900">{item.service}</p>
-                  <span className={`text-xs px-2 py-1 rounded-full ${item.margin >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'}`}>
-                    {item.margin.toFixed(1)}%
-                  </span>
-                </div>
-                <div className="mt-2 space-y-1 text-sm text-gray-700">
-                  <div className="flex justify-between">
-                    <span>{t.income}</span>
-                    <span className="font-semibold">{formatCurrency(item.revenue)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>{t.providerCost}</span>
-                    <span className="font-semibold">{formatCurrency(item.cost)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>{t.profitPerService}</span>
-                    <span className={`font-semibold ${item.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {formatCurrency(item.profit)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 
