@@ -25,6 +25,17 @@ export const DatabaseProvider = ({ children }) => {
   const debugForceCompanyName = import.meta.env.VITE_DEBUG_FORCE_COMPANY_NAME || debugForceCompanyId;
   const debugForceRole = import.meta.env.VITE_DEBUG_FORCE_ROLE || 'admin';
 
+  const normalizeCompanyKey = (value) => {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed.toLowerCase() : null;
+  };
+
+  const isAdminRoleValue = (role) => {
+    const normalized = typeof role === 'string' ? role.trim().toLowerCase() : '';
+    return ["admin", "administrator", "owner", "manager", "superadmin"].includes(normalized);
+  };
+
   // Get authentication and company info
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -70,32 +81,139 @@ export const DatabaseProvider = ({ children }) => {
             }
           }
 
-          if (userData?.companyId && userData?.role) {
-  // console.log("User data:", userData); // Removed for production
+	          if (userData?.companyId && userData?.role) {
+	  // console.log("User data:", userData); // Removed for production
 
-            const resolvedRole = userData.role || "employee";
-            setUserRole(resolvedRole);
-  // console.log("Setting userRole state to:", resolvedRole); // Removed for production
-            
-            const companyId = userData.companyId;
-            try {
-              const companyDocRef = doc(db, "companies", companyId);
-              const companySnapshot = await getDoc(companyDocRef);
-              
-              if (companySnapshot.exists()) {
-  // console.log("Company found:", companyId); // Removed for production
-                setCompanyInfo({
-                  id: companyId,
-                  ...companySnapshot.data()
-                });
-              } else {
-                console.error("Company not found:", companyId);
-                setError("Company not found. Please contact your administrator.");
-              }
-            } catch (companyError) {
-              if (companyError?.code === "permission-denied") {
-  // console.warn("Permission denied reading company doc, falling back to authorized_users data"); // Removed for production
-                if (companyId) {
+	            const resolvedRole = userData.role || "employee";
+	            setUserRole(resolvedRole);
+	  // console.log("Setting userRole state to:", resolvedRole); // Removed for production
+	            
+		            const rawCompanyId = typeof userData.companyId === 'string' ? userData.companyId.trim() : null;
+		            const rawCompanyName = typeof userData.companyName === 'string' ? userData.companyName.trim() : null;
+		            const rawCompanyFallback = typeof userData.company === 'string' ? userData.company.trim() : null;
+
+		            try {
+		              const companiesRef = collection(db, "companies");
+
+	              const resolveCompany = async (identifier) => {
+	                const key = normalizeCompanyKey(identifier);
+	                if (!key) return null;
+
+	                // 1) Assume identifier is the company document id.
+	                const directRef = doc(db, "companies", identifier);
+	                const directSnap = await getDoc(directRef);
+	                if (directSnap.exists()) {
+	                  return { id: identifier, data: directSnap.data(), resolvedFrom: "id" };
+	                }
+
+	                // 2) Legacy/UX case: identifier is the company name.
+	                const nameQ = query(companiesRef, where("name", "==", identifier));
+	                const nameSnap = await getDocs(nameQ);
+	                if (!nameSnap.empty) {
+	                  const match = nameSnap.docs[0];
+	                  return { id: match.id, data: match.data(), resolvedFrom: "name" };
+	                }
+
+	                // 3) Case-insensitive match (small company list: safe to scan).
+	                const allSnap = await getDocs(companiesRef);
+	                const match = allSnap.docs.find((d) => {
+	                  const data = d.data();
+	                  return normalizeCompanyKey(d.id) === key || normalizeCompanyKey(data?.name) === key;
+	                });
+	                if (match) {
+	                  return { id: match.id, data: match.data(), resolvedFrom: "scan" };
+	                }
+
+	                return null;
+	              };
+
+		              const resolvedById = rawCompanyId ? await resolveCompany(rawCompanyId) : null;
+		              const resolvedByName = rawCompanyName ? await resolveCompany(rawCompanyName) : null;
+		              const resolvedByFallback = !resolvedById && !resolvedByName && rawCompanyFallback
+		                ? await resolveCompany(rawCompanyFallback)
+		                : null;
+
+		              // Admin convenience: match by company contact email (helps correct bad stored companyId).
+		              let resolvedByEmail = null;
+		              if (isAdminRoleValue(resolvedRole) && user.email) {
+		                const email = user.email.toLowerCase();
+		                const emailQ = query(companiesRef, where("contactEmail", "==", email));
+		                const emailSnap = await getDocs(emailQ);
+		                if (!emailSnap.empty) {
+		                  const match = emailSnap.docs[0];
+		                  resolvedByEmail = { id: match.id, data: match.data(), resolvedFrom: "contactEmail" };
+		                }
+		              }
+
+		              let resolvedCompany =
+		                resolvedByEmail ||
+		                resolvedByName ||
+		                resolvedById ||
+		                resolvedByFallback;
+
+		              if (import.meta.env.DEV && resolvedById && resolvedByName && resolvedById.id !== resolvedByName.id) {
+		                console.warn("User company mismatch:", {
+		                  userCompanyId: rawCompanyId,
+		                  userCompanyName: rawCompanyName,
+		                  resolvedId: resolvedById.id,
+		                  resolvedName: resolvedByName.id
+		                });
+		              }
+
+		              if (resolvedCompany) {
+		                if (import.meta.env.DEV && resolvedCompany.resolvedFrom !== "id") {
+		                  // Helps diagnose mismatched company ids (e.g., user records storing company name instead of doc id).
+		                  console.warn(
+		                    "Resolved company via fallback:",
+		                    { input: rawCompanyId || rawCompanyName || rawCompanyFallback, resolvedId: resolvedCompany.id, via: resolvedCompany.resolvedFrom }
+		                  );
+		                }
+
+	                setCompanyInfo({
+	                  id: resolvedCompany.id,
+	                  ...resolvedCompany.data
+	                });
+
+	                // If we resolved via name/email, the stored companyId might be a name.
+	                // Try to heal missing user docs (safe) but avoid writes that rules disallow.
+	                if (!userSnapshot.exists() && resolvedCompany.id) {
+	                  try {
+	                    await setDoc(doc(db, "users", user.uid), {
+	                      email: user.email?.toLowerCase(),
+	                      companyId: resolvedCompany.id,
+	                      role: userData.role || "agent"
+	                    }, { merge: true });
+	                  } catch {
+	                    // Ignore: rules may block some environments; we can still render UI.
+	                  }
+	                }
+		              } else if (rawCompanyId && isAdminRoleValue(resolvedRole)) {
+		                // Last-resort: if an admin is assigned to a companyId that doesn't exist,
+		                // create a minimal company doc so the app can proceed.
+		                try {
+		                  await setDoc(doc(db, "companies", rawCompanyId), {
+		                    name: rawCompanyId,
+		                    contactEmail: user.email?.toLowerCase() || null,
+		                    createdAt: serverTimestamp()
+		                  }, { merge: true });
+
+		                  setCompanyInfo({
+		                    id: rawCompanyId,
+		                    name: rawCompanyId,
+		                    contactEmail: user.email?.toLowerCase() || null
+		                  });
+		                } catch (createErr) {
+		                  console.error("Company not found and could not be created:", rawCompanyId, createErr);
+		                  setError("Company not found. Please contact your administrator.");
+		                }
+		              } else {
+		                console.error("Company not found:", rawCompanyId || rawCompanyName || rawCompanyFallback);
+		                setError("Company not found. Please contact your administrator.");
+		              }
+		            } catch (companyError) {
+	              if (companyError?.code === "permission-denied") {
+	  // console.warn("Permission denied reading company doc, falling back to authorized_users data"); // Removed for production
+	                if (companyId) {
                   setCompanyInfo({
                     id: companyId,
                     name: companyId
