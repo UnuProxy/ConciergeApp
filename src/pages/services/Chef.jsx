@@ -107,7 +107,7 @@ function Chef() {
     setLoading(true);
     setError(null);
     try {
-      // Chefs are shared services - load all chefs for both companies
+      // Shared catalog: both companies can view all chefs
       const snap = await getDocs(collection(db, 'chefs'));
       const raw = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       const withStats = await Promise.all(

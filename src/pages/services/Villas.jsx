@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, updateDoc, doc, deleteDoc, where, query } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { getAuth, signInAnonymously } from 'firebase/auth';
 import { db, storage } from '../../firebase/config';
 import { useDatabase } from '../../context/DatabaseContext';
 import { isAdminRole } from '../../utils/roleUtils';
@@ -25,6 +24,21 @@ const monthLabels = {
   october: 'October',
   november: 'November',
   december: 'December'
+};
+
+const monthLabelsRo = {
+  january: 'Ianuarie',
+  february: 'Februarie',
+  march: 'Martie',
+  april: 'Aprilie',
+  may: 'Mai',
+  june: 'Iunie',
+  july: 'Iulie',
+  august: 'August',
+  september: 'Septembrie',
+  october: 'Octombrie',
+  november: 'Noiembrie',
+  december: 'Decembrie'
 };
 
 const seasonalMonthOrder = ['may', 'june', 'july', 'august', 'september', 'october'];
@@ -139,6 +153,7 @@ function Villas() {
   const dbContext = useDatabase();
   const userCompanyId = dbContext?.companyId || dbContext?.companyInfo?.id || null;
   const userRole = dbContext?.userRole || dbContext?.role || dbContext?.currentUser?.role || null;
+  const currentUser = dbContext?.currentUser || null;
   const [villas, setVillas] = useState([]);
   const [isAddingVilla, setIsAddingVilla] = useState(false);
   const [isEditingVilla, setIsEditingVilla] = useState(false);
@@ -160,6 +175,7 @@ const clearBrochure = () => {
 };
   const [searchTerm, setSearchTerm] = useState('');
   const [priceFilter, setPriceFilter] = useState({ min: '', max: '' });
+  const [monthFilter, setMonthFilter] = useState('');
   const [bedroomFilter, setBedroomFilter] = useState('');
   const [bathroomFilter, setBathroomFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -240,21 +256,6 @@ const clearBrochure = () => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        const auth = getAuth();
-        if (!auth.currentUser) {
-          await signInAnonymously(auth);
-  // console.log('Signed in anonymously for storage access'); // Removed for production
-        }
-      } catch (error) {
-        console.error('Auth error:', error);
-      }
-    };
-    initAuth();
-  }, []);
-
   // Localized fallback helper: current language -> en -> ro -> string
   const getLoc = (value) => {
     if (!value) return '';
@@ -266,7 +267,8 @@ const clearBrochure = () => {
     const localized = getLoc(monthValue) || monthValue;
     if (!localized) return '';
     const key = typeof localized === 'string' ? localized.toLowerCase() : '';
-    return monthLabels[key] || localized;
+    const labels = language === 'ro' ? monthLabelsRo : monthLabels;
+    return labels[key] || localized;
   };
 
   const normalizeMonthKey = (monthValue) => {
@@ -329,13 +331,16 @@ const clearBrochure = () => {
 
   useEffect(() => {
     fetchVillas();
-    // Villas are shared across companies; no companyId filter needed
   }, [userCompanyId]);
 
   const fetchVillas = async () => {
     try {
-      const villaCollection = collection(db, 'villas');
-      const villaSnapshot = await getDocs(villaCollection);
+      if (!userCompanyId) {
+        setVillas([]);
+        return;
+      }
+      // Shared catalog: both companies can view all villas
+      const villaSnapshot = await getDocs(collection(db, 'villas'));
       const villaList = await Promise.all(
         villaSnapshot.docs.map(async (doc) => {
           const data = doc.data();
@@ -522,16 +527,7 @@ const clearBrochure = () => {
 
   const uploadPhotos = async () => {
     if (photoFiles.length === 0) return [];
-    const auth = getAuth();
-    try {
-      if (!auth.currentUser) {
-        await signInAnonymously(auth);
-  // console.log('Signed in anonymously for photo upload'); // Removed for production
-      }
-    } catch (error) {
-      console.error('Auth error:', error);
-    }
-    if (!auth.currentUser) {
+    if (!currentUser) {
       setPhotoNotice(
         language === 'ro'
           ? 'Nu ești autentificat pentru încărcarea pozelor.'
@@ -595,14 +591,6 @@ const clearBrochure = () => {
   
   const uploadBrochure = async () => {
     if (!brochureFile) return '';
-    try {
-      const auth = getAuth();
-      if (!auth.currentUser) {
-        await signInAnonymously(auth);
-      }
-    } catch (error) {
-      console.error('Auth error:', error);
-    }
     try {
       const filePath = buildBrochurePath(brochureFile);
       const storageRef = ref(storage, filePath);
@@ -753,12 +741,22 @@ const clearBrochure = () => {
     }
   };
 
+  const canManageVilla = (villa) => {
+    if (!userCompanyId) return false;
+    if (!villa?.companyId) return isAdminRole(userRole);
+    return villa.companyId === userCompanyId;
+  };
+
   const handleDeleteVilla = async (id) => {
     if (!window.confirm('Are you sure you want to delete this villa? This action cannot be undone.')) {
       return;
     }
     try {
       const villaToDelete = villas.find(villa => villa.id === id);
+      if (!canManageVilla(villaToDelete)) {
+        console.error('Attempted to delete a villa from another company');
+        return;
+      }
       if (villaToDelete?.photos?.length > 0) {
         for (const photo of villaToDelete.photos) {
           if (photo.path) {
@@ -809,6 +807,10 @@ const clearBrochure = () => {
   };
 
   const startEditingVilla = (villa) => {
+    if (!canManageVilla(villa)) {
+      console.error('Attempted to edit a villa from another company');
+      return;
+    }
     setCurrentVilla(villa);
     setFormData({
       name_en: typeof villa.name === 'string' ? villa.name : (villa.name?.en || ''),
@@ -867,16 +869,55 @@ const clearBrochure = () => {
   };
 
   const searchLower = (searchTerm || '').toLowerCase();
+  const monthKeyFilter = normalizeMonthKey(monthFilter);
 
   const filteredVillas = villas.filter(villa => {
     const matchesSearch =
       normalizeText(villa.name).toLowerCase().includes(searchLower) ||
       normalizeText(villa.address).toLowerCase().includes(searchLower);
-    const price = parseFloat(villa.priceConfigurations?.[0]?.price || villa.price || 0);
-    const matchesPrice = (
-      (!priceFilter.min || price >= parseFloat(priceFilter.min)) &&
-      (!priceFilter.max || price <= parseFloat(priceFilter.max))
-    );
+    const configs = Array.isArray(villa.priceConfigurations) ? villa.priceConfigurations : [];
+    const hasAnyMonthConfig = configs.some((pc) => Boolean(normalizeMonthKey(pc?.month)));
+    const matchesMonth = !monthKeyFilter || !hasAnyMonthConfig || configs.some((pc) => normalizeMonthKey(pc?.month) === monthKeyFilter);
+
+    const parsedMin = priceFilter.min !== '' ? parseFloat(priceFilter.min) : NaN;
+    const parsedMax = priceFilter.max !== '' ? parseFloat(priceFilter.max) : NaN;
+    const min = Number.isFinite(parsedMin) ? parsedMin : null;
+    const max = Number.isFinite(parsedMax) ? parsedMax : null;
+    const needsPriceFilter = min !== null || max !== null;
+
+    const parsePrice = (value) => {
+      const num = parseFloat(value);
+      return Number.isFinite(num) ? num : null;
+    };
+
+    const basePrice = parsePrice(villa.price);
+    const monthPrices = monthKeyFilter
+      ? configs
+          .filter((pc) => normalizeMonthKey(pc?.month) === monthKeyFilter)
+          .map((pc) => parsePrice(pc?.price))
+          .filter((v) => v !== null)
+      : [];
+    const genericPrices = configs
+      .filter((pc) => !normalizeMonthKey(pc?.month))
+      .map((pc) => parsePrice(pc?.price))
+      .filter((v) => v !== null);
+
+    const priceCandidates = (() => {
+      if (monthKeyFilter && hasAnyMonthConfig) {
+        const combined = [...monthPrices, ...genericPrices];
+        return combined.length ? combined : genericPrices;
+      }
+      return [...configs.map((pc) => parsePrice(pc?.price)).filter((v) => v !== null)];
+    })();
+
+    if (basePrice !== null) priceCandidates.push(basePrice);
+
+    const matchesPrice = !needsPriceFilter || priceCandidates.some((price) => {
+      if (min !== null && price < min) return false;
+      if (max !== null && price > max) return false;
+      return true;
+    });
+
     const bedroomsValue = parseInt(villa.bedrooms || '0', 10);
     const bathroomsValue = parseInt(villa.bathrooms || '0', 10);
     const bedroomThreshold = parseInt(bedroomFilter || '0', 10);
@@ -891,18 +932,19 @@ const clearBrochure = () => {
         ? bathroomsValue >= bathroomThreshold
         : bathroomsValue === bathroomThreshold
     );
-    return matchesSearch && matchesPrice && matchesBedrooms && matchesBathrooms;
+    return matchesSearch && matchesMonth && matchesPrice && matchesBedrooms && matchesBathrooms;
   });
 
   const villaCount = villas.filter(villa => (villa.propertyType || 'villa') !== 'apartment').length;
   const apartmentCount = villas.filter(villa => (villa.propertyType || 'villa') === 'apartment').length;
   const filteredCount = filteredVillas.length;
   const hasFilters = Boolean(
-    searchTerm ||
-    priceFilter.min ||
-    priceFilter.max ||
-    bedroomFilter ||
-    bathroomFilter
+   searchTerm ||
+   priceFilter.min ||
+   priceFilter.max ||
+   monthFilter ||
+   bedroomFilter ||
+   bathroomFilter
   );
 
   const translations = {
@@ -925,6 +967,8 @@ const clearBrochure = () => {
       hideFilters: 'Ascunde filtrele',
       minPrice: 'Preț minim',
       maxPrice: 'Preț maxim',
+      month: 'Lună',
+      anyMonth: 'Orice lună',
       anyBedrooms: 'Orice dormitoare',
       anyBathrooms: 'Orice băi',
       statsTotal: 'Total proprietăți',
@@ -962,6 +1006,8 @@ const clearBrochure = () => {
       hideFilters: 'Hide filters',
       minPrice: 'Min price',
       maxPrice: 'Max price',
+      month: 'Month',
+      anyMonth: 'Any month',
       anyBedrooms: 'Any bedrooms',
       anyBathrooms: 'Any bathrooms',
       statsTotal: 'Total properties',
@@ -1039,13 +1085,13 @@ const clearBrochure = () => {
           </button>
         </div>
 
-        {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <input
-              type="number"
-              inputMode="numeric"
-              placeholder={t.minPrice}
-              value={priceFilter.min}
+	        {showFilters && (
+	          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+	            <input
+	              type="number"
+	              inputMode="numeric"
+	              placeholder={t.minPrice}
+	              value={priceFilter.min}
               onChange={(e) => setPriceFilter(prev => ({ ...prev, min: e.target.value }))}
               className="input-premium"
             />
@@ -1054,13 +1100,25 @@ const clearBrochure = () => {
               inputMode="numeric"
               placeholder={t.maxPrice}
               value={priceFilter.max}
-              onChange={(e) => setPriceFilter(prev => ({ ...prev, max: e.target.value }))}
-              className="input-premium"
-            />
-            <select
-              value={bedroomFilter}
-              onChange={(e) => setBedroomFilter(e.target.value)}
-              className="input-premium"
+	              onChange={(e) => setPriceFilter(prev => ({ ...prev, max: e.target.value }))}
+	              className="input-premium"
+	            />
+	            <select
+	              value={monthFilter}
+	              onChange={(e) => setMonthFilter(e.target.value)}
+	              className="input-premium"
+	            >
+	              <option value="">{t.anyMonth}</option>
+	              {monthKeys.map((m) => (
+	                <option key={m} value={m}>
+	                  {(language === 'ro' ? monthLabelsRo : monthLabels)[m] || m}
+	                </option>
+	              ))}
+	            </select>
+	            <select
+	              value={bedroomFilter}
+	              onChange={(e) => setBedroomFilter(e.target.value)}
+	              className="input-premium"
             >
               <option value="">{t.anyBedrooms}</option>
               <option value="1">1</option>

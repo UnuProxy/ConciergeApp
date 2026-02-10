@@ -1,10 +1,11 @@
 // Cars component with inline styles and enhanced filtering
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, doc, deleteDoc, query, where } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { db, storage } from '../../firebase/config';
+import { useDatabase } from '../../context/DatabaseContext';
 import { getCurrentLanguage } from "../../utils/languageHelper";
+import { isAdminRole } from '../../utils/roleUtils';
 
 // Normalize media items to a consistent shape for images and PDFs
 const normalizeMediaItem = (item) => {
@@ -527,6 +528,10 @@ resultsCount: {
 };
 
 function Cars() {
+  const { companyInfo, userRole } = useDatabase();
+  const userCompanyId = companyInfo?.id || null;
+  const userCompanyName = companyInfo?.name || companyInfo?.id || '';
+
   const [cars, setCars] = useState([]);
   const [isAddingCar, setIsAddingCar] = useState(false);
   const [isEditingCar, setIsEditingCar] = useState(false);
@@ -818,30 +823,6 @@ function Cars() {
     (filters.features && filters.features.length > 0)
   );
 
-  // Enhanced authentication useEffect that properly sets up auth state listener
-  useEffect(() => {
-    const auth = getAuth();
-    
-    // Setup auth state listener
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        // Only sign in anonymously if no user is signed in
-        signInAnonymously(auth)
-          .then(() => {
-  // console.log("Signed in anonymously for storage access"); // Removed for production
-          })
-          .catch((error) => {
-            console.error("Anonymous auth error:", error);
-          });
-      } else {
-  // console.log("User is already authenticated", user.uid); // Removed for production
-      }
-    });
-    
-    // Clean up listener on component unmount
-    return () => unsubscribe();
-  }, []);
-  
   // Handle language changes
   useEffect(() => {
     const handleStorageChange = () => {
@@ -853,16 +834,24 @@ function Cars() {
     };
   }, []);
   
-  // Fetch cars on component mount
+  // Fetch cars when company is resolved
   useEffect(() => {
+    if (!userCompanyId) {
+      setCars([]);
+      return;
+    }
     fetchCars();
-  }, []);
+  }, [userCompanyId]);
   
   // Fetch cars from Firestore
   const fetchCars = async () => {
     try {
-      const carCollection = collection(db, "cars");
-      const carSnapshot = await getDocs(carCollection);
+      if (!userCompanyId) {
+        setCars([]);
+        return;
+      }
+      // Shared catalog: both companies can view all cars
+      const carSnapshot = await getDocs(collection(db, "cars"));
       const carList = carSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -871,6 +860,12 @@ function Cars() {
     } catch (error) {
       console.error("Error fetching cars:", error);
     }
+  };
+
+  const canManageCar = (car) => {
+    if (!userCompanyId) return false;
+    if (!car?.companyId) return isAdminRole(userRole);
+    return car.companyId === userCompanyId;
   };
 
   // ALL OTHER EXISTING FUNCTIONS CONTINUE HERE...
@@ -1047,12 +1042,6 @@ function Cars() {
     const uploadedDocs = [];
 
     try {
-      const auth = getAuth();
-      if (!auth.currentUser) {
-        await signInAnonymously(auth);
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-
       for (let i = 0; i < documentFiles.length; i++) {
         const file = documentFiles[i];
         if (!(file instanceof File) || file.type !== 'application/pdf') continue;
@@ -1096,22 +1085,6 @@ function Cars() {
     const photoUrls = [];
     
     try {
-      // Get current auth instance and ensure we have a user
-      const auth = getAuth();
-      if (!auth.currentUser) {
-        try {
-          await signInAnonymously(auth);
-  // console.log("Signed in anonymously for upload"); // Removed for production
-          
-          // Allow time for auth to propagate
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        } catch (authError) {
-          console.error("Auth error during upload:", authError);
-          setIsUploading(false);
-          return [];
-        }
-      }
-      
       for (let i = 0; i < photoFiles.length; i++) {
         const file = photoFiles[i];
         if (!(file instanceof File)) continue;
@@ -1184,8 +1157,8 @@ function Cars() {
     const resolvedDaily = formData.priceDaily || (cheapestPrice !== null ? String(cheapestPrice) : '');
     return {
       // Basic company association
-      companyId: 'just_enjoy_ibiza',
-      companyName: 'Just Enjoy Ibiza',
+      companyId: userCompanyId,
+      companyName: userCompanyName,
       priceMonth: resolvedPriceMonth,
       // Localized fields
       name: {
@@ -1236,6 +1209,10 @@ function Cars() {
   const handleAddCar = async (e) => {
     if (e) e.preventDefault();
     try {
+      if (!userCompanyId) {
+        console.error("No company resolved for current user");
+        return;
+      }
       // Upload photos
       const photoUrls = await uploadPhotos();
       const docUrls = await uploadDocuments();
@@ -1269,8 +1246,16 @@ function Cars() {
   const handleUpdateCar = async (e) => {
     if (e) e.preventDefault();
     try {
+      if (!userCompanyId) {
+        console.error("No company resolved for current user");
+        return;
+      }
       if (!currentCar || !currentCar.id) {
         console.error("No current car selected for update");
+        return;
+      }
+      if (currentCar.companyId && currentCar.companyId !== userCompanyId) {
+        console.error("Attempted to update a car from another company");
         return;
       }
       
@@ -1317,6 +1302,10 @@ function Cars() {
     try {
       // Find the car to get its photos
       const carToDelete = cars.find(car => car.id === id);
+      if (!canManageCar(carToDelete)) {
+        console.error("Attempted to delete a car from another company");
+        return;
+      }
       
       // Delete photos from storage if they exist
       if (carToDelete.photos && carToDelete.photos.length > 0) {
@@ -1415,6 +1404,10 @@ function Cars() {
   
   // Start editing a car
   const startEditingCar = (car) => {
+    if (!canManageCar(car)) {
+      console.error("Attempted to edit a car from another company");
+      return;
+    }
     setCurrentCar(car);
     const { month: cheapestMonth, price: cheapestPrice } = getCheapestMonthlyPricing(car.pricing?.monthly || {});
     

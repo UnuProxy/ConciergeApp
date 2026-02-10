@@ -1,10 +1,10 @@
 // Boats component with updated pricing structure - inline styles
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, doc, deleteDoc, query, where } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { getAuth, signInAnonymously } from 'firebase/auth';
 import { db, storage } from '../../firebase/config';
 import { useDatabase } from '../../context/DatabaseContext';
+import { isAdminRole } from '../../utils/roleUtils';
 
 // Normalize media items to support both images and PDFs
 const normalizeMediaItem = (item) => {
@@ -666,8 +666,9 @@ const Icon = ({ name, size = 16, color = '#6b7280' }) => {
 
 function Boats() {
   // Get company context
-  const { companyInfo } = useDatabase();
-  const userCompanyId = companyInfo?.id;
+  const { companyInfo, userRole } = useDatabase();
+  const userCompanyId = companyInfo?.id || null;
+  const userCompanyName = companyInfo?.name || companyInfo?.id || '';
 
   const [boats, setBoats] = useState([]);
   const [isAddingBoat, setIsAddingBoat] = useState(false);
@@ -916,33 +917,24 @@ function Boats() {
     };
   }, [language]);
 
-  // Initialize anonymous auth to fix storage permission issues
+  // Fetch boats when company is resolved
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        const auth = getAuth();
-        if (!auth.currentUser) {
-          await signInAnonymously(auth);
-  // console.log("Signed in anonymously for storage access"); // Removed for production
-        }
-      } catch (error) {
-        console.error("Auth error:", error);
-      }
-    };
-    
-    initAuth();
-  }, []);
-  
-  // Fetch boats on component mount
-  useEffect(() => {
+    if (!userCompanyId) {
+      setBoats([]);
+      return;
+    }
     fetchBoats();
-  }, []);
+  }, [userCompanyId]);
   
   // Fetch boats from Firestore
   const fetchBoats = async () => {
     try {
-      const boatCollection = collection(db, "boats");
-      const boatSnapshot = await getDocs(boatCollection);
+      if (!userCompanyId) {
+        setBoats([]);
+        return;
+      }
+      // Shared catalog: both companies can view all boats
+      const boatSnapshot = await getDocs(collection(db, "boats"));
       const boatList = boatSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -951,6 +943,13 @@ function Boats() {
     } catch (error) {
       console.error("Error fetching boats:", error);
     }
+  };
+
+  const canManageBoat = (boat) => {
+    if (!userCompanyId) return false;
+    // Allow admins to claim legacy items that never had a companyId
+    if (!boat?.companyId) return isAdminRole(userRole);
+    return boat.companyId === userCompanyId;
   };
   
   // Enhanced input handler that can handle deeply nested objects
@@ -1152,14 +1151,6 @@ function Boats() {
   
   const uploadDocuments = async () => {
     if (documentFiles.length === 0) return [];
-    try {
-      const auth = getAuth();
-      if (!auth.currentUser) {
-        await signInAnonymously(auth);
-      }
-    } catch (error) {
-      console.error("Auth error:", error);
-    }
 
     setIsUploading(true);
     const uploadPromises = documentFiles.map(async (file) => {
@@ -1197,17 +1188,6 @@ function Boats() {
   // Upload photos to Firebase Storage
   const uploadPhotos = async () => {
     if (photoFiles.length === 0) return [];
-    
-    // Ensure we're authenticated for Firebase Storage
-    try {
-      const auth = getAuth();
-      if (!auth.currentUser) {
-        await signInAnonymously(auth);
-  // console.log("Signed in anonymously for photo upload"); // Removed for production
-      }
-    } catch (error) {
-      console.error("Auth error:", error);
-    }
     
     setIsUploading(true);
     
@@ -1251,8 +1231,8 @@ function Boats() {
   const prepareFormDataForSave = () => {
     return {
       // Basic company association
-      companyId: 'just_enjoy_ibiza',
-      companyName: 'Just Enjoy Ibiza',
+      companyId: userCompanyId,
+      companyName: userCompanyName,
       
       // Localized fields
       name: {
@@ -1312,6 +1292,10 @@ function Boats() {
     e.preventDefault();
     
     try {
+      if (!userCompanyId) {
+        console.error("No company resolved for current user");
+        return;
+      }
       // Upload photos
       const photoUrls = await uploadPhotos();
       const docUrls = await uploadDocuments();
@@ -1321,8 +1305,7 @@ function Boats() {
         ...prepareFormDataForSave(),
         photos: photoUrls,
         documents: docUrls,
-        createdAt: new Date(),
-        companyId: userCompanyId
+        createdAt: new Date()
       };
       
       // Save to Firestore
@@ -1347,8 +1330,16 @@ function Boats() {
     e.preventDefault();
     
     try {
+      if (!userCompanyId) {
+        console.error("No company resolved for current user");
+        return;
+      }
       if (!currentBoat || !currentBoat.id) {
         console.error("No current boat selected for update");
+        return;
+      }
+      if (currentBoat.companyId && currentBoat.companyId !== userCompanyId) {
+        console.error("Attempted to update a boat from another company");
         return;
       }
       
@@ -1370,7 +1361,7 @@ function Boats() {
         photos: updatedPhotos,
         documents: updatedDocuments,
         updatedAt: new Date(),
-        companyId: currentBoat.companyId || userCompanyId
+        companyId: userCompanyId
       };
       
       // Update in Firestore
@@ -1396,6 +1387,10 @@ function Boats() {
     try {
       // Find the boat to get its photos
       const boatToDelete = boats.find(boat => boat.id === id);
+      if (!canManageBoat(boatToDelete)) {
+        console.error("Attempted to delete a boat from another company");
+        return;
+      }
       
       // Delete photos from storage if they exist
       if (boatToDelete.photos && boatToDelete.photos.length > 0) {
@@ -1494,6 +1489,10 @@ function Boats() {
   
   // Start editing a boat
   const startEditingBoat = (boat) => {
+    if (!canManageBoat(boat)) {
+      console.error("Attempted to edit a boat from another company");
+      return;
+    }
     setCurrentBoat(boat);
     
     // Extract data to flat form structure

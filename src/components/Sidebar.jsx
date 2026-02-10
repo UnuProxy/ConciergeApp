@@ -1,7 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
-import { useDatabase } from '../context/DatabaseContext';
-import { isAdminRole } from '../utils/roleUtils';
+import { usePermissions } from '../hooks/usePermissions';
 
 const getInitialMobileState = () => {
   if (typeof window === 'undefined') return true;
@@ -14,7 +13,7 @@ function Sidebar({ open, setOpen }) {
   const [servicesExpanded, setServicesExpanded] = useState(false);
   const [systemExpanded, setSystemExpanded] = useState(false);
   const [isMobile, setIsMobile] = useState(getInitialMobileState);
-  const { userRole } = useDatabase();
+  const { modules, isAdmin, canViewFinance } = usePermissions();
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem('appLanguage') || 'ro';
   });
@@ -29,9 +28,6 @@ function Sidebar({ open, setOpen }) {
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [language]);
-
-  const isAdmin = isAdminRole(userRole);
-  const canViewFinance = isAdmin;
 
   const translations = {
     ro: {
@@ -189,90 +185,102 @@ function Sidebar({ open, setOpen }) {
         </div>
 
         <div className="app-sidebar__nav">
-          <div className="app-sidebar__category">{t.reservations}</div>
-          <Link
-            to="/reservations"
-            className={`app-sidebar__item ${location.pathname.startsWith('/reservations') ? 'app-sidebar__item--active' : ''}`}
-            onClick={handleLinkClick}
-          >
-            <SidebarIcon path="M9.75 17a2.25 2.25 0 104.5 0m-7.5-3h10.5A1.5 1.5 0 0018 12.5V9a6 6 0 00-6-6 6 6 0 00-6 6v3.5A1.5 1.5 0 006.75 14z" />
-            {t.reservations}
-          </Link>
-
-          <div className="app-sidebar__category">{t.clients}</div>
-          <div
-            className={`app-sidebar__item ${location.pathname.startsWith('/clients') ? 'app-sidebar__item--active' : ''}`}
-            onClick={() => setClientsExpanded((prev) => !prev)}
-          >
-            <SidebarIcon path="M17 20h5V10H2v10h5m10-8v8M7 12v8m0 0a3 3 0 006 0m-6 0a3 3 0 016 0" />
-            {t.clients}
-            <Chevron expanded={clientsExpanded} />
-          </div>
-          {clientsExpanded && (
-            <div>
-              <SidebarLink
-                to="/clients/add"
-                label={t.addClient}
-                active={location.pathname === '/clients/add'}
+          {modules.reservations && (
+            <>
+              <div className="app-sidebar__category">{t.reservations}</div>
+              <Link
+                to="/reservations"
+                className={`app-sidebar__item ${location.pathname.startsWith('/reservations') ? 'app-sidebar__item--active' : ''}`}
                 onClick={handleLinkClick}
-              />
-              <SidebarLink
-                to="/clients/existing"
-                label={t.existingClients}
-                active={location.pathname === '/clients/existing'}
-                onClick={handleLinkClick}
-              />
-              <SidebarLink
-                to="/clients/collaborators"
-                label={t.collaborators}
-                active={location.pathname === '/clients/collaborators'}
-                onClick={handleLinkClick}
-              />
-            </div>
+              >
+                <SidebarIcon path="M9.75 17a2.25 2.25 0 104.5 0m-7.5-3h10.5A1.5 1.5 0 0018 12.5V9a6 6 0 00-6-6 6 6 0 00-6 6v3.5A1.5 1.5 0 006.75 14z" />
+                {t.reservations}
+              </Link>
+            </>
           )}
 
-          <div className="app-sidebar__category">{t.services}</div>
-          <div
-            className={`app-sidebar__item ${location.pathname.startsWith('/services') ? 'app-sidebar__item--active' : ''}`}
-            onClick={() => setServicesExpanded((prev) => !prev)}
-          >
-            <SidebarIcon path="M3 7h18M3 12h18M3 17h18" />
-            {t.services}
-            <Chevron expanded={servicesExpanded} />
-          </div>
-          {servicesExpanded && (
-            <div>
-              <SidebarLink
-                to="/services/villas"
-                label={t.rentalVillas}
-                active={location.pathname === '/services/villas'}
-                onClick={handleLinkClick}
-              />
-              <SidebarLink
-                to="/services/boats"
-                label={t.boats}
-                active={location.pathname === '/services/boats'}
-                onClick={handleLinkClick}
-              />
-              <SidebarLink
-                to="/services/cars"
-                label={t.cars}
-                active={location.pathname === '/services/cars'}
-                onClick={handleLinkClick}
-              />
-              <SidebarLink
-                to="/services/properties-for-sale"
-                label={t.propertiesForSale}
-                active={location.pathname === '/services/properties-for-sale'}
-                onClick={handleLinkClick}
-              />
-              <SidebarLink
-                to="/services/core-concierge"
-                label={t.coreConcierge}
-                active={location.pathname === '/services/core-concierge'}
-                onClick={handleLinkClick}
-              />
-            </div>
+          {modules.clients && (
+            <>
+              <div className="app-sidebar__category">{t.clients}</div>
+              <div
+                className={`app-sidebar__item ${location.pathname.startsWith('/clients') ? 'app-sidebar__item--active' : ''}`}
+                onClick={() => setClientsExpanded((prev) => !prev)}
+              >
+                <SidebarIcon path="M17 20h5V10H2v10h5m10-8v8M7 12v8m0 0a3 3 0 006 0m-6 0a3 3 0 016 0" />
+                {t.clients}
+                <Chevron expanded={clientsExpanded} />
+              </div>
+              {clientsExpanded && (
+                <div>
+                  <SidebarLink
+                    to="/clients/add"
+                    label={t.addClient}
+                    active={location.pathname === '/clients/add'}
+                    onClick={handleLinkClick}
+                  />
+                  <SidebarLink
+                    to="/clients/existing"
+                    label={t.existingClients}
+                    active={location.pathname === '/clients/existing'}
+                    onClick={handleLinkClick}
+                  />
+                  <SidebarLink
+                    to="/clients/collaborators"
+                    label={t.collaborators}
+                    active={location.pathname === '/clients/collaborators'}
+                    onClick={handleLinkClick}
+                  />
+                </div>
+              )}
+            </>
+          )}
+
+          {modules.services && (
+            <>
+              <div className="app-sidebar__category">{t.services}</div>
+              <div
+                className={`app-sidebar__item ${location.pathname.startsWith('/services') ? 'app-sidebar__item--active' : ''}`}
+                onClick={() => setServicesExpanded((prev) => !prev)}
+              >
+                <SidebarIcon path="M3 7h18M3 12h18M3 17h18" />
+                {t.services}
+                <Chevron expanded={servicesExpanded} />
+              </div>
+              {servicesExpanded && (
+                <div>
+                  <SidebarLink
+                    to="/services/villas"
+                    label={t.rentalVillas}
+                    active={location.pathname === '/services/villas'}
+                    onClick={handleLinkClick}
+                  />
+                  <SidebarLink
+                    to="/services/boats"
+                    label={t.boats}
+                    active={location.pathname === '/services/boats'}
+                    onClick={handleLinkClick}
+                  />
+                  <SidebarLink
+                    to="/services/cars"
+                    label={t.cars}
+                    active={location.pathname === '/services/cars'}
+                    onClick={handleLinkClick}
+                  />
+                  <SidebarLink
+                    to="/services/properties-for-sale"
+                    label={t.propertiesForSale}
+                    active={location.pathname === '/services/properties-for-sale'}
+                    onClick={handleLinkClick}
+                  />
+                  <SidebarLink
+                    to="/services/core-concierge"
+                    label={t.coreConcierge}
+                    active={location.pathname === '/services/core-concierge'}
+                    onClick={handleLinkClick}
+                  />
+                </div>
+              )}
+            </>
           )}
 
           {canViewFinance && (

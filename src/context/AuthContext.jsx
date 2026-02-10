@@ -177,7 +177,22 @@ export function AuthProvider({ children }) {
     try {
       const normalizedEmail = email?.toLowerCase();
 
-      // First check authorized_users collection
+      // First check authorized_users collection (prefer deterministic doc id: email)
+      if (normalizedEmail) {
+        const directSnap = await getDoc(doc(db, 'authorized_users', normalizedEmail));
+        if (directSnap.exists()) {
+          const userData = directSnap.data();
+          return {
+            authorized: true,
+            companyId: userData.companyId,
+            role: userData.role,
+            permissions: userData.permissions || null,
+            companyName: userData.companyName || null
+          };
+        }
+      }
+
+      // Fallback: query by email (legacy docs)
       const authorizedUsersRef = collection(db, 'authorized_users');
       const q = query(authorizedUsersRef, where("email", "==", normalizedEmail));
       const snapshot = await getDocs(q);
@@ -187,7 +202,9 @@ export function AuthProvider({ children }) {
         return {
           authorized: true,
           companyId: userData.companyId,
-          role: userData.role
+          role: userData.role,
+          permissions: userData.permissions || null,
+          companyName: userData.companyName || null
         };
       }
 
@@ -355,7 +372,7 @@ export function AuthProvider({ children }) {
         if (!isMounted) return;
         try {
           if (user) {
-            const { authorized, companyId, role } = await isAuthorizedUser(user.email, user.uid);
+            const { authorized, companyId, role, permissions, companyName } = await isAuthorizedUser(user.email, user.uid);
 
             if (!authorized) {
               const errorMsg = `Access denied: ${user.email} is not authorized. Please contact your administrator.`;
@@ -383,17 +400,21 @@ export function AuthProvider({ children }) {
             const userDocData = userDoc.exists() ? userDoc.data() : null;
             const needsCompany = !userDocData?.companyId && !!companyId;
             const needsRole = !userDocData?.role && !!role;
+            const needsPermissions = !userDocData?.permissions && !!permissions;
+            const needsCompanyName = !userDocData?.companyName && !!companyName;
             const companyMismatch = !!companyId && userDocData?.companyId && userDocData.companyId !== companyId;
             const roleMismatch = !!role && userDocData?.role && userDocData.role !== role;
             const isNewUserDoc = !userDoc.exists();
 
-            if (isNewUserDoc || needsCompany || needsRole || companyMismatch || roleMismatch) {
+            if (isNewUserDoc || needsCompany || needsRole || needsPermissions || needsCompanyName || companyMismatch || roleMismatch) {
               const userPayload = {
                 email: user.email,
                 displayName: user.displayName,
                 photoURL: user.photoURL,
                 ...(companyId ? { companyId } : {}),
-                ...(role ? { role } : {})
+                ...(role ? { role } : {}),
+                ...(permissions ? { permissions } : {}),
+                ...(companyName ? { companyName } : {})
               };
 
               if (isNewUserDoc) {

@@ -38,6 +38,37 @@ function safeRender(value) {
   return value;
 }
 
+// Date helpers shared across this module (must be in module scope).
+const normalizeDateTime = (value, { endOfDay = false } = {}) => {
+  if (!value) return null;
+  if (value instanceof Date) return new Date(value);
+  if (value?.toDate) return new Date(value.toDate());
+  if (value?.seconds) return new Date(value.seconds * 1000);
+  if (typeof value === 'number') return new Date(value);
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const dateOnly = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dateOnly) {
+      const d = new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+      if (endOfDay) d.setHours(23, 59, 59, 999);
+      else d.setHours(0, 0, 0, 0);
+      return d;
+    }
+    const parsed = new Date(trimmed);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed;
+  }
+  const fallback = new Date(value);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
+};
+
+const getBookingWindow = (booking) => {
+  const start = normalizeDateTime(booking?.tripStart || booking?.checkIn);
+  const end = normalizeDateTime(booking?.tripEnd || booking?.checkOut || booking?.checkIn, { endOfDay: true });
+  return { start, end };
+};
+
 
 // Status colors - refined, premium look
 const statusColors = {
@@ -742,17 +773,15 @@ const getServiceThumbnail = (service) => {
       
       <div className="space-y-3">
         {bookings.map((booking, index) => {
-          const checkIn = booking.checkIn ? new Date(booking.checkIn) : null;
-          const checkOut = booking.checkOut ? new Date(booking.checkOut) : null;
+          const { start: checkIn, end: checkOut } = getBookingWindow(booking);
           const isSelected = selectedBooking?.id === booking.id;
           const accommodationName = safeRender(booking.accommodationType || booking.propertyName || booking.villaName || `Booking ${index + 1}`);
           const isLocked = String(booking?.status || '').toLowerCase() === 'booked';
           
           // Check if booking is current (today is within dates)
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const isCurrent = checkIn && checkOut && today >= checkIn && today <= checkOut;
-          const isUpcoming = checkIn && today < checkIn;
+          const now = new Date();
+          const isCurrent = checkIn && checkOut && now >= checkIn && now <= checkOut;
+          const isUpcoming = checkIn && now < checkIn;
           
           return (
             <button
@@ -2064,19 +2093,23 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping, disa
   // Helper functions
   const formatShortDate = (dateStr) => {
     if (!dateStr) return '';
-    const date = new Date(dateStr);
+    const date = dateStr instanceof Date
+      ? dateStr
+      : dateStr?.toDate
+        ? dateStr.toDate()
+        : new Date(dateStr);
     return date.toLocaleDateString(language === 'en' ? 'en-GB' : 'ro-RO', {
       day: '2-digit',
       month: '2-digit'
     });
   };
 
-  const normalizeCardDate = (value) => {
-    if (!value) return null;
-    if (value instanceof Date) return new Date(value);
-    if (value?.toDate) return new Date(value.toDate());
-    if (value?.seconds) return new Date(value.seconds * 1000);
-    if (typeof value === 'number') return new Date(value);
+	  const normalizeCardDate = (value) => {
+	    if (!value) return null;
+	    if (value instanceof Date) return new Date(value);
+	    if (value?.toDate) return new Date(value.toDate());
+	    if (value?.seconds) return new Date(value.seconds * 1000);
+	    if (typeof value === 'number') return new Date(value);
     if (typeof value === 'string') {
       const trimmed = value.trim();
       if (!trimmed) return null;
@@ -2102,13 +2135,13 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping, disa
     const fallback = new Date(value);
     if (Number.isNaN(fallback.getTime())) return null;
     fallback.setHours(0, 0, 0, 0);
-    return fallback;
-  };
-
-  const buildBookingRangeLabel = (bookings = []) => {
-    if (!bookings.length) return '';
-    const starts = bookings.map(b => normalizeCardDate(b.checkIn)).filter(Boolean);
-    const ends = bookings.map(b => normalizeCardDate(b.checkOut || b.checkIn)).filter(Boolean);
+	    return fallback;
+	  };
+	
+	  const buildBookingRangeLabel = (bookings = []) => {
+	    if (!bookings.length) return '';
+	    const starts = bookings.map(b => normalizeCardDate(b.tripStart || b.checkIn)).filter(Boolean);
+	    const ends = bookings.map(b => normalizeCardDate(b.tripEnd || b.checkOut || b.checkIn)).filter(Boolean);
     if (!starts.length || !ends.length) return '';
     const startDate = new Date(Math.min(...starts.map(d => d.getTime())));
     const endDate = new Date(Math.max(...ends.map(d => d.getTime())));
@@ -2128,8 +2161,8 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping, disa
 
     const normalized = bookings
       .map(booking => {
-        const start = normalizeCardDate(booking.checkIn);
-        const end = normalizeCardDate(booking.checkOut || booking.checkIn);
+        const start = normalizeCardDate(booking.tripStart || booking.checkIn);
+        const end = normalizeCardDate(booking.tripEnd || booking.checkOut || booking.checkIn);
         if (!start || !end) return null;
         return { ...booking, _start: start, _end: end };
       })
@@ -2213,8 +2246,8 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping, disa
   
   const formatBookingRange = (booking) => {
     if (!booking) return '';
-    const start = formatShortDate(booking.checkIn);
-    const end = formatShortDate(booking.checkOut || booking.checkIn);
+    const start = formatShortDate(booking.tripStart || booking.checkIn);
+    const end = formatShortDate(booking.tripEnd || booking.checkOut || booking.checkIn);
     if (start && end && start !== end) {
       return `${start} → ${end}`;
     }
@@ -2256,8 +2289,7 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping, disa
 
   function isServiceWithinBooking(service, booking) {
     if (!service || !booking) return true;
-    const checkIn = booking.checkIn ? new Date(booking.checkIn) : null;
-    const checkOut = booking.checkOut ? new Date(booking.checkOut) : null;
+    const { start: checkIn, end: checkOut } = getBookingWindow(booking);
     if (!checkIn || !checkOut) return true;
 
     const start = new Date(service.startDate || service.date);
@@ -2424,14 +2456,13 @@ const ClientCard = ({ client, onViewDetails, onOpenService, onOpenShopping, disa
               // Multiple bookings - show each booking's services separately
               <div className="space-y-3">
                 {[...displayBookings]
-                  .sort((a, b) => new Date(a.checkIn || 0) - new Date(b.checkIn || 0))
+                  .sort((a, b) => (getBookingWindow(a).start || new Date(0)) - (getBookingWindow(b).start || new Date(0)))
                   .map((booking, bookingIdx) => {
                     const bookingServices = booking.services || [];
                     if (bookingServices.length === 0) return null;
                     
                     // Format booking dates
-                    const checkInDate = booking.checkIn ? new Date(booking.checkIn) : null;
-                    const checkOutDate = booking.checkOut ? new Date(booking.checkOut) : null;
+                    const { start: checkInDate, end: checkOutDate } = getBookingWindow(booking);
                     const formatDate = (d) => d ? formatShortDate(d) : '';
                     const isToday = checkInDate && checkInDate.toDateString() === new Date().toDateString();
                     const isTomorrow = checkInDate && checkInDate.toDateString() === new Date(Date.now() + 86400000).toDateString();
@@ -2925,8 +2956,8 @@ const UpcomingBookings = () => {
 
   const getBookingTimeBucket = (booking, today = getTodayStart()) => {
     if (!booking || isBookingInactive(booking)) return null;
-    const checkIn = normalizeDateValue(booking.checkIn);
-    const checkOut = normalizeDateValue(booking.checkOut || booking.checkIn);
+    const checkIn = normalizeDateValue(booking.tripStart || booking.checkIn);
+    const checkOut = normalizeDateValue(booking.tripEnd || booking.checkOut || booking.checkIn);
     if (!checkIn || !checkOut) return null;
     
     if (checkIn > today) return 'upcoming';
@@ -2939,7 +2970,7 @@ const UpcomingBookings = () => {
     if (!Array.isArray(bookings) || bookings.length === 0) return false;
     const today = getTodayStart();
     return bookings.every((booking) => {
-      const checkOut = normalizeDateValue(booking?.checkOut || booking?.checkIn);
+      const checkOut = normalizeDateValue(booking?.tripEnd || booking?.checkOut || booking?.checkIn);
       if (!checkOut) return false;
       return checkOut < today;
     });
@@ -2956,8 +2987,8 @@ const UpcomingBookings = () => {
   };
 
   const getClientDetailsBookingSortInfo = (booking, today = getTodayStart()) => {
-    const checkIn = normalizeDateValue(booking?.checkIn);
-    const checkOut = normalizeDateValue(booking?.checkOut || booking?.checkIn);
+    const checkIn = normalizeDateValue(booking?.tripStart || booking?.checkIn);
+    const checkOut = normalizeDateValue(booking?.tripEnd || booking?.checkOut || booking?.checkIn);
     if (!checkIn || !checkOut) {
       return { rank: 99, checkIn: new Date(0), checkOut: new Date(0) };
     }
@@ -4455,15 +4486,14 @@ const renderMainContent = (filteredClients) => {
             !hasUnlockedBooking(selectedItem.bookings);
 
           return (
-            <div className="p-4 bg-white space-y-4">
-              <div className="text-center border-b pb-4">
-                <h2 className="text-xl font-bold text-gray-900">{safeRender(selectedItem.clientName)}</h2>
-                <p className="text-gray-600">{t.totalValue || 'Total'}: {selectedItem.totalValue.toLocaleString()} €</p>
-                <p className="text-gray-600">{t.amountDue || 'Due'}: {selectedItem.dueAmount.toLocaleString()} €</p>
-                <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusBadgeClass(selectedItem.paymentStatus)}`}>
-                  {getPaymentStatusText(selectedItem.paymentStatus)}
-                </div>
-              </div>
+	            <div className="p-4 bg-white space-y-4">
+	              <div className="text-center border-b pb-4">
+	                <h2 className="text-xl font-bold text-gray-900">{safeRender(selectedItem.clientName)}</h2>
+	                <p className="text-gray-600">{t.totalValue || 'Total'}: {selectedItem.totalValue.toLocaleString()} €</p>
+	                <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusBadgeClass(selectedItem.paymentStatus)}`}>
+	                  {getPaymentStatusText(selectedItem.paymentStatus)}
+	                </div>
+	              </div>
               
               {!disableAddService && (
                 <div className="pt-4 border-t">
@@ -5289,8 +5319,7 @@ const renderMainContent = (filteredClients) => {
 
     const isWithinBooking = (service, booking) => {
       if (!service || !booking) return true;
-      const checkIn = booking.checkIn ? new Date(booking.checkIn) : null;
-      const checkOut = booking.checkOut ? new Date(booking.checkOut) : null;
+      const { start: checkIn, end: checkOut } = getBookingWindow(booking);
       if (!checkIn || !checkOut) return true;
       const start = new Date(service.startDate || service.date);
       const end = new Date(service.endDate || service.startDate || service.date || start);
@@ -6206,15 +6235,14 @@ async function handleShoppingFormSubmit(shoppingExpense) {
         
         {/* CLIENT DETAILS */}
         {bottomSheetContent === 'client-details' && selectedItem && (
-          <div className="p-4 bg-white space-y-4">
-            <div className="text-center border-b pb-4">
-              <h2 className="text-xl font-bold text-gray-900">{safeRender(selectedItem.clientName)}</h2>
-              <p className="text-gray-600">{t.totalValue || 'Total'}: {selectedItem.totalValue.toLocaleString()} €</p>
-              <p className="text-gray-600">{t.amountDue || 'Due'}: {selectedItem.dueAmount.toLocaleString()} €</p>
-              <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusBadgeClass(selectedItem.paymentStatus)}`}>
-                {getPaymentStatusText(selectedItem.paymentStatus)}
-              </div>
-            </div>
+	          <div className="p-4 bg-white space-y-4">
+	            <div className="text-center border-b pb-4">
+	              <h2 className="text-xl font-bold text-gray-900">{safeRender(selectedItem.clientName)}</h2>
+	              <p className="text-gray-600">{t.totalValue || 'Total'}: {selectedItem.totalValue.toLocaleString()} €</p>
+	              <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusBadgeClass(selectedItem.paymentStatus)}`}>
+	                {getPaymentStatusText(selectedItem.paymentStatus)}
+	              </div>
+	            </div>
             
             {/* Bookings & Associated Services Section */}
             <div className="space-y-4">
@@ -6244,7 +6272,15 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                           <p className="font-bold text-gray-900">{safeRender(booking.accommodationType)}</p>
                         </div>
                         <p className="text-sm text-slate-700 font-semibold bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200 inline-flex items-center gap-1 shadow-sm">
-                          📅 {new Date(booking.checkIn).toLocaleDateString(language === 'en' ? 'en-GB' : 'ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' })} → {new Date(booking.checkOut).toLocaleDateString(language === 'en' ? 'en-GB' : 'ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                          {(() => {
+                            const { start, end } = getBookingWindow(booking);
+                            const locale = language === 'en' ? 'en-GB' : 'ro-RO';
+                            const fmt = (d) =>
+                              d
+                                ? d.toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' })
+                                : '?';
+                            return `📅 ${fmt(start)} → ${fmt(end)}`;
+                          })()}
                         </p>
                       </div>
                       <div className="text-right">
@@ -6547,15 +6583,15 @@ async function handleShoppingFormSubmit(shoppingExpense) {
                               {safeRender(payment.serviceName)}
                             </p>
                           )}
-                          {payment.notes && (
-                            <p className="text-[10px] text-gray-600 mt-1 italic">
-                              {safeRender(payment.notes)}
-                            </p>
-                          )}
-                        </div>
-                        <span className="px-2 py-1 bg-white border border-gray-200 text-gray-700 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm">{payment.method}</span>
-                      </div>
-                    </div>
+	                          {payment.notes && (
+	                            <p className="mt-2 inline-block rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 leading-relaxed whitespace-pre-line">
+	                              {safeRender(payment.notes)}
+	                            </p>
+	                          )}
+	                        </div>
+	                        <span className="px-2 py-1 bg-white border border-gray-200 text-gray-700 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm">{payment.method}</span>
+	                      </div>
+	                    </div>
                   ))}
                   <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 mt-4 shadow-sm">
                     <div className="flex justify-between items-center">

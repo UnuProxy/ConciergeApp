@@ -615,21 +615,21 @@ function Dashboard() {
         
         const upcomingBookings = reservations
           .filter(booking => {
-            if (!booking.checkIn) return false;
-            const checkInDate = booking.checkIn.toDate ? booking.checkIn.toDate() : new Date(booking.checkIn);
+            const checkInDate = toLocalDate(booking.tripStart || booking.checkIn);
+            if (!checkInDate) return false;
             if (checkInDate < today) return false;
             const client = booking.clientId ? clientsById.get(booking.clientId) : null;
             const isVip = client?.isVip || client?.clientType === 'vip' || booking.isVip || booking.clientType === 'vip';
             return Boolean(isVip);
           })
           .sort((a, b) => {
-            const dateA = a.checkIn.toDate ? a.checkIn.toDate() : new Date(a.checkIn);
-            const dateB = b.checkIn.toDate ? b.checkIn.toDate() : new Date(b.checkIn);
+            const dateA = toLocalDate(a.tripStart || a.checkIn) || new Date(0);
+            const dateB = toLocalDate(b.tripStart || b.checkIn) || new Date(0);
             return dateA - dateB;
           })
           .slice(0, 3)
           .map(booking => {
-            const checkInDate = booking.checkIn.toDate ? booking.checkIn.toDate() : new Date(booking.checkIn);
+            const checkInDate = toLocalDate(booking.tripStart || booking.checkIn) || new Date();
             const isToday = checkInDate.toDateString() === today.toDateString();
             const isTomorrow = checkInDate.toDateString() === tomorrow.toDateString();
             const clientName = getBookingClientName(booking, clientsById);
@@ -681,6 +681,23 @@ function Dashboard() {
   }, [userCompanyId, language]);
 
   const formatRelative = (template, count) => template.replace('{count}', count);
+
+  const toLocalDate = (value) => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (typeof value?.toDate === 'function') return value.toDate();
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      const dateOnly = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (dateOnly) {
+        return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+      }
+      const parsed = new Date(trimmed);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
 
   const getTimeAgo = (date) => {
     const now = new Date();

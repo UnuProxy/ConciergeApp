@@ -27,7 +27,7 @@ import Finance from './pages/Finance'
 // Auth
 import Login from './pages/Login'
 import PrivateRoute from './components/PrivateRoute'
-import RoleProtectedRoute from './components/RoleProtectedRoute'
+import ModuleProtectedRoute from './components/ModuleProtectedRoute'
 // User Management
 import UserManagement from './pages/users/UserManagement'
 import PropertiesForSale from './pages/services/properties/PropertiesForSale';
@@ -111,16 +111,18 @@ function App() {
                     path="/clients/*"
                     element={
                       <PrivateRoute>
-                        <ProtectedLayout
-                          sidebarOpen={sidebarOpen}
-                          setSidebarOpen={setSidebarOpen}
-                        >
-                          <Routes>
-                            <Route path="add" element={<AddClient />} />
-                            <Route path="existing" element={<ExistingClients />} />
-                            <Route path="collaborators" element={<Collaborators />} />
-                          </Routes>
-                        </ProtectedLayout>
+                        <ModuleProtectedRoute module="clients">
+                          <ProtectedLayout
+                            sidebarOpen={sidebarOpen}
+                            setSidebarOpen={setSidebarOpen}
+                          >
+                            <Routes>
+                              <Route path="add" element={<AddClient />} />
+                              <Route path="existing" element={<ExistingClients />} />
+                              <Route path="collaborators" element={<Collaborators />} />
+                            </Routes>
+                          </ProtectedLayout>
+                        </ModuleProtectedRoute>
                       </PrivateRoute>
                     }
                   />
@@ -129,25 +131,27 @@ function App() {
                     path="/services/*"
                     element={
                       <PrivateRoute>
-                        <ProtectedLayout
-                          sidebarOpen={sidebarOpen}
-                          setSidebarOpen={setSidebarOpen}
-                        >
-                          <Routes>
-                            <Route path="villas" element={<Villas />} />
-                            <Route path="core-concierge" element={<CoreConcierge />} />
-                            <Route path="boats" element={<Boats />} />
-                            <Route path="cars" element={<Cars />} />
-                            <Route path="security" element={<Security />} />
-                            <Route path="chef" element={<Chef />} />
-                            
-                            {/* Add these new routes */}
-                            <Route path="properties-for-sale" element={<PropertiesForSale />} />
-                            <Route path="properties-for-sale/add" element={<AddProperty />} />
-                            <Route path="properties-for-sale/:id" element={<PropertyDetail />} />
-                            <Route path="properties-for-sale/edit/:id" element={<AddProperty />} />
-                          </Routes>
-                        </ProtectedLayout>
+                        <ModuleProtectedRoute module="services">
+                          <ProtectedLayout
+                            sidebarOpen={sidebarOpen}
+                            setSidebarOpen={setSidebarOpen}
+                          >
+                            <Routes>
+                              <Route path="villas" element={<Villas />} />
+                              <Route path="core-concierge" element={<CoreConcierge />} />
+                              <Route path="boats" element={<Boats />} />
+                              <Route path="cars" element={<Cars />} />
+                              <Route path="security" element={<Security />} />
+                              <Route path="chef" element={<Chef />} />
+                              
+                              {/* Add these new routes */}
+                              <Route path="properties-for-sale" element={<PropertiesForSale />} />
+                              <Route path="properties-for-sale/add" element={<AddProperty />} />
+                              <Route path="properties-for-sale/:id" element={<PropertyDetail />} />
+                              <Route path="properties-for-sale/edit/:id" element={<AddProperty />} />
+                            </Routes>
+                          </ProtectedLayout>
+                        </ModuleProtectedRoute>
                       </PrivateRoute>
                     }
                   />
@@ -158,12 +162,14 @@ function App() {
                     path="/reservations"
                     element={
                       <PrivateRoute>
-                        <ProtectedLayout
-                          sidebarOpen={sidebarOpen}
-                          setSidebarOpen={setSidebarOpen}
-                        >
-                          <UpcomingBookings />
-                        </ProtectedLayout>
+                        <ModuleProtectedRoute module="reservations">
+                          <ProtectedLayout
+                            sidebarOpen={sidebarOpen}
+                            setSidebarOpen={setSidebarOpen}
+                          >
+                            <UpcomingBookings />
+                          </ProtectedLayout>
+                        </ModuleProtectedRoute>
                       </PrivateRoute>
                     }
                   />
@@ -172,14 +178,14 @@ function App() {
                     path="/finance"
                     element={
                       <PrivateRoute>
-                        <RoleProtectedRoute requiredRole="admin">
+                        <ModuleProtectedRoute module="finance">
                           <ProtectedLayout
                             sidebarOpen={sidebarOpen}
                             setSidebarOpen={setSidebarOpen}
                           >
                             <Finance />
                           </ProtectedLayout>
-                        </RoleProtectedRoute>
+                        </ModuleProtectedRoute>
                       </PrivateRoute>
                     }
                   />
@@ -203,12 +209,14 @@ function App() {
                     path="/users/manage"
                     element={
                       <PrivateRoute>
-                        <ProtectedLayout
-                          sidebarOpen={sidebarOpen}
-                          setSidebarOpen={setSidebarOpen}
-                        >
-                          <UserManagement />
-                        </ProtectedLayout>
+                        <ModuleProtectedRoute module="userManagement">
+                          <ProtectedLayout
+                            sidebarOpen={sidebarOpen}
+                            setSidebarOpen={setSidebarOpen}
+                          >
+                            <UserManagement />
+                          </ProtectedLayout>
+                        </ModuleProtectedRoute>
                       </PrivateRoute>
                     }
                   />
