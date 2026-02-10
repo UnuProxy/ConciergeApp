@@ -5,6 +5,12 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function userEmail() {
+      return isAuthed() && request.auth.token.email != null
+        ? request.auth.token.email.lower()
+        : null;
+    }
+
     function userDoc() {
       return isAuthed()
         ? get(/databases/$(database)/documents/users/$(request.auth.uid))
@@ -79,7 +85,7 @@ service cloud.firestore {
     // Companies (metadata) + nested per-company collections
     match /companies/{companyId} {
       allow read: if isAuthed();
-      allow write: if isAdminOf(companyId);
+      allow write: if false;
 
       match /{sub=**} {
         allow read, write: if matchesCompany(companyId);
@@ -89,7 +95,10 @@ service cloud.firestore {
     // authorized_users: allow any signed-in user to read (for login/authorization checks)
     // This must be permissive for initial login flow before users doc exists
     match /authorized_users/{docId} {
-      allow read: if isAuthed();
+      // Prevent cross-company/user leakage: users can only read their own entry by email,
+      // or admins can read/manage entries for their company.
+      allow read: if isAuthed()
+        && (resource.data.email == userEmail() || isAdminOf(resource.data.companyId));
       allow create, update: if isAuthed()
         && request.resource.data.companyId != null
         && isAdminOf(request.resource.data.companyId);
@@ -117,54 +126,70 @@ service cloud.firestore {
     // (villas, cars, boats, chefs, security, services, properties)
     // ========================================================================
 
-    // Make catalog items easier: any authenticated user can read.
-    // Admins of either company can manage any shared item. Non-admins limited to their company.
+    // SHARED CATALOGS: both companies can view the same services (read),
+    // but can only write within their own companyId (prevents mixing).
     match /cars/{id} {
       allow read: if isAuthed();
-      allow create: if isAuthed();
-      allow update, delete: if isAuthed() && (isAdmin() || matchesCompany(resource.data.companyId));
+      allow create: if canCreateForCompany(request.resource.data.companyId);
+      allow update: if canUpdateForCompany(resource.data.companyId) ||
+        (isAdmin() && resource.data.companyId == null && request.resource.data.companyId == userCompanyId());
+      allow delete: if canDeleteForCompany(resource.data.companyId) || (isAdmin() && resource.data.companyId == null);
     }
 
     match /villas/{id} {
       allow read: if isAuthed();
-      allow create: if isAuthed();
-      allow update, delete: if isAuthed() && (isAdmin() || matchesCompany(resource.data.companyId));
+      allow create: if canCreateForCompany(request.resource.data.companyId);
+      allow update: if canUpdateForCompany(resource.data.companyId) ||
+        (isAdmin() && resource.data.companyId == null && request.resource.data.companyId == userCompanyId());
+      allow delete: if canDeleteForCompany(resource.data.companyId) || (isAdmin() && resource.data.companyId == null);
     }
 
     match /boats/{id} {
       allow read: if isAuthed();
-      allow create: if isAuthed();
-      allow update, delete: if isAuthed() && (isAdmin() || matchesCompany(resource.data.companyId));
+      allow create: if canCreateForCompany(request.resource.data.companyId);
+      allow update: if canUpdateForCompany(resource.data.companyId) ||
+        (isAdmin() && resource.data.companyId == null && request.resource.data.companyId == userCompanyId());
+      allow delete: if canDeleteForCompany(resource.data.companyId) || (isAdmin() && resource.data.companyId == null);
     }
 
     match /chefs/{id} {
       allow read: if isAuthed();
-      allow create: if isAuthed() && request.resource.data.companyId != null;
-      allow update, delete: if isAuthed() && (isAdmin() || matchesCompany(resource.data.companyId));
+      allow create: if canCreateForCompany(request.resource.data.companyId);
+      allow update: if canUpdateForCompany(resource.data.companyId) ||
+        (isAdmin() && resource.data.companyId == null && request.resource.data.companyId == userCompanyId());
+      allow delete: if canDeleteForCompany(resource.data.companyId) || (isAdmin() && resource.data.companyId == null);
     }
 
     match /services/{id} {
       allow read: if isAuthed();
-      allow create: if isAuthed() && request.resource.data.companyId != null;
-      allow update, delete: if isAuthed() && (isAdmin() || matchesCompany(resource.data.companyId));
+      allow create: if canCreateForCompany(request.resource.data.companyId);
+      allow update: if canUpdateForCompany(resource.data.companyId) ||
+        (isAdmin() && resource.data.companyId == null && request.resource.data.companyId == userCompanyId());
+      allow delete: if canDeleteForCompany(resource.data.companyId) || (isAdmin() && resource.data.companyId == null);
     }
 
     match /serviceCategories/{id} {
       allow read: if isAuthed();
-      allow create: if isAuthed() && request.resource.data.companyId != null;
-      allow update, delete: if isAuthed() && (isAdmin() || matchesCompany(resource.data.companyId));
+      allow create: if canCreateForCompany(request.resource.data.companyId);
+      allow update: if canUpdateForCompany(resource.data.companyId) ||
+        (isAdmin() && resource.data.companyId == null && request.resource.data.companyId == userCompanyId());
+      allow delete: if canDeleteForCompany(resource.data.companyId) || (isAdmin() && resource.data.companyId == null);
     }
 
     match /security/{id} {
       allow read: if isAuthed();
-      allow create: if isAuthed() && request.resource.data.companyId != null;
-      allow update, delete: if isAuthed() && (isAdmin() || matchesCompany(resource.data.companyId));
+      allow create: if canCreateForCompany(request.resource.data.companyId);
+      allow update: if canUpdateForCompany(resource.data.companyId) ||
+        (isAdmin() && resource.data.companyId == null && request.resource.data.companyId == userCompanyId());
+      allow delete: if canDeleteForCompany(resource.data.companyId) || (isAdmin() && resource.data.companyId == null);
     }
 
     match /properties/{id} {
       allow read: if isAuthed();
-      allow create: if isAuthed() && request.resource.data.companyId != null;
-      allow update, delete: if isAuthed() && (isAdmin() || matchesCompany(resource.data.companyId));
+      allow create: if canCreateForCompany(request.resource.data.companyId);
+      allow update: if canUpdateForCompany(resource.data.companyId) ||
+        (isAdmin() && resource.data.companyId == null && request.resource.data.companyId == userCompanyId());
+      allow delete: if canDeleteForCompany(resource.data.companyId) || (isAdmin() && resource.data.companyId == null);
     }
 
     // ========================================================================

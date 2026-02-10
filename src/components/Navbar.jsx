@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useDatabase } from '../context/DatabaseContext';
 import { useLanguage } from '../utils/languageHelper';
 
 const NAVBAR_TRANSLATIONS = {
@@ -64,6 +65,7 @@ function Navbar({ sidebarOpen, setSidebarOpen }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { currentUser, userCompany, userRole: authUserRole, logout } = useAuth();
+  const { companyInfo, userRole: dbUserRole } = useDatabase();
   const userMenuRef = useRef(null);
   const { language } = useLanguage();
   const navbarStrings = NAVBAR_TRANSLATIONS[language] || NAVBAR_TRANSLATIONS.en;
@@ -77,8 +79,8 @@ function Navbar({ sidebarOpen, setSidebarOpen }) {
       return 'admin';
     }
     
-    return authUserRole;
-  }, [currentUser, authUserRole]);
+    return dbUserRole || authUserRole;
+  }, [currentUser, authUserRole, dbUserRole]);
   
   useEffect(() => {
   // console.log('FIXED Navbar - Email:', currentUser?.email); // Removed for production
@@ -95,6 +97,7 @@ function Navbar({ sidebarOpen, setSidebarOpen }) {
   };
   
   const getCompanyName = () => {
+    if (companyInfo?.name) return companyInfo.name;
     if (userCompany === 'company1') return 'Luxury Concierge';
     if (userCompany === 'company2') return 'VIP Services';
     return '';

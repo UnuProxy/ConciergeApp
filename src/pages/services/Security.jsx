@@ -107,7 +107,7 @@ function Security() {
     setLoading(true);
     setError(null);
     try {
-      // Security is a shared service - load all security staff for both companies
+      // Shared catalog: both companies can view all security staff
       const snap = await getDocs(collection(db, 'security'));
       const raw = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       const withStats = await Promise.all(

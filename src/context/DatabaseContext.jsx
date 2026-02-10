@@ -21,6 +21,7 @@ export const DatabaseProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [userRole, setUserRole] = useState(null);
+  const [permissions, setPermissions] = useState(null);
   const debugForceCompanyId = import.meta.env.VITE_DEBUG_FORCE_COMPANY_ID || null;
   const debugForceCompanyName = import.meta.env.VITE_DEBUG_FORCE_COMPANY_NAME || debugForceCompanyId;
   const debugForceRole = import.meta.env.VITE_DEBUG_FORCE_ROLE || 'admin';
@@ -36,6 +37,30 @@ export const DatabaseProvider = ({ children }) => {
     return ["admin", "administrator", "owner", "manager", "superadmin"].includes(normalized);
   };
 
+  const normalizePermissions = (rawPermissions, roleValue) => {
+    const isAdmin = isAdminRoleValue(roleValue);
+    const base = {
+      clients: true,
+      services: true,
+      reservations: true,
+      finance: false
+    };
+
+    if (rawPermissions && typeof rawPermissions === 'object') {
+      const normalized = {
+        ...base,
+        clients: typeof rawPermissions.clients === 'boolean' ? rawPermissions.clients : base.clients,
+        services: typeof rawPermissions.services === 'boolean' ? rawPermissions.services : base.services,
+        reservations: typeof rawPermissions.reservations === 'boolean' ? rawPermissions.reservations : base.reservations,
+        finance: typeof rawPermissions.finance === 'boolean' ? rawPermissions.finance : base.finance
+      };
+      // Admins default to full access unless explicitly disabled (rare).
+      return isAdmin ? { ...normalized, finance: normalized.finance === false ? false : true } : normalized;
+    }
+
+    return isAdmin ? { ...base, finance: true } : base;
+  };
+
   // Get authentication and company info
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -49,19 +74,32 @@ export const DatabaseProvider = ({ children }) => {
           const userDocRef = doc(db, "users", user.uid);
           const userSnapshot = await getDoc(userDocRef);
           let userData = userSnapshot.exists() ? userSnapshot.data() : null;
+          let fallbackAuthorizedData = null;
 
           // Fallback to authorized_users if no user doc or missing required fields
           if (!userData?.companyId || !userData?.role) {
-            const usersRef = collection(db, "authorized_users");
-            const emailQuery = query(usersRef, where("email", "==", user.email.toLowerCase()));
-            const emailSnapshot = await getDocs(emailQuery);
+            let fallbackSnap = null;
+            const normalizedEmail = user.email.toLowerCase();
+            // Prefer deterministic doc id: authorized_users/{email}
+            const direct = await getDoc(doc(db, "authorized_users", normalizedEmail));
+            if (direct.exists()) {
+              fallbackSnap = { data: () => direct.data() };
+            } else {
+              const usersRef = collection(db, "authorized_users");
+              const emailQuery = query(usersRef, where("email", "==", normalizedEmail));
+              const emailSnapshot = await getDocs(emailQuery);
+              if (!emailSnapshot.empty) fallbackSnap = emailSnapshot.docs[0];
+            }
 
-            if (!emailSnapshot.empty) {
-              const fallbackData = emailSnapshot.docs[0].data();
+            if (fallbackSnap) {
+              const fallbackData = fallbackSnap.data();
+              fallbackAuthorizedData = fallbackData;
               userData = {
                 ...userData,
                 companyId: userData?.companyId || fallbackData.companyId,
-                role: userData?.role || fallbackData.role
+                role: userData?.role || fallbackData.role,
+                permissions: userData?.permissions || fallbackData.permissions,
+                companyName: userData?.companyName || fallbackData.companyName
               };
   // console.log("User found via authorized_users:", emailSnapshot.docs[0].id); // Removed for production
 
@@ -69,15 +107,43 @@ export const DatabaseProvider = ({ children }) => {
               if (!userSnapshot.exists() && userData.companyId) {
                 try {
                   await setDoc(doc(db, "users", user.uid), {
-                    email: user.email.toLowerCase(),
+                    email: normalizedEmail,
                     companyId: userData.companyId,
-                    role: userData.role || "agent"
+                    role: userData.role || "agent",
+                    ...(userData.permissions ? { permissions: userData.permissions } : {}),
+                    ...(userData.companyName ? { companyName: userData.companyName } : {})
                   }, { merge: true });
   // console.log("Created users doc from authorized_users fallback"); // Removed for production
                 } catch (writeErr) {
   // console.warn("Failed to create users doc from authorized_users:", writeErr); // Removed for production
                 }
               }
+            }
+          } else if (!userData?.permissions || !userData?.companyName) {
+            // If the user doc exists but is missing optional fields, try to hydrate from authorized_users.
+            try {
+              const normalizedEmail = user.email.toLowerCase();
+              let fallbackData = null;
+              const direct = await getDoc(doc(db, "authorized_users", normalizedEmail));
+              if (direct.exists()) {
+                fallbackData = direct.data();
+              } else {
+                const usersRef = collection(db, "authorized_users");
+                const emailQuery = query(usersRef, where("email", "==", normalizedEmail));
+                const emailSnapshot = await getDocs(emailQuery);
+                if (!emailSnapshot.empty) fallbackData = emailSnapshot.docs[0].data();
+              }
+
+              if (fallbackData) {
+                fallbackAuthorizedData = fallbackData;
+                userData = {
+                  ...userData,
+                  permissions: userData?.permissions || fallbackData.permissions,
+                  companyName: userData?.companyName || fallbackData.companyName
+                };
+              }
+            } catch {
+              // Ignore: app can still run without permissions/companyName hydration.
             }
           }
 
@@ -86,6 +152,24 @@ export const DatabaseProvider = ({ children }) => {
 
 	            const resolvedRole = userData.role || "employee";
 	            setUserRole(resolvedRole);
+              const resolvedPermissions = normalizePermissions(userData?.permissions, resolvedRole);
+              setPermissions(resolvedPermissions);
+
+              // Heal users/{uid} with permissions/companyName if allowed by rules.
+              if (userSnapshot.exists()) {
+                const needsPermissions = !userData?.permissions && !!(fallbackAuthorizedData?.permissions);
+                const needsCompanyName = !userData?.companyName && !!(fallbackAuthorizedData?.companyName);
+                if (needsPermissions || needsCompanyName) {
+                  try {
+                    await setDoc(userDocRef, {
+                      ...(needsPermissions ? { permissions: fallbackAuthorizedData.permissions } : {}),
+                      ...(needsCompanyName ? { companyName: fallbackAuthorizedData.companyName } : {})
+                    }, { merge: true });
+                  } catch {
+                    // Ignore: permissions can still be derived from authorized_users in-memory.
+                  }
+                }
+              }
 	  // console.log("Setting userRole state to:", resolvedRole); // Removed for production
 	            
 		            const rawCompanyId = typeof userData.companyId === 'string' ? userData.companyId.trim() : null;
@@ -133,23 +217,22 @@ export const DatabaseProvider = ({ children }) => {
 		                ? await resolveCompany(rawCompanyFallback)
 		                : null;
 
-		              // Admin convenience: match by company contact email (helps correct bad stored companyId).
-		              let resolvedByEmail = null;
-		              if (isAdminRoleValue(resolvedRole) && user.email) {
+		              let resolvedCompany =
+		                resolvedById ||
+		                resolvedByName ||
+		                resolvedByFallback;
+
+		              // Last-resort fallback: if companyId/name couldn't be resolved, try matching by contactEmail.
+		              // Important: never override an explicit companyId (prevents cross-company mixing).
+		              if (!resolvedCompany && isAdminRoleValue(resolvedRole) && user.email) {
 		                const email = user.email.toLowerCase();
 		                const emailQ = query(companiesRef, where("contactEmail", "==", email));
 		                const emailSnap = await getDocs(emailQ);
 		                if (!emailSnap.empty) {
 		                  const match = emailSnap.docs[0];
-		                  resolvedByEmail = { id: match.id, data: match.data(), resolvedFrom: "contactEmail" };
+		                  resolvedCompany = { id: match.id, data: match.data(), resolvedFrom: "contactEmail" };
 		                }
 		              }
-
-		              let resolvedCompany =
-		                resolvedByEmail ||
-		                resolvedByName ||
-		                resolvedById ||
-		                resolvedByFallback;
 
 		              if (import.meta.env.DEV && resolvedById && resolvedByName && resolvedById.id !== resolvedByName.id) {
 		                console.warn("User company mismatch:", {
@@ -187,25 +270,6 @@ export const DatabaseProvider = ({ children }) => {
 	                    // Ignore: rules may block some environments; we can still render UI.
 	                  }
 	                }
-		              } else if (rawCompanyId && isAdminRoleValue(resolvedRole)) {
-		                // Last-resort: if an admin is assigned to a companyId that doesn't exist,
-		                // create a minimal company doc so the app can proceed.
-		                try {
-		                  await setDoc(doc(db, "companies", rawCompanyId), {
-		                    name: rawCompanyId,
-		                    contactEmail: user.email?.toLowerCase() || null,
-		                    createdAt: serverTimestamp()
-		                  }, { merge: true });
-
-		                  setCompanyInfo({
-		                    id: rawCompanyId,
-		                    name: rawCompanyId,
-		                    contactEmail: user.email?.toLowerCase() || null
-		                  });
-		                } catch (createErr) {
-		                  console.error("Company not found and could not be created:", rawCompanyId, createErr);
-		                  setError("Company not found. Please contact your administrator.");
-		                }
 		              } else {
 		                console.error("Company not found:", rawCompanyId || rawCompanyName || rawCompanyFallback);
 		                setError("Company not found. Please contact your administrator.");
@@ -213,12 +277,13 @@ export const DatabaseProvider = ({ children }) => {
 		            } catch (companyError) {
 	              if (companyError?.code === "permission-denied") {
 	  // console.warn("Permission denied reading company doc, falling back to authorized_users data"); // Removed for production
-	                if (companyId) {
-                  setCompanyInfo({
-                    id: companyId,
-                    name: companyId
-                  });
-                }
+	                const fallbackCompanyId = rawCompanyId || rawCompanyName || rawCompanyFallback;
+	                if (fallbackCompanyId) {
+                    setCompanyInfo({
+                      id: fallbackCompanyId,
+                      name: rawCompanyName || fallbackCompanyId
+                    });
+                  }
               } else {
                 throw companyError;
               }
@@ -234,6 +299,7 @@ export const DatabaseProvider = ({ children }) => {
             // Dev escape hatch to continue testing UI when rules are too strict
             if (debugForceCompanyId) {
               setUserRole(debugForceRole);
+              setPermissions(normalizePermissions(null, debugForceRole));
               setCompanyInfo({
                 id: debugForceCompanyId,
                 name: debugForceCompanyName || debugForceCompanyId
@@ -251,6 +317,7 @@ export const DatabaseProvider = ({ children }) => {
         setCurrentUser(null);
         setCompanyInfo(null);
         setUserRole(null); // Reset userRole on logout
+        setPermissions(null);
         setLoading(false);
       }
     });
@@ -300,6 +367,7 @@ export const DatabaseProvider = ({ children }) => {
         loading,
         error,
         userRole,
+        permissions,
         
         // Raw Firebase services
         auth,

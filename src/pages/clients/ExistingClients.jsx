@@ -309,6 +309,12 @@ const translations = {
     accommodationType: 'Accommodation Type',
     past: 'Past Stays',
     upcoming: 'Upcoming Reservations',
+    tripTimeOnIsland: 'IMPORTANT: Client time on the island',
+    islandArrivalTime: 'Island arrival (date & time)',
+    islandDepartureTime: 'Island departure (date & time)',
+    importantTripTimeNote: 'Set the real arrival/departure time to keep the booking open even if services start before accommodation.',
+    tripTimeRequired: 'Please set the client arrival and departure time on the island (date & time).',
+    tripTimeInvalid: 'Departure time must be after arrival time.',
     preferences: 'Preferences',
     dietaryRestrictions: 'Dietary Restrictions',
     transportPreferences: 'Transport Preferences',
@@ -351,6 +357,8 @@ const translations = {
     chefs: 'Chefs',
     excursions: 'Excursions & Activities',
     discount: 'Discount',
+    beforeDiscount: 'Before discount',
+    afterDiscount: 'After discount',
     customPriceLabel: 'Custom price',
     customPriceNote: "Doesn't change brochure PDF",
     resetPrice: 'Reset',
@@ -545,6 +553,12 @@ const translations = {
     accommodationType: 'Tipul de Cazare',
     past: 'Sejururi Anterioare',
     upcoming: 'Rezervări Viitoare',
+    tripTimeOnIsland: 'IMPORTANT: Timpul real al clientului pe insulă',
+    islandArrivalTime: 'Sosire pe insulă (dată și oră)',
+    islandDepartureTime: 'Plecare de pe insulă (dată și oră)',
+    importantTripTimeNote: 'Setează ora reală de sosire/plecare ca rezervarea să rămână deschisă chiar dacă serviciile încep înainte de cazare.',
+    tripTimeRequired: 'Te rog setează sosirea și plecarea clientului pe insulă (dată și oră).',
+    tripTimeInvalid: 'Ora plecării trebuie să fie după ora sosirii.',
     preferences: 'Preferințe',
     dietaryRestrictions: 'Restricții Alimentare',
     transportPreferences: 'Preferințe Transport',
@@ -583,6 +597,8 @@ const translations = {
     chefs: 'Bucatari',
     excursions: 'Excursii și Activități',
     discount: 'Reducere',
+    beforeDiscount: 'Înainte de reducere',
+    afterDiscount: 'După reducere',
     customPriceLabel: 'Preț personalizat',
     customPriceNote: 'Nu modifică broșura PDF',
     resetPrice: 'Resetează',
@@ -898,6 +914,8 @@ const extractImageUrl = (data) => {
   const [reservationData, setReservationData] = useState({
     startDate: '',
     endDate: '',
+    tripStart: '',
+    tripEnd: '',
     adults: 1,
     children: 0,
     accommodationType: '',
@@ -1251,7 +1269,10 @@ useEffect(() => {
             
             // If there's a filter, apply it (for service subcategories)
             if (category.filter) {
-              queryRef = query(collectionRef, where("type", "==", category.filter));
+              queryRef = query(
+                collectionRef,
+                where("type", "==", category.filter)
+              );
             }
             
             const snapshot = await getDocs(queryRef);
@@ -1880,24 +1901,31 @@ setAvailableServices(services);
           ...doc.data()
         }));
         
-        // Categorize reservations
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        // Categorize reservations (use tripStart/tripEnd when available to keep bookings open)
+        const now = new Date();
         
         const upcomingReservations = [];
         const pastStays = [];
         let currentStay = null;
         
         allReservations.forEach(res => {
-          const checkIn = res.checkIn?.toDate ? res.checkIn.toDate() : new Date(res.checkIn);
-          const checkOut = res.checkOut?.toDate ? res.checkOut.toDate() : new Date(res.checkOut);
+          const checkIn = toJsDate(res.checkIn);
+          const checkOut = toJsDate(res.checkOut, { endOfDay: true });
+          const tripStart = res.tripStart ? toJsDate(res.tripStart) : null;
+          const tripEnd = res.tripEnd ? toJsDate(res.tripEnd) : null;
+
+          const windowStart = tripStart || checkIn;
+          const windowEnd = tripEnd || checkOut;
+          if (!windowStart || !windowEnd) return;
           
           // Current stay: check-in is in the past, check-out is in the future
-          if (checkIn <= today && checkOut >= today) {
+          if (windowStart <= now && windowEnd >= now) {
             currentStay = {
               id: res.id,
               checkIn: res.checkIn,
               checkOut: res.checkOut,
+              tripStart: res.tripStart,
+              tripEnd: res.tripEnd,
               accommodationType: res.accommodationType,
               totalAmount: res.totalAmount || res.baseAmount,
               paymentStatus: res.paymentStatus,
@@ -1905,11 +1933,13 @@ setAvailableServices(services);
             };
           }
           // Upcoming: check-in is in the future
-          else if (checkIn > today) {
+          else if (windowStart > now) {
             upcomingReservations.push({
               id: res.id,
               checkIn: res.checkIn,
               checkOut: res.checkOut,
+              tripStart: res.tripStart,
+              tripEnd: res.tripEnd,
               accommodationType: res.accommodationType,
               totalAmount: res.totalAmount || res.baseAmount,
               paymentStatus: res.paymentStatus,
@@ -1917,11 +1947,13 @@ setAvailableServices(services);
             });
           }
           // Past: check-out is in the past
-          else if (checkOut < today) {
+          else if (windowEnd < now) {
             pastStays.push({
               id: res.id,
               checkIn: res.checkIn,
               checkOut: res.checkOut,
+              tripStart: res.tripStart,
+              tripEnd: res.tripEnd,
               accommodationType: res.accommodationType,
               totalAmount: res.totalAmount || res.baseAmount,
               paymentStatus: res.paymentStatus,
@@ -1930,17 +1962,17 @@ setAvailableServices(services);
           }
         });
         
-        // Sort upcoming by check-in date (ascending)
+        // Sort upcoming by arrival (ascending)
         upcomingReservations.sort((a, b) => {
-          const dateA = a.checkIn?.toDate?.() || new Date(a.checkIn);
-          const dateB = b.checkIn?.toDate?.() || new Date(b.checkIn);
+          const dateA = toJsDate(a.tripStart || a.checkIn) || new Date(0);
+          const dateB = toJsDate(b.tripStart || b.checkIn) || new Date(0);
           return dateA - dateB;
         });
         
-        // Sort past stays by check-out date (descending)
+        // Sort past stays by departure (descending)
         pastStays.sort((a, b) => {
-          const dateA = a.checkOut?.toDate?.() || new Date(a.checkOut);
-          const dateB = b.checkOut?.toDate?.() || new Date(b.checkOut);
+          const dateA = toJsDate(a.tripEnd || a.checkOut, { endOfDay: true }) || new Date(0);
+          const dateB = toJsDate(b.tripEnd || b.checkOut, { endOfDay: true }) || new Date(0);
           return dateB - dateA;
         });
         
@@ -2165,13 +2197,26 @@ const fetchCompanyAdminForPdf = async (companyId) => {
         return;
       }
       
+      const missingDates = (offer.items || []).filter((item) => !(item?.startDate && item?.endDate));
+      if (missingDates.length) {
+        const first = missingDates[0];
+        const name = typeof first?.name === 'object' ? getLocalizedText(first.name, language) : (first?.name || 'service');
+        alert(`Please set service dates (from/to) for all items before converting to a booking. Missing: ${name}`);
+        return;
+      }
+
+      const offerStart = offer.items.reduce((min, item) => (!min || item.startDate < min ? item.startDate : min), null);
+      const offerEnd = offer.items.reduce((max, item) => (!max || item.endDate > max ? item.endDate : max), null);
+
       // Create basic reservation data from the offer
       const reservationData = {
         clientId: selectedClient.id,
         companyId: companyInfo.id,
         offerId: offer.id,
-        checkIn: new Date().toISOString().split('T')[0], // Default to today
-        checkOut: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Default to 7 days later
+        checkIn: offerStart || new Date().toISOString().split('T')[0], // Default to today
+        checkOut: offerEnd || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Default to 7 days later
+        tripStart: `${(offerStart || new Date().toISOString().split('T')[0])}T00:00`,
+        tripEnd: `${(offerEnd || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])}T23:59`,
         adults: 2,
         children: 0,
         accommodationType: '',
@@ -2200,8 +2245,8 @@ const fetchCompanyAdminForPdf = async (companyId) => {
           // Add payment tracking properties
           paymentStatus: 'unpaid',
           amountPaid: 0,
-          startDate: reservationData.checkIn,
-          endDate: reservationData.checkOut,
+          startDate: item.startDate || reservationData.checkIn,
+          endDate: item.endDate || reservationData.checkOut,
           offerId: offer.id
         });
       });
@@ -2378,6 +2423,17 @@ const fetchCompanyAdminForPdf = async (companyId) => {
       // Calculate booking dates from service dates (earliest start, latest end)
       const bookingCheckIn = earliestStartDate || new Date().toISOString().split('T')[0];
       const bookingCheckOut = latestEndDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+      const tripStartDate = toJsDate(reservationData.tripStart) || toJsDate(`${bookingCheckIn}T00:00`);
+      const tripEndDate = toJsDate(reservationData.tripEnd) || toJsDate(`${bookingCheckOut}T23:59`);
+      if (!tripStartDate || !tripEndDate) {
+        alert(t.tripTimeRequired);
+        return;
+      }
+      if (tripEndDate < tripStartDate) {
+        alert(t.tripTimeInvalid);
+        return;
+      }
       
       // Determine main accommodation type
       let mainAccommodationType = "Various Services";
@@ -2445,6 +2501,8 @@ const fetchCompanyAdminForPdf = async (companyId) => {
         offerId: offer.id,
         checkIn: bookingCheckIn,
         checkOut: bookingCheckOut,
+        tripStart: tripStartDate,
+        tripEnd: tripEndDate,
         adults: parseInt(reservationData.adults) || 2,
         children: parseInt(reservationData.children) || 0,
         accommodationType: mainAccommodationType,
@@ -2490,8 +2548,10 @@ const fetchCompanyAdminForPdf = async (companyId) => {
       // Create a UI-friendly reservation object
       const uiReservation = {
         id: docRef.id,
-        checkIn: reservationData.checkIn,
-        checkOut: reservationData.checkOut,
+        checkIn: bookingCheckIn,
+        checkOut: bookingCheckOut,
+        tripStart: tripStartDate,
+        tripEnd: tripEndDate,
         accommodationType: mainAccommodationType,
         offerReference: offer.id.slice(-5), // Add reference to the original offer
         totalAmount: totalAmount,
@@ -2791,6 +2851,75 @@ const handleSelectClient = async (client) => {
     } else {
       return Math.max(itemTotal - item.discountValue, 0);
     }
+  };
+
+  const pad2 = (value) => String(value).padStart(2, '0');
+
+  const formatISODateLocal = (date) => {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+    const y = date.getFullYear();
+    const m = pad2(date.getMonth() + 1);
+    const d = pad2(date.getDate());
+    return `${y}-${m}-${d}`;
+  };
+
+  const addDaysISO = (isoDateString, daysToAdd) => {
+    if (!isoDateString) return '';
+    const date = new Date(`${isoDateString}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return '';
+    date.setDate(date.getDate() + daysToAdd);
+    return formatISODateLocal(date);
+  };
+
+  const normalizeServiceDates = (item, nextStartDate, nextEndDate) => {
+    const startDate = nextStartDate || '';
+    let endDate = nextEndDate || '';
+    if (!startDate) return { startDate: '', endDate: '' };
+
+    if (!endDate) {
+      endDate = item?.category === 'villas' ? addDaysISO(startDate, 6) : startDate;
+    }
+
+    // Prevent endDate before startDate
+    if (endDate && startDate && endDate < startDate) {
+      endDate = item?.category === 'villas' ? addDaysISO(startDate, 6) : startDate;
+    }
+
+    return { startDate, endDate };
+  };
+
+  const monthKeyToIndex = (monthKey) => {
+    if (!monthKey || typeof monthKey !== 'string') return null;
+    const key = monthKey.trim().toLowerCase();
+    const map = {
+      january: 0,
+      february: 1,
+      march: 2,
+      april: 3,
+      may: 4,
+      june: 5,
+      july: 6,
+      august: 7,
+      september: 8,
+      october: 9,
+      november: 10,
+      december: 11
+    };
+    return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : null;
+  };
+
+  const suggestStartDateForItem = (item) => {
+    const monthKey = item?.selectedMonth;
+    if (!monthKey || monthKey === 'daily') return '';
+    const monthIndex = monthKeyToIndex(monthKey);
+    if (monthIndex === null) return '';
+
+    const now = new Date();
+    const currentMonthIndex = now.getMonth();
+    const currentYear = now.getFullYear();
+    const year = monthIndex < currentMonthIndex ? currentYear + 1 : currentYear;
+    // IMPORTANT: Build YYYY-MM-DD directly to avoid timezone shifts (e.g. May 1 -> Apr 30 in ISO).
+    return `${year}-${pad2(monthIndex + 1)}-01`;
   };
   
   // Handle back to list on mobile
@@ -3198,6 +3327,8 @@ const handleSelectClient = async (client) => {
       discountType: 'percentage',
       discountValue: 0,
       hasCustomDiscount: false,
+      startDate: '',
+      endDate: '',
       selectedMonth: selectedMonthOption ? selectedMonthOption.month : null,
       selectedMonthLabel: selectedMonthOption ? selectedMonthOption.label : null,
       propertyLink: service.propertyLink || '',
@@ -3225,27 +3356,30 @@ const handleSelectClient = async (client) => {
     setCustomService(prev => ({ ...prev, [name]: name === 'quantity' ? value.replace(/[^0-9]/g, '') : value }));
   };
 
-  const handleAddCustomService = () => {
-    const price = parseFloat(customService.price);
-    const quantity = Math.max(1, parseInt(customService.quantity, 10) || 1);
-    if (!customService.name || Number.isNaN(price)) {
-      setOfferNotice(t.addCustomService);
-      return;
-    }
-    const id = `custom-${Date.now()}`;
-    const newItem = {
-      id,
-      serviceId: id,
-      name: customService.name,
-      category: pendingService?.category || 'custom',
-      price: price,
-      originalPrice: price,
-      unit: 'service',
-      customUnit: customServiceUnit,
-      quantity,
-      discountType: 'percentage',
-      discountValue: 0,
-      hasCustomDiscount: false,
+	  const handleAddCustomService = () => {
+	    const price = parseFloat(customService.price);
+	    const quantity = Math.max(1, parseInt(customService.quantity, 10) || 1);
+	    if (!customService.name || Number.isNaN(price)) {
+	      setOfferNotice(t.addCustomService);
+	      return;
+	    }
+	    const id = `custom-${Date.now()}`;
+	    const unit = customServiceUnit || 'service';
+	    const newItem = {
+	      id,
+	      serviceId: id,
+	      name: customService.name,
+	      category: pendingService?.category || 'custom',
+	      price: price,
+	      originalPrice: price,
+	      unit,
+	      customUnit: unit,
+	      quantity,
+	      discountType: 'percentage',
+	      discountValue: 0,
+	      hasCustomDiscount: false,
+	      startDate: '',
+      endDate: '',
       selectedMonth: null,
       selectedMonthLabel: null,
       propertyLink: '',
@@ -3417,6 +3551,17 @@ const handleSelectClient = async (client) => {
   // Generate PDF for offer with enhanced luxury design - UPDATED for generic company use
 const generateOfferPdf = async (offer) => {
   if (!offer || !companyInfo) return;
+
+  const itemsMissingDates = (offer.items || []).filter((item) => {
+    // Require dates for every line item so PDF + booking conversion are always consistent.
+    return !(item?.startDate && item?.endDate);
+  });
+  if (itemsMissingDates.length) {
+    const first = itemsMissingDates[0];
+    const name = typeof first?.name === 'object' ? getLocalizedText(first.name, language) : (first?.name || 'service');
+    alert(`Please set service dates (from/to) for all items before generating the PDF. Missing: ${name}`);
+    return;
+  }
   
   // ALWAYS use English for PDF as requested
   const pdfLocale = 'en-GB';
@@ -3457,6 +3602,15 @@ const generateOfferPdf = async (offer) => {
       unit: 'mm',
       format: 'a4',
     });
+
+    const formatPdfDate = (isoDateString) => {
+      if (!isoDateString || typeof isoDateString !== 'string') return '';
+      const [y, m, d] = isoDateString.split('-').map((p) => parseInt(p, 10));
+      if (!y || !m || !d) return isoDateString;
+      const date = new Date(y, m - 1, d);
+      if (Number.isNaN(date.getTime())) return isoDateString;
+      return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
     
     // Set up luxury fonts
     doc.setFont("helvetica", "bold");
@@ -3599,7 +3753,7 @@ const generateOfferPdf = async (offer) => {
       const item = offer.items[i];
       
       // Check if we need to add a new page
-      if (currentY > 250) {
+      if (currentY > 225) {
         doc.addPage();
         currentY = 20;
         
@@ -3628,19 +3782,26 @@ const generateOfferPdf = async (offer) => {
       doc.setDrawColor(220, 220, 230);
       doc.setLineWidth(0.3);
       doc.setFillColor(250, 250, 252);
-      doc.roundedRect(20, currentY, 170, 45, 2, 2, 'FD');
+      doc.roundedRect(20, currentY, 170, 60, 2, 2, 'FD');
       
-      // Add image background
-      doc.setFillColor(240, 240, 240);
-      doc.rect(25, currentY + 5, 50, 35, 'F');
+      // Image / icon box (use a landscape ratio to avoid heavy letterboxing)
+      const imageX = 25;
+      const imageW = 50;
+      const imageH = 35;
+      const imageY = currentY + (60 - imageH) / 2;
+
+      // Subtle background for image/icon area
+      doc.setFillColor(245, 247, 250);
+      doc.setDrawColor(220, 220, 230);
+      doc.roundedRect(imageX, imageY, imageW, imageH, 2, 2, 'FD');
       
       // Try to use the actual image if available in cache
       let imageDisplayed = false;
       if (item.imageUrl && imageCache[item.imageUrl]) {
         try {
-          addImageContain(imageCache[item.imageUrl], 25, currentY + 5, 50, 35);
+          addImageContain(imageCache[item.imageUrl], imageX, imageY, imageW, imageH);
           if (item.category === 'villas' && item.propertyLink) {
-            doc.link(25, currentY + 5, 50, 35, { url: item.propertyLink });
+            doc.link(imageX, imageY, imageW, imageH, { url: item.propertyLink });
           }
           imageDisplayed = true;
         } catch (imgError) {
@@ -3652,10 +3813,10 @@ const generateOfferPdf = async (offer) => {
       // If no image was displayed, show the icon
       if (!imageDisplayed) {
         // Draw elegant vector icon for the service category
-        const iconX = 25;
-        const iconY = currentY + 5;
-        const iconW = 50;
-        const iconH = 35;
+        const iconX = imageX;
+        const iconY = imageY;
+        const iconW = imageW;
+        const iconH = imageH;
         
         // Add subtle background
         doc.setFillColor(245, 247, 250); 
@@ -3741,42 +3902,104 @@ const generateOfferPdf = async (offer) => {
         doc.setTextColor(100, 100, 110);
         infoY += 7;
       }
+
+      if (item.startDate && item.endDate) {
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 110);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Dates: ${formatPdfDate(item.startDate)} - ${formatPdfDate(item.endDate)}`, 80, infoY);
+        infoY += 7;
+      }
       
       // Price and quantity - FIXED SPACING AND FORMAT
-      const unitInfo = item.unit ? getUnitDisplayLabel(item.unit, pdfStrings, item.category) : '';
-      const priceLineY = infoY;
-      doc.setFontSize(9);
-      doc.setTextColor(32, 32, 64);
-      const unitDescriptor = unitInfo ? ` / ${unitInfo}` : '';
-      // Use more standard Quantity x Price format
-      doc.text(`${item.quantity} × ${formatCurrency(item.price)}${unitDescriptor}`, 80, priceLineY);
+	      const unitInfo = item.unit ? getUnitDisplayLabel(item.unit, pdfStrings, item.category) : '';
+	      const priceLineY = infoY;
+	      doc.setFontSize(9);
+	      doc.setTextColor(32, 32, 64);
+	      const effectiveUnit = (item.customUnit || item.unit || '').toString();
+	      const unitInfoRaw = effectiveUnit ? getUnitDisplayLabel(effectiveUnit, pdfStrings, item.category) : '';
+	      const unitInfoStripped = unitInfoRaw ? unitInfoRaw.replace(/^per\s+/i, '') : '';
+	      const unitDescriptor = unitInfoStripped ? ` / ${unitInfoStripped}` : '';
+
+	      const formatQuantityWithUnit = (qty, unitValue) => {
+	        const numericQty = Number(qty);
+	        const safeQty = Number.isFinite(numericQty) ? numericQty : 0;
+	        const normalizedUnit = (unitValue || '').toString().toLowerCase();
+	        const unitKey = normalizedUnit.includes('hour') || normalizedUnit === 'h'
+	          ? 'hour'
+	          : normalizedUnit.includes('day') || normalizedUnit === 'd'
+	            ? 'day'
+	            : normalizedUnit.includes('night')
+	              ? 'night'
+	              : normalizedUnit.includes('week')
+	                ? 'week'
+	                : normalizedUnit.includes('month')
+	                  ? 'month'
+	                  : '';
+
+	        if (!unitKey) return `${safeQty}`;
+	        const labels = {
+	          hour: safeQty === 1 ? 'hour' : 'hours',
+	          day: safeQty === 1 ? 'day' : 'days',
+	          night: safeQty === 1 ? 'night' : 'nights',
+	          week: safeQty === 1 ? 'week' : 'weeks',
+	          month: safeQty === 1 ? 'month' : 'months'
+	        };
+	        return `${safeQty} ${labels[unitKey] || unitKey}`;
+	      };
+
+	      // Use more standard Quantity x Price format
+	      const standardPrice = getItemStandardPrice(item);
+	      const basePrice = getItemBasePrice(item);
+	      const itemTotal = calculateItemPrice(item);
+	      doc.text(`${formatQuantityWithUnit(item.quantity, effectiveUnit)} × ${formatCurrency(basePrice)}${unitDescriptor}`, 80, priceLineY);
+
+      let metaY = priceLineY + 7;
+
+      const metaLeftX = 80;
+      const metaRightX = 180;
+      const hasCustomPrice =
+        item.customPrice !== undefined &&
+        item.customPrice !== null &&
+        item.customPrice !== '' &&
+        Math.abs(basePrice - standardPrice) > 0.01;
+
+      if (hasCustomPrice) {
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 110);
+        doc.setFont("helvetica", "normal");
+        doc.text('Custom price:', metaLeftX, metaY);
+        doc.text(formatCurrency(basePrice), metaRightX, metaY, { align: 'right' });
+        metaY += 5.5;
+
+        doc.text('Standard price:', metaLeftX, metaY);
+        doc.text(formatCurrency(standardPrice), metaRightX, metaY, { align: 'right' });
+        metaY += 5.5;
+      }
       
       // Show if there's a discount
       if (item.discountValue > 0) {
-        const discountText = item.discountType === 'percentage' 
-          ? `${item.discountValue}% discount applied` 
-          : `${formatCurrency(item.discountValue)} discount applied`;
+        const preDiscountTotal = basePrice * (item.quantity || 0);
+        const discountAmount = Math.max(preDiscountTotal - itemTotal, 0);
+        const discountText = item.discountType === 'percentage'
+          ? `Discount (${item.discountValue}%):`
+          : `Discount:`;
         doc.setFontSize(8);
         doc.setTextColor(180, 70, 70);
-        doc.text(discountText, 80, priceLineY + 7);
+        doc.setFont("helvetica", "normal");
+        doc.text(discountText, metaLeftX, metaY);
+        doc.text(`-${formatCurrency(discountAmount)}`, metaRightX, metaY, { align: 'right' });
       }
       
       // Total for this item
       doc.setFontSize(11);
       doc.setTextColor(32, 32, 64);
       doc.setFont("helvetica", "bold");
-      
-      const basePrice = item.originalPrice || item.price;
-      const itemTotal = item.discountValue
-        ? (item.discountType === 'percentage' 
-            ? (basePrice * item.quantity) * (1 - item.discountValue/100) 
-            : (basePrice * item.quantity) - item.discountValue)
-        : (basePrice * item.quantity);
         
       doc.text(formatCurrency(itemTotal), 180, priceLineY, { align: 'right' });
       
       // Move down for the next service
-      currentY += 55;
+      currentY += 70;
     }
     
     // Add totals with luxury styling
@@ -3808,13 +4031,7 @@ const generateOfferPdf = async (offer) => {
     
     // Recalculate subtotal from items (in case stored value is incorrect for old offers)
     const recalculatedSubtotal = offer.items.reduce((sum, item) => {
-      const basePrice = item.originalPrice || item.price;
-      const itemTotal = item.discountValue
-        ? (item.discountType === 'percentage' 
-            ? (basePrice * item.quantity) * (1 - item.discountValue/100) 
-            : (basePrice * item.quantity) - item.discountValue)
-        : (basePrice * item.quantity);
-      return sum + Math.max(itemTotal, 0);
+      return sum + Math.max(calculateItemPrice(item), 0);
     }, 0);
     
     // Subtotal
@@ -4032,7 +4249,16 @@ const generateOfferPdf = async (offer) => {
   // Handle reservation form input changes
   const handleReservationChange = (e) => {
     const { name, value } = e.target;
-    setReservationData(prev => ({ ...prev, [name]: value }));
+    setReservationData(prev => {
+      const next = { ...prev, [name]: value };
+      if (name === 'startDate' && value && !prev.tripStart) {
+        next.tripStart = `${value}T00:00`;
+      }
+      if (name === 'endDate' && value && !prev.tripEnd) {
+        next.tripEnd = `${value}T23:59`;
+      }
+      return next;
+    });
   };
   
   // Create reservation
@@ -4045,6 +4271,17 @@ const generateOfferPdf = async (offer) => {
       alert('Please fill in all required fields.');
       return;
     }
+
+    const tripStartDate = toJsDate(reservationData.tripStart);
+    const tripEndDate = toJsDate(reservationData.tripEnd);
+    if (!tripStartDate || !tripEndDate) {
+      alert(t.tripTimeRequired);
+      return;
+    }
+    if (tripEndDate < tripStartDate) {
+      alert(t.tripTimeInvalid);
+      return;
+    }
     
     try {
       const newReservation = {
@@ -4052,6 +4289,8 @@ const generateOfferPdf = async (offer) => {
         companyId: companyInfo.id,
         checkIn: reservationData.startDate,
         checkOut: reservationData.endDate,
+        tripStart: tripStartDate,
+        tripEnd: tripEndDate,
         adults: parseInt(reservationData.adults) || 1,
         children: parseInt(reservationData.children) || 0,
         accommodationType: reservationData.accommodationType,
@@ -4070,6 +4309,8 @@ const generateOfferPdf = async (offer) => {
         id: docRef.id,
         checkIn: reservationData.startDate,
         checkOut: reservationData.endDate,
+        tripStart: tripStartDate,
+        tripEnd: tripEndDate,
         accommodationType: reservationData.accommodationType
       };
       
@@ -4089,7 +4330,7 @@ const generateOfferPdf = async (offer) => {
         setClients(prev => prev.map(client => client.id === selectedClient.id ? updatedClient : client));
       }
       
-      setReservationData({ startDate: '', endDate: '', adults: 1, children: 0, accommodationType: '', transport: '', notes: '', collaboratorId: '' });
+      setReservationData({ startDate: '', endDate: '', tripStart: '', tripEnd: '', adults: 1, children: 0, accommodationType: '', transport: '', notes: '', collaboratorId: '' });
       setShowCreateReservation(false);
       
       if (isMobile) {
@@ -4104,14 +4345,68 @@ const generateOfferPdf = async (offer) => {
   };
   
   // Format date for display
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
-    try {
-      return new Date(dateString).toLocaleDateString();
-    } catch (error) {
-      console.error("Error formatting date:", error);
-      return dateString;
+  const toJsDate = (value, { endOfDay = false } = {}) => {
+    if (!value) return null;
+    if (value instanceof Date) return new Date(value);
+    if (typeof value?.toDate === 'function') return new Date(value.toDate());
+    if (value?.seconds) return new Date(value.seconds * 1000);
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+
+      // Date-only: treat as local day boundaries (prevents timezone shifting issues)
+      const dateOnly = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (dateOnly) {
+        const year = Number(dateOnly[1]);
+        const month = Number(dateOnly[2]) - 1;
+        const day = Number(dateOnly[3]);
+        const d = new Date(year, month, day);
+        if (endOfDay) d.setHours(23, 59, 59, 999);
+        else d.setHours(0, 0, 0, 0);
+        return d;
+      }
+
+      // datetime-local string (YYYY-MM-DDTHH:mm)
+      const dt = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+      if (dt) {
+        return new Date(
+          Number(dt[1]),
+          Number(dt[2]) - 1,
+          Number(dt[3]),
+          Number(dt[4]),
+          Number(dt[5]),
+          0,
+          0
+        );
+      }
+
+      const parsed = new Date(trimmed);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+      return null;
     }
+
+    const fallback = new Date(value);
+    if (Number.isNaN(fallback.getTime())) return null;
+    return fallback;
+  };
+
+  const formatDate = (value) => {
+    const d = toJsDate(value);
+    if (!d) return '';
+    return d.toLocaleDateString();
+  };
+
+  const formatDateTime = (value) => {
+    const d = toJsDate(value);
+    if (!d) return '';
+    return d.toLocaleString(undefined, {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   // Contact action handlers
@@ -5860,11 +6155,71 @@ const getUserName = async (userId) => {
   {item.hasCustomDiscount && item.discountValue > 0 && (
     <div className="mt-2 flex items-center justify-between text-sm">
       <span className="text-gray-500 line-through">
-        Original: € {(getItemBasePrice(item) * item.quantity).toFixed(2)}
+        {t.beforeDiscount}: € {(getItemBasePrice(item) * item.quantity).toFixed(2)}
       </span>
       <span className="font-bold text-emerald-600">
-        After discount: €{calculateItemPrice(item).toFixed(2)}
+        {t.afterDiscount}: €{calculateItemPrice(item).toFixed(2)}
       </span>
+    </div>
+  )}
+</div>
+
+{/* Service dates (required for clear PDF + easy booking conversion) */}
+<div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+  <div className="flex items-center justify-between mb-2">
+    <span className="text-sm font-medium text-gray-700">{t.serviceDates}:</span>
+    {item.startDate && item.endDate && (
+      <span className="text-xs text-gray-500">
+        {item.category === 'villas' ? `${t.from} ${item.startDate} ${t.to} ${item.endDate}` : `${item.startDate} → ${item.endDate}`}
+      </span>
+    )}
+  </div>
+  <div className="grid grid-cols-2 gap-2">
+    <div>
+      <label className="block text-xs text-gray-600 mb-1">{t.from}</label>
+      <input
+        type="date"
+        value={item.startDate || ''}
+        onFocus={(e) => {
+          if (item.startDate) return;
+          const suggested = suggestStartDateForItem(item);
+          if (!suggested) return;
+          const { startDate, endDate } = normalizeServiceDates(item, suggested, item.endDate);
+          setOfferItems(prev => prev.map(i => (i.id === item.id ? { ...i, startDate, endDate } : i)));
+          // Ensure the picker opens on the suggested month in browsers that use input value.
+          e.target.value = startDate;
+        }}
+        onChange={(e) => {
+          const nextStartDate = e.target.value;
+          setOfferItems(prev => prev.map(i => {
+            if (i.id !== item.id) return i;
+            const { startDate, endDate } = normalizeServiceDates(i, nextStartDate, i.endDate);
+            return { ...i, startDate, endDate };
+          }));
+        }}
+        className="w-full p-2 border border-gray-300 rounded bg-white text-sm"
+      />
+    </div>
+    <div>
+      <label className="block text-xs text-gray-600 mb-1">{t.to}</label>
+      <input
+        type="date"
+        value={item.endDate || ''}
+        onChange={(e) => {
+          const nextEndDate = e.target.value;
+          setOfferItems(prev => prev.map(i => {
+            if (i.id !== item.id) return i;
+            const { startDate, endDate } = normalizeServiceDates(i, i.startDate, nextEndDate);
+            return { ...i, startDate, endDate };
+          }));
+        }}
+        className="w-full p-2 border border-gray-300 rounded bg-white text-sm"
+      />
+    </div>
+  </div>
+  {item.category === 'villas' && item.startDate && item.endDate && (
+    <div className="mt-2 text-xs text-gray-500">
+      Week: {item.startDate} → {item.endDate}
     </div>
   )}
 </div>
@@ -5882,7 +6237,7 @@ const getUserName = async (userId) => {
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total:</span>
                   <span className="text-indigo-600">
-                  € {offerItems.reduce((total, item) => total + (getItemBasePrice(item) * item.quantity), 0).toFixed(2)}
+                  € {calculateTotal().toFixed(2)}
                 </span>
                 </div>
               </div>
@@ -6552,10 +6907,10 @@ const getUserName = async (userId) => {
   {item.hasCustomDiscount && item.discountValue > 0 && (
     <div className="mt-2 flex items-center justify-between text-xs">
       <span className="text-gray-500 line-through">
-        Original: €{(getItemBasePrice(item) * item.quantity).toFixed(2)}
+        {t.beforeDiscount}: €{(getItemBasePrice(item) * item.quantity).toFixed(2)}
       </span>
       <span className="font-bold text-emerald-600">
-        After: € {calculateItemPrice(item).toFixed(2)}
+        {t.afterDiscount}: € {calculateItemPrice(item).toFixed(2)}
       </span>
     </div>
   )}
@@ -6564,6 +6919,60 @@ const getUserName = async (userId) => {
                         {/* Price breakdown */}
                         <div className="text-xs text-gray-500 mt-2">
                           € {getItemBasePrice(item).toFixed(2)} × {item.quantity} = €{calculateItemPrice(item).toFixed(2)}
+                        </div>
+
+                        {/* Service dates (Desktop) */}
+                        <div className="mt-2 p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-medium text-gray-700">{t.serviceDates}:</span>
+                            {item.startDate && item.endDate && (
+                              <span className="text-[11px] text-gray-500">
+                                {item.startDate} → {item.endDate}
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[11px] text-gray-600 mb-1">{t.from}</label>
+      <input
+        type="date"
+        value={item.startDate || ''}
+        onFocus={(e) => {
+          if (item.startDate) return;
+          const suggested = suggestStartDateForItem(item);
+          if (!suggested) return;
+          const { startDate, endDate } = normalizeServiceDates(item, suggested, item.endDate);
+          setOfferItems(prev => prev.map(i => (i.id === item.id ? { ...i, startDate, endDate } : i)));
+          e.target.value = startDate;
+        }}
+        onChange={(e) => {
+          const nextStartDate = e.target.value;
+          setOfferItems(prev => prev.map(i => {
+            if (i.id !== item.id) return i;
+                                    const { startDate, endDate } = normalizeServiceDates(i, nextStartDate, i.endDate);
+                                    return { ...i, startDate, endDate };
+                                  }));
+                                }}
+                                className="w-full p-1.5 text-xs border border-gray-300 rounded bg-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] text-gray-600 mb-1">{t.to}</label>
+                              <input
+                                type="date"
+                                value={item.endDate || ''}
+                                onChange={(e) => {
+                                  const nextEndDate = e.target.value;
+                                  setOfferItems(prev => prev.map(i => {
+                                    if (i.id !== item.id) return i;
+                                    const { startDate, endDate } = normalizeServiceDates(i, i.startDate, nextEndDate);
+                                    return { ...i, startDate, endDate };
+                                  }));
+                                }}
+                                className="w-full p-1.5 text-xs border border-gray-300 rounded bg-white"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -6667,11 +7076,11 @@ const getUserName = async (userId) => {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span>{t.subtotal}:</span>
-                        <span>€{offerItems.reduce((total, item) => total + (getItemBasePrice(item) * item.quantity), 0).toFixed(2)}</span>
+                        <span>€{calculateSubtotal().toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between font-semibold text-lg border-t pt-2">
                         <span>{t.total}:</span>
-                        <span>€{offerItems.reduce((total, item) => total + (getItemBasePrice(item) * item.quantity), 0).toFixed(2)}</span>
+                        <span>€{calculateSubtotal().toFixed(2)}</span>
                       </div>
                     </div>
                   </div>
@@ -6693,7 +7102,7 @@ const getUserName = async (userId) => {
                 {offerItems.length} {offerItems.length === 1 ? 'item' : 'items'} in cart
               </span>
               <span className="font-semibold text-lg text-indigo-600">
-                €{offerItems.reduce((total, item) => total + (getItemBasePrice(item) * item.quantity), 0).toFixed(2)}
+                €{calculateSubtotal().toFixed(2)}
               </span>
             </div>
           </div>
@@ -6709,7 +7118,7 @@ const getUserName = async (userId) => {
           
           {!isMobile && (
             <div className="text-sm text-gray-600">
-              {offerItems.length} {offerItems.length === 1 ? 'item' : 'items'} • €{offerItems.reduce((total, item) => total + (getItemBasePrice(item) * item.quantity), 0).toFixed(2)}
+              {offerItems.length} {offerItems.length === 1 ? 'item' : 'items'} • €{calculateSubtotal().toFixed(2)}
             </div>
           )}
           
@@ -6784,6 +7193,45 @@ const getUserName = async (userId) => {
                           min={getMinDate(reservationData.startDate)}
                           className="w-full p-2.5 border border-gray-300 rounded-md text-sm"
                         />
+                      </div>
+                    </div>
+
+                    <div className="bg-rose-50 border border-rose-200 rounded-lg p-3">
+                      <p className="text-sm font-semibold text-rose-700 mb-1">
+                        {t.tripTimeOnIsland}
+                      </p>
+                      <p className="text-xs text-rose-700">
+                        {t.importantTripTimeNote}
+                      </p>
+                      <div className={`mt-3 flex flex-wrap gap-4 ${isMobile ? 'flex-col' : ''}`}>
+                        <div className={`${isMobile ? 'w-full' : 'flex-1'}`}>
+                          <label className="block text-sm font-medium text-rose-700 mb-2">
+                            {t.islandArrivalTime} *
+                          </label>
+                          <input
+                            type="datetime-local"
+                            name="tripStart"
+                            value={reservationData.tripStart}
+                            onChange={handleReservationChange}
+                            required
+                            min={reservationData.startDate ? `${reservationData.startDate}T00:00` : `${todayISO}T00:00`}
+                            className="w-full p-2.5 border border-rose-200 rounded-md text-sm bg-white"
+                          />
+                        </div>
+                        <div className={`${isMobile ? 'w-full' : 'flex-1'}`}>
+                          <label className="block text-sm font-medium text-rose-700 mb-2">
+                            {t.islandDepartureTime} *
+                          </label>
+                          <input
+                            type="datetime-local"
+                            name="tripEnd"
+                            value={reservationData.tripEnd}
+                            onChange={handleReservationChange}
+                            required
+                            min={reservationData.tripStart || (reservationData.endDate ? `${reservationData.endDate}T00:00` : `${todayISO}T00:00`)}
+                            className="w-full p-2.5 border border-rose-200 rounded-md text-sm bg-white"
+                          />
+                        </div>
                       </div>
                     </div>
                     
@@ -7112,7 +7560,9 @@ const getUserName = async (userId) => {
                                         {typeof item.name === 'object' ? getLocalizedText(item.name, language) : item.name}
                                       </div>
                                       <div className="text-xs text-gray-500 flex flex-wrap gap-2 ml-6">
-                                        <span>€ {getItemBasePrice(item).toFixed(2)} {item.unit ? `/${item.unit}` : ''}</span>
+	                                        <span>
+	                                          € {getItemBasePrice(item).toFixed(2)} {(item.customUnit || item.unit) ? `/${item.customUnit || item.unit}` : ''}
+	                                        </span>
                                         <span>× {item.quantity}</span>
                                         {item.discountValue ? (
                                           <>
@@ -7474,6 +7924,53 @@ const getUserName = async (userId) => {
                       <h3 className="text-base font-semibold text-gray-800 mb-4">
                         {t.additionalInformation}
                       </h3>
+
+                      <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 mb-4">
+                        <p className="text-sm font-semibold text-rose-700 mb-1">
+                          {t.tripTimeOnIsland}
+                        </p>
+                        <p className="text-xs text-rose-700">
+                          {t.importantTripTimeNote}
+                        </p>
+                        <div className={`mt-3 flex flex-wrap gap-4 ${isMobile ? 'flex-col' : ''}`}>
+                          <div className={`${isMobile ? 'w-full' : 'flex-1'}`}>
+                            <label className="block text-sm font-medium text-rose-700 mb-2">
+                              {t.islandArrivalTime} *
+                            </label>
+                            <input
+                              type="datetime-local"
+                              name="tripStart"
+                              value={reservationFromOffer.reservationData.tripStart || ''}
+                              onChange={handleReservationFromOfferChange}
+                              required
+                              min={reservationFromOffer.reservationData.checkIn ? `${reservationFromOffer.reservationData.checkIn}T00:00` : `${todayISO}T00:00`}
+                              className={`
+                                w-full p-2.5 border border-rose-200 rounded-md
+                                text-sm bg-white
+                                ${isMobile ? 'min-h-11' : ''}
+                              `}
+                            />
+                          </div>
+                          <div className={`${isMobile ? 'w-full' : 'flex-1'}`}>
+                            <label className="block text-sm font-medium text-rose-700 mb-2">
+                              {t.islandDepartureTime} *
+                            </label>
+                            <input
+                              type="datetime-local"
+                              name="tripEnd"
+                              value={reservationFromOffer.reservationData.tripEnd || ''}
+                              onChange={handleReservationFromOfferChange}
+                              required
+                              min={reservationFromOffer.reservationData.tripStart || (reservationFromOffer.reservationData.checkOut ? `${reservationFromOffer.reservationData.checkOut}T00:00` : `${todayISO}T00:00`)}
+                              className={`
+                                w-full p-2.5 border border-rose-200 rounded-md
+                                text-sm bg-white
+                                ${isMobile ? 'min-h-11' : ''}
+                              `}
+                            />
+                          </div>
+                        </div>
+                      </div>
                       
                       <div className="w-full mb-4">
                         <label className="block text-sm font-medium text-gray-600 mb-2">
@@ -7900,6 +8397,14 @@ const getUserName = async (userId) => {
                               <p className="text-xs text-blue-700 font-medium mb-1">{t.accommodationType}</p>
                               <p className="text-sm text-blue-900">{selectedClient.currentStay.accommodationType}</p>
                             </div>
+                            {(selectedClient.currentStay.tripStart || selectedClient.currentStay.tripEnd) && (
+                              <div className={isMobile ? '' : 'col-span-3'}>
+                                <p className="text-xs text-rose-700 font-semibold mb-1">{t.tripTimeOnIsland}</p>
+                                <p className="text-sm text-rose-900">
+                                  {formatDateTime(selectedClient.currentStay.tripStart)} - {formatDateTime(selectedClient.currentStay.tripEnd)}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
