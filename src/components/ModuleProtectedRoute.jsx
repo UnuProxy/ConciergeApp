@@ -6,8 +6,9 @@ function ModuleProtectedRoute({ children, module, fallbackPath = '/' }) {
 
   const allowed = (() => {
     if (module === 'userManagement') return isAdmin;
+    if (module === 'finance') return modules?.finance === true || isAdmin;
     if (!module) return true;
-    return modules?.[module] === true;
+    return modules?.[module] === true || isAdmin;
   })();
 
   if (!allowed) {
@@ -18,4 +19,3 @@ function ModuleProtectedRoute({ children, module, fallbackPath = '/' }) {
 }
 
 export default ModuleProtectedRoute;
-

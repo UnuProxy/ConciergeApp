@@ -4,7 +4,6 @@ import { collection, getDocs, addDoc, updateDoc, doc, deleteDoc, query, where } 
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../firebase/config';
 import { useDatabase } from '../../context/DatabaseContext';
-import { isAdminRole } from '../../utils/roleUtils';
 
 // Normalize media items to support both images and PDFs
 const normalizeMediaItem = (item) => {
@@ -666,7 +665,7 @@ const Icon = ({ name, size = 16, color = '#6b7280' }) => {
 
 function Boats() {
   // Get company context
-  const { companyInfo, userRole } = useDatabase();
+  const { companyInfo } = useDatabase();
   const userCompanyId = companyInfo?.id || null;
   const userCompanyName = companyInfo?.name || companyInfo?.id || '';
 
@@ -947,9 +946,7 @@ function Boats() {
 
   const canManageBoat = (boat) => {
     if (!userCompanyId) return false;
-    // Allow admins to claim legacy items that never had a companyId
-    if (!boat?.companyId) return isAdminRole(userRole);
-    return boat.companyId === userCompanyId;
+    return boat?.companyId === userCompanyId;
   };
   
   // Enhanced input handler that can handle deeply nested objects
@@ -1338,7 +1335,7 @@ function Boats() {
         console.error("No current boat selected for update");
         return;
       }
-      if (currentBoat.companyId && currentBoat.companyId !== userCompanyId) {
+      if (!canManageBoat(currentBoat)) {
         console.error("Attempted to update a boat from another company");
         return;
       }
@@ -3264,6 +3261,7 @@ function Boats() {
           ) : (
             <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
               {filteredBoats.map((boat) => {
+                const canManage = canManageBoat(boat);
                 const priceRange = getPriceRange(boat.pricing?.monthly);
                 const lengthLabel = boat.length ? `${boat.length}m` : null;
                 const capacityLabel = boat.capacity ? `${boat.capacity} ${language === 'en' ? 'people' : 'persoane'}` : null;
@@ -3359,8 +3357,14 @@ function Boats() {
                         )}
                         <button
                           type="button"
-                          onClick={(e) => { e.stopPropagation(); startEditingBoat(boat); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!canManage) return;
+                            startEditingBoat(boat);
+                          }}
                           className="flex-1 btn-soft"
+                          disabled={!canManage}
+                          title={!canManage ? (language === 'en' ? 'You can only edit your company boats' : 'Poți edita doar bărcile companiei tale') : undefined}
                         >
                           {t.edit}
                         </button>
@@ -3368,11 +3372,13 @@ function Boats() {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (!canManage) return;
                             if (window.confirm(language === 'en' ? 'Are you sure you want to delete this boat?' : 'Ești sigur că vrei să ștergi această barcă?')) {
                               handleDeleteBoat(boat.id);
                             }
                           }}
                           className="btn-soft btn-soft-danger"
+                          disabled={!canManage}
                           style={{ width: '44px', height: '44px', padding: 0 }}
                           aria-label={t.delete}
                           title={t.delete}

@@ -131,65 +131,57 @@ service cloud.firestore {
     match /cars/{id} {
       allow read: if isAuthed();
       allow create: if canCreateForCompany(request.resource.data.companyId);
-      allow update: if canUpdateForCompany(resource.data.companyId) ||
-        (isAdmin() && resource.data.companyId == null && request.resource.data.companyId == userCompanyId());
-      allow delete: if canDeleteForCompany(resource.data.companyId) || (isAdmin() && resource.data.companyId == null);
+      allow update: if canUpdateForCompany(resource.data.companyId);
+      allow delete: if canDeleteForCompany(resource.data.companyId);
     }
 
     match /villas/{id} {
       allow read: if isAuthed();
       allow create: if canCreateForCompany(request.resource.data.companyId);
-      allow update: if canUpdateForCompany(resource.data.companyId) ||
-        (isAdmin() && resource.data.companyId == null && request.resource.data.companyId == userCompanyId());
-      allow delete: if canDeleteForCompany(resource.data.companyId) || (isAdmin() && resource.data.companyId == null);
+      allow update: if canUpdateForCompany(resource.data.companyId);
+      allow delete: if canDeleteForCompany(resource.data.companyId);
     }
 
     match /boats/{id} {
       allow read: if isAuthed();
       allow create: if canCreateForCompany(request.resource.data.companyId);
-      allow update: if canUpdateForCompany(resource.data.companyId) ||
-        (isAdmin() && resource.data.companyId == null && request.resource.data.companyId == userCompanyId());
-      allow delete: if canDeleteForCompany(resource.data.companyId) || (isAdmin() && resource.data.companyId == null);
+      allow update: if canUpdateForCompany(resource.data.companyId);
+      allow delete: if canDeleteForCompany(resource.data.companyId);
     }
 
     match /chefs/{id} {
       allow read: if isAuthed();
       allow create: if canCreateForCompany(request.resource.data.companyId);
-      allow update: if canUpdateForCompany(resource.data.companyId) ||
-        (isAdmin() && resource.data.companyId == null && request.resource.data.companyId == userCompanyId());
-      allow delete: if canDeleteForCompany(resource.data.companyId) || (isAdmin() && resource.data.companyId == null);
+      allow update: if canUpdateForCompany(resource.data.companyId);
+      allow delete: if canDeleteForCompany(resource.data.companyId);
     }
 
     match /services/{id} {
       allow read: if isAuthed();
       allow create: if canCreateForCompany(request.resource.data.companyId);
-      allow update: if canUpdateForCompany(resource.data.companyId) ||
-        (isAdmin() && resource.data.companyId == null && request.resource.data.companyId == userCompanyId());
-      allow delete: if canDeleteForCompany(resource.data.companyId) || (isAdmin() && resource.data.companyId == null);
+      allow update: if canUpdateForCompany(resource.data.companyId);
+      allow delete: if canDeleteForCompany(resource.data.companyId);
     }
 
     match /serviceCategories/{id} {
       allow read: if isAuthed();
       allow create: if canCreateForCompany(request.resource.data.companyId);
-      allow update: if canUpdateForCompany(resource.data.companyId) ||
-        (isAdmin() && resource.data.companyId == null && request.resource.data.companyId == userCompanyId());
-      allow delete: if canDeleteForCompany(resource.data.companyId) || (isAdmin() && resource.data.companyId == null);
+      allow update: if canUpdateForCompany(resource.data.companyId);
+      allow delete: if canDeleteForCompany(resource.data.companyId);
     }
 
     match /security/{id} {
       allow read: if isAuthed();
       allow create: if canCreateForCompany(request.resource.data.companyId);
-      allow update: if canUpdateForCompany(resource.data.companyId) ||
-        (isAdmin() && resource.data.companyId == null && request.resource.data.companyId == userCompanyId());
-      allow delete: if canDeleteForCompany(resource.data.companyId) || (isAdmin() && resource.data.companyId == null);
+      allow update: if canUpdateForCompany(resource.data.companyId);
+      allow delete: if canDeleteForCompany(resource.data.companyId);
     }
 
     match /properties/{id} {
       allow read: if isAuthed();
       allow create: if canCreateForCompany(request.resource.data.companyId);
-      allow update: if canUpdateForCompany(resource.data.companyId) ||
-        (isAdmin() && resource.data.companyId == null && request.resource.data.companyId == userCompanyId());
-      allow delete: if canDeleteForCompany(resource.data.companyId) || (isAdmin() && resource.data.companyId == null);
+      allow update: if canUpdateForCompany(resource.data.companyId);
+      allow delete: if canDeleteForCompany(resource.data.companyId);
     }
 
     // ========================================================================

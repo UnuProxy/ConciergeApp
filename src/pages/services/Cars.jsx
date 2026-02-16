@@ -5,7 +5,6 @@ import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebas
 import { db, storage } from '../../firebase/config';
 import { useDatabase } from '../../context/DatabaseContext';
 import { getCurrentLanguage } from "../../utils/languageHelper";
-import { isAdminRole } from '../../utils/roleUtils';
 
 // Normalize media items to a consistent shape for images and PDFs
 const normalizeMediaItem = (item) => {
@@ -394,7 +393,9 @@ resultsCount: {
   carImage: {
     width: '100%',
     height: '100%',
-    objectFit: 'cover'
+    objectFit: 'contain',
+    objectPosition: 'center',
+    backgroundColor: '#f3f4f6'
   },
   carCardContent: {
     padding: '20px 20px 22px'
@@ -528,7 +529,7 @@ resultsCount: {
 };
 
 function Cars() {
-  const { companyInfo, userRole } = useDatabase();
+  const { companyInfo } = useDatabase();
   const userCompanyId = companyInfo?.id || null;
   const userCompanyName = companyInfo?.name || companyInfo?.id || '';
 
@@ -864,8 +865,7 @@ function Cars() {
 
   const canManageCar = (car) => {
     if (!userCompanyId) return false;
-    if (!car?.companyId) return isAdminRole(userRole);
-    return car.companyId === userCompanyId;
+    return car?.companyId === userCompanyId;
   };
 
   // ALL OTHER EXISTING FUNCTIONS CONTINUE HERE...
@@ -1254,7 +1254,7 @@ function Cars() {
         console.error("No current car selected for update");
         return;
       }
-      if (currentCar.companyId && currentCar.companyId !== userCompanyId) {
+      if (!canManageCar(currentCar)) {
         console.error("Attempted to update a car from another company");
         return;
       }
@@ -3309,6 +3309,10 @@ function Cars() {
                       })()}
                     </div>
                     <div className="flex gap-2 mt-4">
+                      {(() => {
+                        const canManage = canManageCar(car);
+                        return (
+                          <>
                       <button
                         type="button"
                         onClick={() => setSelectedCar(car)}
@@ -3348,19 +3352,26 @@ function Cars() {
                       )}
                       <button
                         type="button"
-                        onClick={() => startEditingCar(car)}
+                        onClick={() => {
+                          if (!canManage) return;
+                          startEditingCar(car);
+                        }}
                         className="flex-1 btn-soft"
+                        disabled={!canManage}
+                        title={!canManage ? (language === 'en' ? 'You can only edit your company cars' : 'Poți edita doar mașinile companiei tale') : undefined}
                       >
                         {t.edit}
                       </button>
                       <button
                         type="button"
                         onClick={() => {
+                          if (!canManage) return;
                           if (window.confirm(language === 'en' ? 'Are you sure you want to delete this car?' : 'Ești sigur că vrei să ștergi această mașină?')) {
                             handleDeleteCar(car.id);
                           }
                         }}
                         className="btn-soft btn-soft-danger"
+                        disabled={!canManage}
                         style={{ width: '44px', height: '44px', padding: 0 }}
                         aria-label={t.delete}
                         title={t.delete}
@@ -3379,6 +3390,9 @@ function Cars() {
                           <path d="M19 6l-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6m5 0V4a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2" />
                         </svg>
                       </button>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -3508,7 +3522,7 @@ function CarViewModal({ car, onClose, language, t, getLocalizedContent }) {
                       <img
                         src={activeUrl}
                         alt="Car cover"
-                        className="w-full h-64 sm:h-96 object-cover"
+                        className="w-full h-64 sm:h-96 object-contain bg-gray-100"
                       />
                       
                       {/* Navigation Arrows */}

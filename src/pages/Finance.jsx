@@ -1104,10 +1104,11 @@ const Finance = () => {
   const grossProfit = totalClientRevenue - totalProviderCosts;
   const realizedClientRevenue = fullyPaidFinanceRecords.reduce((sum, r) => sum + toNumber(r.clientAmount || 0), 0);
   const realizedGrossProfit = realizedClientRevenue - totalProviderCosts;
-  const totalRevenue = grossProfit;
-  const netProfit = totalRevenue - totalExpenses;
   const realizedNetProfit = realizedGrossProfit - totalExpenses;
-  const totalIncome = totalClientRevenue;
+  // Reports should reflect only closed/fully-paid client amounts.
+  const totalIncome = realizedClientRevenue;
+  const totalRevenue = realizedGrossProfit;
+  const netProfit = realizedNetProfit;
   const totalPayments = totalProviderCosts;
   const trueProfit = realizedNetProfit;
 
@@ -1475,7 +1476,7 @@ const Finance = () => {
   };
 
   // Monthly data for reports based on finance records + provider costs
-  const monthlyData = filteredFinanceRecords.reduce((acc, r) => {
+  const monthlyData = fullyPaidFinanceRecords.reduce((acc, r) => {
     if (!r.date) return acc;
     
     const month = r.date.substring(0, 7);
