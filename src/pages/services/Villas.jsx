@@ -193,6 +193,7 @@ const clearBrochure = () => {
     address_ro: '',
     bedrooms: '',
     bathrooms: '',
+    toilets: '',
     description_en: '',
     description_ro: '',
     propertyLink: '',
@@ -467,7 +468,7 @@ const clearBrochure = () => {
       referenceNumber: '',
       propertyType: 'villa',
       address_en: '', address_ro: '',
-      bedrooms: '', bathrooms: '',
+      bedrooms: '', bathrooms: '', toilets: '',
       description_en: '', description_ro: '',
       propertyLink: '',
       amenities_en: '', amenities_ro: '',
@@ -632,6 +633,7 @@ const clearBrochure = () => {
       address: { en: formData.address_en || '', ro: formData.address_ro || '' },
       bedrooms: formData.bedrooms || '',
       bathrooms: formData.bathrooms || '',
+      toilets: formData.toilets || '',
       description: { en: formData.description_en || '', ro: formData.description_ro || '' },
       propertyLink: (formData.propertyLink || '').trim(),
       amenities: { en: formData.amenities_en || '', ro: formData.amenities_ro || '' },
@@ -743,8 +745,7 @@ const clearBrochure = () => {
 
   const canManageVilla = (villa) => {
     if (!userCompanyId) return false;
-    if (!villa?.companyId) return isAdminRole(userRole);
-    return villa.companyId === userCompanyId;
+    return villa?.companyId === userCompanyId;
   };
 
   const handleDeleteVilla = async (id) => {
@@ -821,6 +822,7 @@ const clearBrochure = () => {
       address_ro: typeof villa.address === 'string' ? villa.address : (villa.address?.ro || ''),
       bedrooms: villa.bedrooms || '',
       bathrooms: villa.bathrooms || '',
+      toilets: villa.toilets || '',
       description_en: typeof villa.description === 'string' ? villa.description : (villa.description?.en || ''),
       description_ro: typeof villa.description === 'string' ? villa.description : (villa.description?.ro || ''),
       propertyLink: villa.propertyLink || villa.property_link || '',
@@ -981,6 +983,7 @@ const clearBrochure = () => {
       apartmentType: 'Apartament',
       bedrooms: 'Dormitoare',
       bathrooms: 'Băi',
+      toilets: 'Toalete',
       propertyLink: 'Link proprietate',
       price: 'Preț',
       priceType: 'Tip preț',
@@ -1020,6 +1023,7 @@ const clearBrochure = () => {
       apartmentType: 'Apartment',
       bedrooms: 'Bedrooms',
       bathrooms: 'Bathrooms',
+      toilets: 'Toilets',
       propertyLink: 'Property link',
       price: 'Price',
       priceType: 'Price type',
@@ -1154,6 +1158,7 @@ const clearBrochure = () => {
           <div className="col-span-full text-center text-gray-500">{t.noVillas}</div>
         ) : (
           filteredVillas.map((villa, index) => {
+            const canManage = canManageVilla(villa);
             const mainPhoto = villa.photos?.[0]?.url || villa.photos?.[0] || '';
             const displayName = getLoc(villa.name) || 'Villa';
             const displayAddress = getLoc(villa.address) || '';
@@ -1162,6 +1167,7 @@ const clearBrochure = () => {
             const standardRate = villa.priceConfigurations?.[0]?.price || villa.price || '';
             const bedrooms = villa.bedrooms || '-';
             const bathrooms = villa.bathrooms || '-';
+            const toilets = villa.toilets || '-';
             const seasonalRates = Array.isArray(villa.priceConfigurations)
               ? villa.priceConfigurations
                   .slice(1)
@@ -1190,9 +1196,9 @@ const clearBrochure = () => {
                 style={{ animationDelay: `${index * 45}ms`, animationFillMode: 'both' }}
               >
                 {mainPhoto ? (
-                  <img src={mainPhoto} alt={displayName} className="w-full h-44 object-cover" />
+                  <img src={mainPhoto} alt={displayName} className="w-full h-52 sm:h-56 object-cover" />
                 ) : (
-                  <div className="w-full h-44 bg-gradient-to-br from-amber-50 via-white to-slate-50 flex items-center justify-center text-slate-400">
+                  <div className="w-full h-52 sm:h-56 bg-gradient-to-br from-amber-50 via-white to-slate-50 flex items-center justify-center text-slate-400">
                     {language === 'ro' ? 'Fără foto' : 'No photo'}
                   </div>
                 )}
@@ -1205,6 +1211,7 @@ const clearBrochure = () => {
                   <div className="flex items-center gap-4 text-sm text-gray-700 mt-2">
                     <span>{bedrooms} {t.bedrooms}</span>
                     <span>{bathrooms} {t.bathrooms}</span>
+                    <span>{toilets} {t.toilets}</span>
                   </div>
                   <div className="mt-1 text-sm text-gray-900 font-medium">
                     {t.standardRate}: €{standardRate} / {villa.priceConfigurations?.[0]?.type === 'monthly' ? t.monthly : 'week'}
@@ -1288,14 +1295,23 @@ const clearBrochure = () => {
                     </a>
                   )}
                   <button
-                    onClick={() => startEditingVilla(villa)}
+                    onClick={() => {
+                      if (!canManage) return;
+                      startEditingVilla(villa);
+                    }}
                     className="flex-1 min-w-[96px] btn-soft"
+                    disabled={!canManage}
+                    title={!canManage ? (language === 'ro' ? 'Poți edita doar proprietățile companiei tale' : 'You can only edit your company properties') : undefined}
                   >
                     {t.edit}
                   </button>
                   <button
-                    onClick={() => handleDeleteVilla(villa.id)}
+                    onClick={() => {
+                      if (!canManage) return;
+                      handleDeleteVilla(villa.id);
+                    }}
                     className="btn-soft btn-soft-danger"
+                    disabled={!canManage}
                     style={{width: '44px', height: '44px', padding: 0}}
                     aria-label={t.delete}
                     title={t.delete}
@@ -1368,6 +1384,10 @@ const clearBrochure = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Bathrooms</label>
                   <input name="bathrooms" value={formData.bathrooms} onChange={handleInputChange} className="w-full border rounded px-3 py-2" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Toilets</label>
+                  <input name="toilets" value={formData.toilets} onChange={handleInputChange} className="w-full border rounded px-3 py-2" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Property Link</label>
@@ -1652,6 +1672,10 @@ const clearBrochure = () => {
                   <input name="bathrooms" value={formData.bathrooms} onChange={handleInputChange} className="w-full border rounded px-3 py-2" />
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-gray-700">Toilets</label>
+                  <input name="toilets" value={formData.toilets} onChange={handleInputChange} className="w-full border rounded px-3 py-2" />
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700">Property Link</label>
                   <input name="propertyLink" value={formData.propertyLink} onChange={handleInputChange} className="w-full border rounded px-3 py-2" />
                 </div>
@@ -1893,18 +1917,20 @@ const clearBrochure = () => {
                 {language === 'ro' ? 'Înapoi la Vile' : 'Back to Villas'}
               </button>
               <div className="flex items-center gap-3">
-                <button
-                  onClick={() => {
-                    setViewVilla(null);
-                    startEditingVilla(viewVilla);
-                  }}
-                  className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium transition-colors"
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                  {t.edit}
-                </button>
+                {canManageVilla(viewVilla) && (
+                  <button
+                    onClick={() => {
+                      setViewVilla(null);
+                      startEditingVilla(viewVilla);
+                    }}
+                    className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium transition-colors"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    {t.edit}
+                  </button>
+                )}
                 <button
                   onClick={() => setViewVilla(null)}
                   className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 transition-colors"
@@ -2160,6 +2186,10 @@ const clearBrochure = () => {
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600">{t.bathrooms}</span>
                         <span className="font-medium text-gray-900">{viewVilla.bathrooms || '-'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600">{t.toilets}</span>
+                        <span className="font-medium text-gray-900">{viewVilla.toilets || '-'}</span>
                       </div>
                     </div>
 

@@ -360,7 +360,7 @@ const translations = {
     beforeDiscount: 'Before discount',
     afterDiscount: 'After discount',
     customPriceLabel: 'Custom price',
-    customPriceNote: "Doesn't change brochure PDF",
+    customPriceNote: 'Overrides client-facing price',
     resetPrice: 'Reset',
     standardPrice: 'Standard price',
     discountAmount: 'Discount Amount',
@@ -440,6 +440,7 @@ const translations = {
     maxGuests: 'Capacity',
     bedrooms: 'Bedrooms',
     bathrooms: 'Bathrooms',
+    toilets: 'Toilets',
     amenities: 'Amenities',
     model: 'Model',
     year: 'Year',
@@ -600,7 +601,7 @@ const translations = {
     beforeDiscount: 'Înainte de reducere',
     afterDiscount: 'După reducere',
     customPriceLabel: 'Preț personalizat',
-    customPriceNote: 'Nu modifică broșura PDF',
+    customPriceNote: 'Suprascrie prețul afișat clientului',
     resetPrice: 'Resetează',
     standardPrice: 'Preț standard',
     discountAmount: 'Valoare Reducere',
@@ -680,6 +681,7 @@ const translations = {
     maxGuests: 'Capacitate',
     bedrooms: 'Dormitoare',
     bathrooms: 'Băi',
+    toilets: 'Toalete',
     amenities: 'Facilități',
     model: 'Model',
     year: 'An',
@@ -3851,10 +3853,12 @@ const generateOfferPdf = async (offer) => {
       if (item.category === 'villas') {
         const location = item.location || item.address || '';
         const bedrooms = item.bedrooms ? `${item.bedrooms} bedrooms` : '';
+        const bathrooms = item.bathrooms ? `${item.bathrooms} bathrooms` : '';
+        const toilets = item.toilets ? `${item.toilets} toilets` : '';
         const capacity = item.capacity ? `${item.capacity} guests max` : '';
         
-        if (location || bedrooms || capacity) {
-          detailsText = [location, bedrooms, capacity].filter(Boolean).join(' • ');
+        if (location || bedrooms || bathrooms || toilets || capacity) {
+          detailsText = [location, bedrooms, bathrooms, toilets, capacity].filter(Boolean).join(' • ');
         }
       } 
       else if (item.category === 'cars') {
@@ -3949,7 +3953,6 @@ const generateOfferPdf = async (offer) => {
 	      };
 
 	      // Use more standard Quantity x Price format
-	      const standardPrice = getItemStandardPrice(item);
 	      const basePrice = getItemBasePrice(item);
 	      const itemTotal = calculateItemPrice(item);
 	      doc.text(`${formatQuantityWithUnit(item.quantity, effectiveUnit)} × ${formatCurrency(basePrice)}${unitDescriptor}`, 80, priceLineY);
@@ -3958,25 +3961,6 @@ const generateOfferPdf = async (offer) => {
 
       const metaLeftX = 80;
       const metaRightX = 180;
-      const hasCustomPrice =
-        item.customPrice !== undefined &&
-        item.customPrice !== null &&
-        item.customPrice !== '' &&
-        Math.abs(basePrice - standardPrice) > 0.01;
-
-      if (hasCustomPrice) {
-        doc.setFontSize(8);
-        doc.setTextColor(100, 100, 110);
-        doc.setFont("helvetica", "normal");
-        doc.text('Custom price:', metaLeftX, metaY);
-        doc.text(formatCurrency(basePrice), metaRightX, metaY, { align: 'right' });
-        metaY += 5.5;
-
-        doc.text('Standard price:', metaLeftX, metaY);
-        doc.text(formatCurrency(standardPrice), metaRightX, metaY, { align: 'right' });
-        metaY += 5.5;
-      }
-      
       // Show if there's a discount
       if (item.discountValue > 0) {
         const preDiscountTotal = basePrice * (item.quantity || 0);
@@ -4645,6 +4629,14 @@ const getUserName = async (userId) => {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500 font-medium">{t.bedrooms}:</span>
                   <span className="text-gray-700">{service.bedrooms || '-'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500 font-medium">{t.bathrooms}:</span>
+                  <span className="text-gray-700">{service.bathrooms || '-'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500 font-medium">{t.toilets}:</span>
+                  <span className="text-gray-700">{service.toilets || '-'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500 font-medium">{t.maxGuests}:</span>
@@ -5977,9 +5969,7 @@ const getUserName = async (userId) => {
       }}
     />
   </div>
-  <div className="text-xs text-gray-500 mb-3">
-    {t.standardPrice}: €{getItemStandardPrice(item).toFixed(2)} · {t.customPriceNote}
-  </div>
+  <div className="text-xs text-gray-500 mb-3">{t.customPriceNote}</div>
 
   <div className="flex items-center justify-between mb-2">
     <span className="text-sm font-medium text-gray-700">Custom Discount:</span>
@@ -6510,6 +6500,12 @@ const getUserName = async (userId) => {
       {service.bedrooms && (
         <span>🛏️ {service.bedrooms} bed</span>
       )}
+      {service.bathrooms && (
+        <span>🛁 {service.bathrooms} bath</span>
+      )}
+      {service.toilets && (
+        <span>🚽 {service.toilets} wc</span>
+      )}
       {service.capacity && (
         <span>👥 {service.capacity} guests</span>
       )}
@@ -6814,9 +6810,7 @@ const getUserName = async (userId) => {
       }}
     />
   </div>
-  <div className="text-[11px] text-gray-500 mb-2">
-    {t.standardPrice}: €{getItemStandardPrice(item).toFixed(2)} · {t.customPriceNote}
-  </div>
+  <div className="text-[11px] text-gray-500 mb-2">{t.customPriceNote}</div>
 
   <div className="flex items-center justify-between mb-2">
     <span className="text-xs font-medium text-gray-700">Discount:</span>

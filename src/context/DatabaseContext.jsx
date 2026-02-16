@@ -47,6 +47,7 @@ export const DatabaseProvider = ({ children }) => {
     };
 
     if (rawPermissions && typeof rawPermissions === 'object') {
+      const hasExplicitFinanceFlag = Object.prototype.hasOwnProperty.call(rawPermissions, 'finance');
       const normalized = {
         ...base,
         clients: typeof rawPermissions.clients === 'boolean' ? rawPermissions.clients : base.clients,
@@ -54,8 +55,14 @@ export const DatabaseProvider = ({ children }) => {
         reservations: typeof rawPermissions.reservations === 'boolean' ? rawPermissions.reservations : base.reservations,
         finance: typeof rawPermissions.finance === 'boolean' ? rawPermissions.finance : base.finance
       };
-      // Admins default to full access unless explicitly disabled (rare).
-      return isAdmin ? { ...normalized, finance: normalized.finance === false ? false : true } : normalized;
+      // Admins default to full finance access unless explicitly disabled (rare).
+      if (isAdmin) {
+        return {
+          ...normalized,
+          finance: hasExplicitFinanceFlag ? normalized.finance !== false : true
+        };
+      }
+      return normalized;
     }
 
     return isAdmin ? { ...base, finance: true } : base;
