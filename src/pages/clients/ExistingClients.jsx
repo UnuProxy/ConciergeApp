@@ -3554,10 +3554,36 @@ const handleSelectClient = async (client) => {
 const generateOfferPdf = async (offer) => {
   if (!offer || !companyInfo) return;
 
-  const itemsMissingDates = (offer.items || []).filter((item) => {
-    // Require dates for every line item so PDF + booking conversion are always consistent.
-    return !(item?.startDate && item?.endDate);
+  const rawItems = Array.isArray(offer.items) ? offer.items : [];
+  const datedItems = rawItems.filter((item) => item?.startDate && item?.endDate);
+  const offerStartFromItems = datedItems.reduce((min, item) => (!min || item.startDate < min ? item.startDate : min), null);
+  const offerEndFromItems = datedItems.reduce((max, item) => (!max || item.endDate > max ? item.endDate : max), null);
+  const fallbackStartDate =
+    offer?.startDate ||
+    offer?.checkIn ||
+    selectedClient?.startDate ||
+    selectedClient?.checkIn ||
+    offerStartFromItems ||
+    '';
+  const fallbackEndDate =
+    offer?.endDate ||
+    offer?.checkOut ||
+    selectedClient?.endDate ||
+    selectedClient?.checkOut ||
+    offerEndFromItems ||
+    '';
+
+  const pdfItems = rawItems.map((item) => {
+    if (item?.startDate && item?.endDate) return item;
+    const { startDate, endDate } = normalizeServiceDates(
+      item,
+      item?.startDate || fallbackStartDate,
+      item?.endDate || fallbackEndDate
+    );
+    return { ...item, startDate, endDate };
   });
+
+  const itemsMissingDates = pdfItems.filter((item) => !(item?.startDate && item?.endDate));
   if (itemsMissingDates.length) {
     const first = itemsMissingDates[0];
     const name = typeof first?.name === 'object' ? getLocalizedText(first.name, language) : (first?.name || 'service');
@@ -3583,7 +3609,7 @@ const generateOfferPdf = async (offer) => {
     const imageCache = {};
     
     // Process all items to pre-fetch images
-    for (const currentItem of offer.items) {
+    for (const currentItem of pdfItems) {
       if (currentItem.imageUrl) {
         try {
   // console.log(`Pre-loading image for item: ${currentItem.id || 'unknown'}`); // Removed for production
@@ -3751,8 +3777,8 @@ const generateOfferPdf = async (offer) => {
     };
 
     // Process the services for the PDF
-    for (let i = 0; i < offer.items.length; i++) {
-      const item = offer.items[i];
+    for (let i = 0; i < pdfItems.length; i++) {
+      const item = pdfItems[i];
       
       // Check if we need to add a new page
       if (currentY > 225) {
@@ -3916,19 +3942,41 @@ const generateOfferPdf = async (offer) => {
       }
       
       // Price and quantity - FIXED SPACING AND FORMAT
-	      const unitInfo = item.unit ? getUnitDisplayLabel(item.unit, pdfStrings, item.category) : '';
 	      const priceLineY = infoY;
 	      doc.setFontSize(9);
 	      doc.setTextColor(32, 32, 64);
 	      const effectiveUnit = (item.customUnit || item.unit || '').toString();
+	      const normalizedEffectiveUnit = effectiveUnit.toLowerCase();
+
+	      const getDurationDays = (startDate, endDate) => {
+	        if (!startDate || !endDate) return null;
+	        const start = new Date(`${startDate}T00:00:00`);
+	        const end = new Date(`${endDate}T00:00:00`);
+	        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+	        const diffDays = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+	        return diffDays > 0 ? diffDays : null;
+	      };
+
+	      const durationDaysForLine = getDurationDays(item.startDate, item.endDate);
 	      const unitInfoRaw = effectiveUnit ? getUnitDisplayLabel(effectiveUnit, pdfStrings, item.category) : '';
 	      const unitInfoStripped = unitInfoRaw ? unitInfoRaw.replace(/^per\s+/i, '') : '';
-	      const unitDescriptor = unitInfoStripped ? ` / ${unitInfoStripped}` : '';
+	      const hideWeeklyDescriptor = normalizedEffectiveUnit.includes('week') && durationDaysForLine > 7;
+	      const unitDescriptor = unitInfoStripped && !hideWeeklyDescriptor ? ` / ${unitInfoStripped}` : '';
 
-	      const formatQuantityWithUnit = (qty, unitValue) => {
+	      const formatQuantityWithUnit = (qty, unitValue, startDate, endDate) => {
 	        const numericQty = Number(qty);
 	        const safeQty = Number.isFinite(numericQty) ? numericQty : 0;
 	        const normalizedUnit = (unitValue || '').toString().toLowerCase();
+	        const durationDays = getDurationDays(startDate, endDate);
+
+	        // For longer villa stays priced weekly/monthly, show the real day span in PDF.
+	        if (
+	          durationDays &&
+	          (normalizedUnit.includes('week') || normalizedUnit.includes('month'))
+	        ) {
+	          return durationDays === 1 ? '1 day' : `${durationDays} days`;
+	        }
+
 	        const unitKey = normalizedUnit.includes('hour') || normalizedUnit === 'h'
 	          ? 'hour'
 	          : normalizedUnit.includes('day') || normalizedUnit === 'd'
@@ -3955,7 +4003,7 @@ const generateOfferPdf = async (offer) => {
 	      // Use more standard Quantity x Price format
 	      const basePrice = getItemBasePrice(item);
 	      const itemTotal = calculateItemPrice(item);
-	      doc.text(`${formatQuantityWithUnit(item.quantity, effectiveUnit)} × ${formatCurrency(basePrice)}${unitDescriptor}`, 80, priceLineY);
+	      doc.text(`${formatQuantityWithUnit(item.quantity, effectiveUnit, item.startDate, item.endDate)} × ${formatCurrency(basePrice)}${unitDescriptor}`, 80, priceLineY);
 
       let metaY = priceLineY + 7;
 
