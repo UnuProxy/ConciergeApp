@@ -214,6 +214,7 @@ function AddProperty() {
       ro: ''
     }, // Initialize as an object with language keys
     price: '',
+    size: '',
     livingArea: '',
     gardenArea: '',
     status: 'available',
@@ -421,6 +422,17 @@ function AddProperty() {
   const formattedInteger = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   return parts.length > 1 ? `${formattedInteger}.${parts[1]}` : formattedInteger;
 };
+
+  const parseFormattedNumber = (value) => {
+    if (value === null || value === undefined || value === '') return 0;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+
+    const cleaned = String(value).replace(/,/g, '').trim();
+    if (!cleaned) return 0;
+
+    const parsed = parseFloat(cleaned);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
   
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
@@ -623,12 +635,12 @@ function AddProperty() {
         companyId,
         type: formData.type,
         location: formData.location,
-        size: parseFloat(formData.size.replace(/,/g, '')) || 0,
+        size: parseFormattedNumber(formData.size),
         status: formData.status,
         
         // Store price as a number - handle large numbers properly
         pricing: {
-          price: Number(formData.price.replace(/,/g, '')) || 0,
+          price: parseFormattedNumber(formData.price),
           currency: 'EUR'
         },
         
@@ -643,7 +655,7 @@ function AddProperty() {
         ? {
             // Land specs
             zoning: formData.zoning || '',
-            buildableArea: parseFloat(formData.buildableArea.replace(/,/g, '')) || 0,
+            buildableArea: parseFormattedNumber(formData.buildableArea),
             terrain: formData.terrain || ''
           }
         : {
@@ -651,8 +663,8 @@ function AddProperty() {
             bedrooms: parseInt(formData.bedrooms, 10) || 0,
             bathrooms: parseInt(formData.bathrooms, 10) || 0,
             year: parseInt(formData.yearBuilt, 10) || null,
-            livingArea: parseFloat(formData.livingArea.replace(/,/g, '')) || 0,
-            gardenArea: parseFloat(formData.gardenArea.replace(/,/g, '')) || 0
+            livingArea: parseFormattedNumber(formData.livingArea),
+            gardenArea: parseFormattedNumber(formData.gardenArea)
           },
         
         // Convert amenities array to object of booleans
