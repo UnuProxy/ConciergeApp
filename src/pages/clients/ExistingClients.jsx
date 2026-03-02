@@ -4003,7 +4003,21 @@ const generateOfferPdf = async (offer) => {
 	      // Use more standard Quantity x Price format
 	      const basePrice = getItemBasePrice(item);
 	      const itemTotal = calculateItemPrice(item);
-	      doc.text(`${formatQuantityWithUnit(item.quantity, effectiveUnit, item.startDate, item.endDate)} × ${formatCurrency(basePrice)}${unitDescriptor}`, 80, priceLineY);
+	      const quantityLabel = formatQuantityWithUnit(item.quantity, effectiveUnit, item.startDate, item.endDate);
+	      const numericQuantity = Number(item.quantity);
+	      const safeQuantity = Number.isFinite(numericQuantity) ? numericQuantity : 0;
+	      const isPeriodStyleUnit = normalizedEffectiveUnit.includes('week') || normalizedEffectiveUnit.includes('month');
+	      const isDateRangeTotalLine =
+	        item.category === 'villas' &&
+	        isPeriodStyleUnit &&
+	        durationDaysForLine &&
+	        durationDaysForLine > 7 &&
+	        safeQuantity <= 1;
+
+	      const priceSummaryText = isDateRangeTotalLine
+	        ? `Total for ${quantityLabel}: ${formatCurrency(basePrice)}`
+	        : `${quantityLabel} × ${formatCurrency(basePrice)}${unitDescriptor}`;
+	      doc.text(priceSummaryText, 80, priceLineY);
 
       let metaY = priceLineY + 7;
 

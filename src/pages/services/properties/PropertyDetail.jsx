@@ -53,6 +53,7 @@ function PropertyDetail() {
       edit: 'Editează',
       delete: 'Șterge',
       description: 'Descriere',
+      notes: 'Notițe',
       noDescriptionAvailable: 'Nicio descriere disponibilă',
       documents: 'Documente',
       document: 'Document',
@@ -90,6 +91,7 @@ function PropertyDetail() {
       edit: 'Edit',
       delete: 'Delete',
       description: 'Description',
+      notes: 'Notes',
       noDescriptionAvailable: 'No description available',
       documents: 'Documents',
       document: 'Document',
@@ -219,6 +221,9 @@ function PropertyDetail() {
             size: parseFloat(data.size || 0),
             status: data.status || 'available',
             description: data.description?.en || data.description?.ro || '',
+            notes: typeof data.notes === 'string'
+              ? data.notes
+              : (data.notes?.en || data.notes?.ro || ''),
             images: data.photos || [],
             documents: data.documents || [],
             owner: data.owner || null,
@@ -526,6 +531,14 @@ function PropertyDetail() {
               )}
             </div>
           </div>
+
+          {/* Property notes */}
+          {property.notes && (
+            <div className="card-premium p-4 sm:p-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">{t.notes}</h2>
+              <p className="text-gray-700 whitespace-pre-line">{property.notes}</p>
+            </div>
+          )}
           
           {/* Documents */}
           <div className="card-premium p-4 sm:p-6">

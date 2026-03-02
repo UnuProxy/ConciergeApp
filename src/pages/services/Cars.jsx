@@ -596,6 +596,8 @@ function Cars() {
     fuel: 'petrol', // petrol, diesel, hybrid, electric
     description_en: '',
     description_ro: '',
+    notes_en: '',
+    notes_ro: '',
     // Specifications
     specs: {
       engine: '',
@@ -948,6 +950,8 @@ function Cars() {
       fuel: 'petrol',
       description_en: '',
       description_ro: '',
+      notes_en: '',
+      notes_ro: '',
       specs: {
         engine: '',
         horsepower: '',
@@ -1168,6 +1172,10 @@ function Cars() {
       description: {
         en: formData.description_en || '',
         ro: formData.description_ro || ''
+      },
+      notes: {
+        en: formData.notes_en || '',
+        ro: formData.notes_ro || ''
       },
       pickupLocation: {
         en: formData.pickupLocation_en || '',
@@ -1423,6 +1431,8 @@ function Cars() {
       fuel: car.fuel || 'petrol',
       description_en: typeof car.description === 'string' ? car.description : (car.description?.en || ''),
       description_ro: typeof car.description === 'string' ? car.description : (car.description?.ro || ''),
+      notes_en: typeof car.notes === 'string' ? car.notes : (car.notes?.en || ''),
+      notes_ro: typeof car.notes === 'string' ? car.notes : (car.notes?.ro || ''),
       // Detailed specs
       specs: {
         engine: car.specs?.engine || '',
@@ -1538,6 +1548,7 @@ function Cars() {
         electric: "Electric"
       },
       description: "Description",
+      notes: "Notes",
       price: {
         daily: "Price per Day (€)",
         monthly: "Monthly Prices",
@@ -1675,6 +1686,7 @@ function Cars() {
         electric: "Electric"
       },
       description: "Descriere",
+      notes: "Notițe",
       price: {
         daily: "Preț pe Zi (€)",
         monthly: "Prețuri Lunare",
@@ -2378,6 +2390,18 @@ function Cars() {
               <textarea
                 name={`description_${language}`}
                 value={formData[`description_${language}`] || ''}
+                onChange={handleInputChange}
+                rows="4"
+                style={styles.textarea}
+              />
+            </div>
+            <div style={styles.formSection}>
+              <label style={styles.formLabel}>
+                {t.notes}
+              </label>
+              <textarea
+                name={`notes_${language}`}
+                value={formData[`notes_${language}`] || ''}
                 onChange={handleInputChange}
                 rows="4"
                 style={styles.textarea}
@@ -3458,6 +3482,7 @@ function CarViewModal({ car, onClose, language, t, getLocalizedContent }) {
   const displayName = getLocalizedContent(car.name, language) || `${car.make || ''} ${car.model || ''}`;
   const displayLocation = getLocalizedContent(car.pickupLocation, language);
   const displayBookingNotes = getLocalizedContent(car.bookingNotes, language);
+  const displayNotes = getLocalizedContent(car.notes, language);
   const hasContactInfo = Boolean(car.contact?.name || car.contact?.phone || car.contact?.email);
   const hasBookingInfo = Boolean(displayLocation || displayBookingNotes);
 
@@ -3616,6 +3641,15 @@ function CarViewModal({ car, onClose, language, t, getLocalizedContent }) {
                   )}
                 </div>
               </div>
+
+              {displayNotes && (
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <h2 className="text-xl font-semibold text-gray-800 mb-4">{t.notes}</h2>
+                  <div className="prose max-w-none text-gray-700 whitespace-pre-line">
+                    {displayNotes}
+                  </div>
+                </div>
+              )}
 
               {/* Features/Amenities */}
               {featuresList.length > 0 && (
