@@ -116,6 +116,7 @@ function AddProperty() {
       hillside: 'Versant',
       oceanfront: 'La Malul Mării',
       description: 'Descriere',
+      notes: 'Notițe',
       propertyImages: 'Imagini Proprietate',
       documents: 'Documente',
       uploadImages: 'Încarcă Imagini',
@@ -130,6 +131,7 @@ function AddProperty() {
       enterPropertyTitle: 'Introduceți titlul proprietății',
       enterLocation: 'Introduceți locația în Ibiza',
       enterPropertyDescription: 'Introduceți descrierea proprietății',
+      enterPropertyNotes: 'Introduceți notițe pentru proprietate',
       errorUploadingImages: 'Eroare la încărcarea imaginilor. Încercați din nou.',
       errorUploadingDocuments: 'Eroare la încărcarea documentelor. Încercați din nou.',
       enterPrice: 'Introduceți prețul (ex: 1500000)'
@@ -181,6 +183,7 @@ function AddProperty() {
       hillside: 'Hillside',
       oceanfront: 'Oceanfront',
       description: 'Description',
+      notes: 'Notes',
       propertyImages: 'Property Images',
       documents: 'Documents',
       uploadImages: 'Upload Images',
@@ -195,6 +198,7 @@ function AddProperty() {
       enterPropertyTitle: 'Enter property title',
       enterLocation: 'Enter location in Ibiza',
       enterPropertyDescription: 'Enter property description',
+      enterPropertyNotes: 'Enter notes for this property',
       errorUploadingImages: 'Error uploading images. Please try again.',
       errorUploadingDocuments: 'Error uploading documents. Please try again.',
       enterPrice: 'Enter price (e.g. 1500000)'
@@ -213,6 +217,7 @@ function AddProperty() {
       en: '',
       ro: ''
     }, // Initialize as an object with language keys
+    notes: '',
     price: '',
     size: '',
     livingArea: '',
@@ -284,6 +289,9 @@ function AddProperty() {
                 en: data.description?.en || '',
                 ro: data.description?.ro || ''
               },
+              notes: typeof data.notes === 'string'
+                ? data.notes
+                : (data.notes?.en || data.notes?.ro || ''),
               
               price: data.pricing?.price?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") || '',
               size: data.size?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") || '',
@@ -649,6 +657,7 @@ function AddProperty() {
           en: formData.description?.en || '',
           ro: formData.description?.ro || ''
         },
+        notes: formData.notes || '',
         
       // Specifications based on property type
       specs: formData.type === 'land'
@@ -1100,6 +1109,19 @@ function AddProperty() {
               placeholder={language === 'ro' ? t.enterPropertyDescription : "Introduceți descrierea proprietății în română"}
             ></textarea>
           </div>
+        </div>
+
+        {/* Notes */}
+        <div className="mb-4 sm:mb-6">
+          <label className="block text-gray-700 font-medium mb-2">{t.notes}</label>
+          <textarea
+            name="notes"
+            value={formData.notes}
+            onChange={handleChange}
+            rows="4"
+            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder={t.enterPropertyNotes}
+          ></textarea>
         </div>
         
         {/* Image Upload */}
