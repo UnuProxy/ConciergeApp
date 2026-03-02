@@ -135,16 +135,14 @@ service cloud.firestore {
 
     match /services/{id} {
       allow read: if isAuthed();
-      allow create: if canCreateForCompany(request.resource.data.companyId);
-      allow update: if canUpdateForCompany(resource.data.companyId);
-      allow delete: if canDeleteForCompany(resource.data.companyId);
+      // Shared service catalog: any authenticated company user can manage entries.
+      allow create, update, delete: if isAuthed();
     }
 
     match /serviceCategories/{id} {
       allow read: if isAuthed();
-      allow create: if canCreateForCompany(request.resource.data.companyId);
-      allow update: if canUpdateForCompany(resource.data.companyId);
-      allow delete: if canDeleteForCompany(resource.data.companyId);
+      // Shared service category catalog: any authenticated company user can manage entries.
+      allow create, update, delete: if isAuthed();
     }
 
     match /security/{id} {
