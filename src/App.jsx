@@ -156,7 +156,7 @@ function App() {
                     }
                   />
 
-                  <Route path="/share/property/:token" element={<PropertyShare />} />
+                  <Route path="/share/property/:token/:slug?" element={<PropertyShare />} />
                   
                   <Route
                     path="/reservations"

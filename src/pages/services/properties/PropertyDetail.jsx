@@ -126,6 +126,16 @@ function PropertyDetail() {
   // Current translations
   const t = translations[language];
 
+  const slugifyForShareUrl = (value) => {
+    const safeValue = String(value || 'property').trim().toLowerCase();
+    const normalized = safeValue
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    return normalized || 'property';
+  };
+
   const buildSharePayload = (propertyData) => ({
     public: true,
     propertyId: propertyData.id,
@@ -176,7 +186,8 @@ function PropertyDetail() {
         const docRef = await addDoc(sharesRef, { ...payload, createdAt: new Date() });
         shareId = docRef.id;
       }
-      const shareUrl = `${window.location.origin}/share/property/${shareId}`;
+      const shareSlug = slugifyForShareUrl(property.title || property.type || 'property');
+      const shareUrl = `${window.location.origin}/share/property/${shareId}/${shareSlug}`;
       setShareLink(shareUrl);
       try {
         await navigator.clipboard.writeText(shareUrl);

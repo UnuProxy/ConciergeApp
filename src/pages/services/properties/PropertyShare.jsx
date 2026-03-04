@@ -151,7 +151,7 @@ const PropertyShare = () => {
                   key={`${img}-${idx}`}
                   type="button"
                   onClick={() => setActiveIndex(idx)}
-                  className={`h-16 w-24 sm:h-20 sm:w-28 rounded-2xl overflow-hidden border transition ${
+                  className={`shrink-0 h-20 w-28 sm:h-24 sm:w-36 rounded-2xl overflow-hidden border transition ${
                     idx === activeIndex ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-white/70 hover:border-emerald-300'
                   }`}
                 >
