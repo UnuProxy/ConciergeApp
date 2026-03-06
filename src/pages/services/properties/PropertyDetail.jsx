@@ -76,6 +76,11 @@ function PropertyDetail() {
       contactAboutProperty: 'Contactează despre Proprietate',
       scheduleViewing: 'Programează o Vizionare',
       shareProperty: 'Distribuie Proprietatea',
+      openLink: 'Deschide linkul',
+      copyLink: 'Copiază linkul',
+      linkCopied: 'Link copiat',
+      linkCopyFailed: 'Nu s-a putut copia linkul',
+      linkShared: 'Link distribuit',
       ownerDetails: 'Detalii proprietar',
       phone: 'Telefon',
       email: 'Email',
@@ -114,6 +119,11 @@ function PropertyDetail() {
       contactAboutProperty: 'Contact About Property',
       scheduleViewing: 'Schedule Viewing',
       shareProperty: 'Share Property',
+      openLink: 'Open link',
+      copyLink: 'Copy link',
+      linkCopied: 'Link copied',
+      linkCopyFailed: 'Could not copy link',
+      linkShared: 'Link shared',
       ownerDetails: 'Owner Details',
       phone: 'Phone',
       email: 'Email',
@@ -159,6 +169,36 @@ function PropertyDetail() {
     updatedAt: new Date()
   });
 
+  const copyTextWithFallback = async (text) => {
+    if (!text) return false;
+    if (navigator?.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (error) {
+        console.warn('Clipboard API copy failed, falling back to execCommand.', error);
+      }
+    }
+
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.setAttribute('readonly', '');
+      textArea.style.position = 'fixed';
+      textArea.style.top = '-9999px';
+      textArea.style.left = '-9999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const copied = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return copied;
+    } catch (error) {
+      console.error('Fallback copy failed:', error);
+      return false;
+    }
+  };
+
   const handleShareProperty = async () => {
     if (!property || !db?.firestore || !db?.companyId) return;
     setShareLoading(true);
@@ -189,11 +229,27 @@ function PropertyDetail() {
       const shareSlug = slugifyForShareUrl(property.title || property.type || 'property');
       const shareUrl = `${window.location.origin}/share/property/${shareId}/${shareSlug}`;
       setShareLink(shareUrl);
+
+      if (navigator?.share) {
+        try {
+          await navigator.share({
+            title: property.title || 'Property',
+            text: property.title || undefined,
+            url: shareUrl
+          });
+          showNotice(t.linkShared);
+          return;
+        } catch (shareError) {
+          if (shareError?.name === 'AbortError') return;
+          console.warn('Native share failed, falling back to copy.', shareError);
+        }
+      }
+
       try {
-        await navigator.clipboard.writeText(shareUrl);
-        showNotice(language === 'ro' ? 'Link copiat' : 'Link copied');
+        const copied = await copyTextWithFallback(shareUrl);
+        showNotice(copied ? t.linkCopied : t.linkCopyFailed);
       } catch {
-        showNotice(shareUrl);
+        showNotice(t.linkCopyFailed);
       }
     } catch (err) {
       console.error('Error creating share link:', err);
@@ -201,6 +257,13 @@ function PropertyDetail() {
     } finally {
       setShareLoading(false);
     }
+  };
+
+  const handleCopyShareLink = async () => {
+    if (!shareLink) return;
+    const copied = await copyTextWithFallback(shareLink);
+    setShareNotice(copied ? t.linkCopied : t.linkCopyFailed);
+    setTimeout(() => setShareNotice(''), 4000);
   };
   
   useEffect(() => {
@@ -798,14 +861,33 @@ function PropertyDetail() {
                 <div className="mt-2 text-xs text-emerald-600">{shareNotice}</div>
               )}
               {shareLink && (
-                <a
-                  href={shareLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-2 inline-flex text-xs font-semibold text-teal-700 underline"
-                >
-                  {language === 'ro' ? 'Deschide linkul' : 'Open link'}
-                </a>
+                <div className="mt-2 space-y-2">
+                  <input
+                    type="text"
+                    value={shareLink}
+                    readOnly
+                    onFocus={(event) => event.target.select()}
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700"
+                    aria-label={t.openLink}
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <a
+                      href={shareLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-center rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-700"
+                    >
+                      {t.openLink}
+                    </a>
+                    <button
+                      type="button"
+                      className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+                      onClick={handleCopyShareLink}
+                    >
+                      {t.copyLink}
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>
