@@ -3166,6 +3166,10 @@ const UpcomingBookings = () => {
     },
     [filteredClients, timeFilter, dateFilterStart, dateFilterEnd]
   );
+  const visibleClientCount = useMemo(
+    () => new Set(filteredClients.map((client) => client.baseClientId || client.clientId)).size,
+    [filteredClients]
+  );
   
   const todayLabel = useMemo(() => {
     try {
@@ -3845,8 +3849,6 @@ useEffect(() => {
   // Filter clients based on time and search filters
   function getFilteredClients() {
     const today = getTodayStart();
-    const splitUpcoming = timeFilter === 'upcoming';
-    
     // Custom date filter function
     const getBookingsForDateRange = (client) => {
       if (!dateFilterStart && !dateFilterEnd) return client.bookings || [];
@@ -3887,7 +3889,8 @@ useEffect(() => {
       );
     };
     
-    const buildFilteredClient = (client, bookingsForFilter) => {
+    const buildFilteredClient = (client, bookingsForFilter, options = {}) => {
+      const bookingIds = bookingsForFilter.map((booking) => booking?.id).filter(Boolean);
       const filteredServices = [];
       bookingsForFilter.forEach(booking => {
         if (Array.isArray(booking.services)) {
@@ -3914,8 +3917,18 @@ useEffect(() => {
 
       return {
         ...client,
+        cardId: options.cardId || client.cardId || client.clientId,
+        baseClientId: client.baseClientId || client.clientId,
+        focusBookingId: options.focusBookingId || client.focusBookingId || bookingIds[0] || null,
         bookings: bookingsForFilter,
         services: filteredServices,
+        paymentHistory: Array.isArray(client.paymentHistory)
+          ? client.paymentHistory.filter((payment) => {
+              if (!bookingIds.length) return true;
+              if (!payment?.bookingId) return true;
+              return bookingIds.includes(payment.bookingId);
+            })
+          : client.paymentHistory,
         totalValue,
         paidAmount,
         dueAmount,
@@ -3951,18 +3964,13 @@ useEffect(() => {
         results.push(filteredClient);
       };
 
-      if (splitUpcoming) {
-        bookingsForFilter.forEach((booking, bookingIdx) => {
-          const singleClient = buildFilteredClient(client, [booking]);
-          singleClient.clientId = `${client.clientId}-${booking.id || bookingIdx}`;
-          singleClient.baseClientId = client.clientId;
-          singleClient.focusBookingId = booking.id || null;
-          addFilteredClient(singleClient);
+      bookingsForFilter.forEach((booking, bookingIdx) => {
+        const singleClient = buildFilteredClient(client, [booking], {
+          cardId: `${client.clientId}-${booking.id || bookingIdx}`,
+          focusBookingId: booking.id || null
         });
-      } else {
-        const filteredClient = buildFilteredClient(client, bookingsForFilter);
-        addFilteredClient(filteredClient);
-      }
+        addFilteredClient(singleClient);
+      });
     });
 
     return results
@@ -4414,7 +4422,7 @@ const renderMainContent = (filteredClients) => {
           !hasUnlockedBooking(client.bookings);
         return (
           <ClientCard 
-            key={client.clientId} 
+            key={client.cardId || `${client.clientId}-${client.focusBookingId || 'card'}`} 
             client={client} 
             timeFilter={timeFilter}
             disableServiceActions={disableServiceActions}
@@ -6175,7 +6183,7 @@ async function handleShoppingFormSubmit(shoppingExpense) {
 
         <div className="booking-filters__info">
           <span>{t.found} <strong>{visibleBookingCount}</strong> {t.bookings}</span>
-          <span className="text-sm text-gray-500">({filteredClients.length} {t.clients})</span>
+          <span className="text-sm text-gray-500">({visibleClientCount} {t.clients})</span>
           {searchQuery && <span>{t.matching} "{searchQuery}"</span>}
         </div>
       </section>
